@@ -1,0 +1,1 @@
+Fix ballast ratio in Borgelt NMEA sentence
