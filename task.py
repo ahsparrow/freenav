@@ -12,6 +12,7 @@ class TaskApp:
         self.lambert = projection.Lambert(*self.task_db.get_projection())
 
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        self.window.set_title('Task')
         self.window.set_border_width(3)
         self.window.connect('destroy', gtk.main_quit)
         self.window.connect('delete_event', self.quit)

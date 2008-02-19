@@ -56,7 +56,7 @@ class Logger:
                 self.f.write(HEADER_STR % (PILOT, GLIDER_TYPE, GLIDER_ID))
 
                 # Write the I record (B record extension for TAS and GSP)
-                self.f.write('I023640GSP4145TAS\r\n')
+                self.f.write('I033638GSP3941TAS4244TRT\r\n')
 
                 self.state = LOG
             except IOError:
@@ -69,7 +69,7 @@ class Logger:
         if self.state == LOG:
             self.f.close()
 
-    def log(self, utc_str, lat, lon, alt, ground_speed, air_speed):
+    def log(self, utc_str, lat, lon, alt, ground_speed, air_speed, track):
         if self.state == CLOSED:
             return
 
@@ -95,8 +95,9 @@ class Logger:
             alt_str = '%05d' % alt
             fields.append(alt_str)
             fields.append(alt_str)
-            fields.append('%04d' % (ground_speed*10))
-            fields.append('%04d' % (air_speed*10))
+            fields.append('%03d' % ground_speed)
+            fields.append('%03d' % air_speed)
+            fields.append('%03d' % track)
             fields.append('\r\n')
 
             try:

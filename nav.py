@@ -53,6 +53,7 @@ class Nav:
         self.ground_speed = fix.speed*KTS_TO_MPS
         self.utc = utc
 
+        # Correct airspeed for airframe static errors
         air_speed = vario.air_speed*KTS_TO_MPS
         if air_speed < self.asi_cal['v1']:
             a, b = self.asi_cal['a1'], self.asi_cal['b1']

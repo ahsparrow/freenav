@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import gps
-import freedb, nav, projection, logger
+import freedb, nav, projection, logger, wind_calc
 import gtk, gobject, pango
 import getopt, math, os.path, sys, time
 import socket
@@ -15,8 +15,7 @@ POLAR_B = 0.08998
 POLAR_C = -1.560
 
 # Map scale limits (metres per pixel)
-MAX_SCALE = 200
-MIN_SCALE = 25
+SCALE = [25, 35, 50, 71, 100, 141, 200]
 
 # Log file location
 LOG_DIR = "/mnt/card/igc"
@@ -56,10 +55,11 @@ class Base:
         self.nav = nav
         self.db = db
         self.logger = logger
+        self.wind_calc = wind_calc.WindCalc()
 
         self.viewx = 0
         self.viewy = 0
-        self.view_scale = MAX_SCALE/2
+        self.view_scale = SCALE[-3]
 
         if time.localtime().tm_isdst:
             self.tz_offset = time.altzone/3600
@@ -98,9 +98,11 @@ class Base:
     def key_press(self, widget, event, *args):
         keyname = gtk.gdk.keyval_name(event.keyval)
         if keyname == 'Up':
-            self.view_scale = max(MIN_SCALE, self.view_scale/2)
+            ind = SCALE.index(self.view_scale)
+            self.view_scale = SCALE[min(len(SCALE)-1, ind+1)]
         elif keyname == 'Down':
-            self.view_scale = min(MAX_SCALE, self.view_scale*2)
+            ind = SCALE.index(self.view_scale)
+            self.view_scale = SCALE[max(0, ind-1)]
         elif keyname == 'Right':
             self.incr_waypoint()
         elif keyname == 'Left':
@@ -148,9 +150,12 @@ class Base:
 
         fix = self.gps.fix
         borgelt = self.gps.borgelt
-        self.nav.update(self.gps.utc, fix, borgelt)
         self.logger.log(self.gps.utc, fix.latitude, fix.longitude, fix.altitude,
-                        fix.speed, borgelt.air_speed)
+                        fix.speed, borgelt.air_speed, fix.track)
+
+        self.nav.update(self.gps.utc, fix, borgelt)
+        self.wind_calc.update(self.nav.ground_speed, self.nav.air_speed,
+                              self.nav.track)
 
         self.viewx = self.nav.x
         self.viewy = self.nav.y
@@ -285,7 +290,7 @@ class Base:
         pl.set_alignment(pango.ALIGN_RIGHT)
         x, y = pl.get_pixel_size()
         win.draw_layout(gc, win_width-x-27, win_height/2-y/3, pl, 
-                        background=bg)
+                        background=None)
 
         # Draw glider heading
         xc = win_width/2
@@ -307,14 +312,34 @@ class Base:
         x = math.sin(ci)
         y = -math.cos(ci)
 
-        xc = yc = 25
+        xc = win_width-24
+        yc = 23
         a, b, c = 21, 5, 13
 
         x0, y0 = x*a, y*a
         xp = [x0, -x0-y*c, -x*b, -x0+y*c]
         yp = [y0, -y0+x*c, -y*b, -y0-x*c]
         poly = [(int(x+xc+0.5), int(y+yc+0.5)) for x, y in zip(xp, yp)]
+
+        gc.line_width = 1
         win.draw_polygon(gc, True, poly)
+
+        # Draw wind speed/direction
+        x = math.sin(self.wind_calc.direction)
+        y = -math.cos(self.wind_calc.direction)
+        xc = yc = 17
+        a, b, c = 15, 3, 7
+
+        x0, y0 = x*a, y*a
+        xp = [x0, -x0-y*c, -x*b, -x0+y*c]
+        yp = [y0, -y0+x*c, -y*b, -y0-x*c]
+        poly = [(int(x+xc+0.5), int(y+yc+0.5)) for x, y in zip(xp, yp)]
+
+        win.draw_polygon(gc, False, poly)
+
+        pl.set_markup('<big><b>%d</b></big>' % self.wind_calc.speed)
+        x, y = pl.get_pixel_size()
+        win.draw_layout(gc, xc-x/2, yc+a+3, pl, background=None)
 
         return True
 
