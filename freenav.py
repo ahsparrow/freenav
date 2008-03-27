@@ -108,9 +108,9 @@ class Base:
         elif keyname == 'Left':
             self.decr_waypoint()
         elif keyname == 'XF86Calendar' or keyname == 'Page_Down':
-            self.nav.set_headwind(self.nav.headwind-nav.KTS_TO_MPS)
+            self.nav.set_headwind(self.nav.headwind-2*nav.KTS_TO_MPS)
         elif keyname == 'telephone' or keyname == 'Page_Up':
-            self.nav.set_headwind(self.nav.headwind+nav.KTS_TO_MPS)
+            self.nav.set_headwind(self.nav.headwind+2*nav.KTS_TO_MPS)
         elif keyname == 'XF86Start' or  keyname == 'q':
             gtk.main_quit()
 
