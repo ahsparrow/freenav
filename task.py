@@ -37,6 +37,7 @@ class TaskApp:
         wp_view.append_column(col2)
         wp_window = gtk.ScrolledWindow()
         wp_window.add(wp_view)
+        wp_view.connect('row-activated', self.wp_activated, wp_store)
 
         # Create task list
         self.task_saved = True
@@ -53,6 +54,7 @@ class TaskApp:
         task_view.set_headers_visible(False)
         task_view.set_reorderable(True)
         task_view.append_column(col)
+        task_view.connect('row-activated', self.wp_activated, self.task_store)
 
         self.dist_label = gtk.Label('')
         self.dist_label.set_alignment(1, 0)
@@ -124,6 +126,15 @@ class TaskApp:
 
         self.update_distance()
         self.task_saved = False
+
+    def wp_activated(self, treeview, path, column, model):
+        id = model[path][0]
+        (name, turnpoint, comment) = self.task_db.get_waypoint_info(id)
+        msg = "%s\n%s\n%s\n%s" % (id, name, turnpoint, comment)
+        md = gtk.MessageDialog(None, gtk.DIALOG_MODAL, gtk.MESSAGE_INFO, 
+                               gtk.BUTTONS_CLOSE, msg)
+        md.run()
+        md.destroy()
 
     def delete_wp(self, button):
         selection = self.task_view.get_selection()

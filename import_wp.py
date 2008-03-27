@@ -23,7 +23,8 @@ def importwp(db, csv_file, projection):
         x, y = projection.forward(lat, lon)
 
         db.insert_waypoint(wp['Name'], wp['ID'], int(x), int(y),
-                           int(int(wp['Elevation [Feet]'])*FT_TO_M))
+                           int(int(wp['Elevation [Feet]'])*FT_TO_M),
+                           wp['Turnpoint'], wp['Comments'])
 
 def main():
     wp_file = sys.argv[1]
