@@ -21,33 +21,61 @@ SCALE = [25, 35, 50, 71, 100, 141, 200]
 LOG_DIR = "/mnt/card/igc"
 
 class FreeflightDb(freedb.Freedb):
+    def __init__(self):
+        freedb.Freedb.__init__(self)
+        self.ref_x = 0
+        self.ref_y = 0
+        self.ref_width = 0
+        self.ref_height = 0
+
     def set_view(self, x, y, width, height):
-        self.xmin = x-width/2
-        self.xmax = x+width/2
-        self.ymin = y-height/2
-        self.ymax = y+height/2
+        if width==self.ref_width and height==self.ref_height and\
+           abs(x-self.ref_x)<width/20 and abs(y-self.ref_y)<height/20:
+            return
 
-    def view_wps(self):
+        self.ref_x = x
+        self.ref_y = y
+        self.ref_width = width
+        self.ref_height = height
+
+        xmin = x-width/2
+        xmax = x+width/2
+        ymin = y-height/2
+        ymax = y+height/2
+
         sql = 'SELECT ID, X, Y FROM Waypoint WHERE X>? AND X<? AND Y>? AND Y<?'
-        self.c.execute(sql, (self.xmin, self.xmax, self.ymin, self.ymax))
-        return self.c.fetchall()
+        self.c.execute(sql, (xmin, xmax, ymin, ymax))
+        self.wps = self.c.fetchall()
 
-    def view_bdry_lines(self, id):
-        sql = 'SELECT X1, Y1, X2, Y2 FROM Airspace_Lines WHERE Id=?'
-        self.c.execute(sql, (id,))
-        return self.c.fetchall()
-
-    def view_bdry_arcs(self, id):
-        sql = 'SELECT X, Y, Radius, Start_Angle, Arc_Length '\
-              'FROM Airspace_Arcs WHERE Id=?'
-        self.c.execute(sql, (id,))
-        return self.c.fetchall()
-
-    def view_bdry(self):
         sql = 'SELECT Id, Name, X_Min, Y_Min, X_Max, Y_Max FROM Airspace_Par '\
               'WHERE ?<X_Max AND ?>X_Min AND ?<Y_Max AND ?>Y_Min'
-        self.c.execute(sql, (self.xmin, self.xmax, self.ymin, self.ymax))
-        return self.c.fetchall()
+        self.c.execute(sql, (xmin, xmax, ymin, ymax))
+        self.bdrys = self.c.fetchall()
+
+        self.bdry_lines = {}
+        self.bdry_arcs = {}
+        for bdry in self.bdrys:
+            id = bdry[0]
+            sql = 'SELECT X1, Y1, X2, Y2 FROM Airspace_Lines WHERE Id=?'
+            self.c.execute(sql, (id,))
+            self.bdry_lines[id] = self.c.fetchall()
+
+            sql = 'SELECT X, Y, Radius, Start_Angle, Arc_Length '\
+                  'FROM Airspace_Arcs WHERE Id=?'
+            self.c.execute(sql, (id,))
+            self.bdry_arcs[id] = self.c.fetchall()
+
+    def view_wps(self):
+        return self.wps
+
+    def view_bdry(self):
+        return self.bdrys
+
+    def view_bdry_lines(self, id):
+        return self.bdry_lines[id]
+
+    def view_bdry_arcs(self, id):
+        return self.bdry_arcs[id]
 
 class Base:
     def __init__(self, gps, nav, db, logger, fullscreen):
