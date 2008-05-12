@@ -9,7 +9,7 @@ import freedb, projection
 import math, sys
 import getopt
 
-MAX_LEVEL = 5000
+MAX_LEVEL = 7000
 NM_TO_M = 1852
 
 # Airspace processor to generate data for navplot
