@@ -204,7 +204,7 @@ class Base:
         win = area.window
         gc = win.new_gc()
         pl = pango.Layout(self.area.create_pango_context())
-        font_description = pango.FontDescription('sans normal 9')
+        font_description = pango.FontDescription('sans normal 10')
         pl.set_font_description(font_description)
 
         win_width, win_height = self.window.get_size()
