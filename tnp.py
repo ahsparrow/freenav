@@ -1,13 +1,11 @@
 #!/usr/bin/env python
-#
-# Extract airspace data from Tim Newport-Peace format file
-#
+"""Extract airspace data from Tim Newport-Peace format file."""
 import math
 from simpleparse.parser import Parser
 from latlon import Latitude, Longitude
 
 # EBNF grammar for TNP airspace format
-decl = r'''
+decl = r"""
 >file<          := (comment/nullline/exclude_block/include_yes/airspace/
                     airtype/class/end)*
 airspace        := title,header,body
@@ -69,7 +67,7 @@ unknown         :='X'/ts
 <digit>         := [0-9]
 <letter>        := [A-Za-z]
 <newline>       := '\n'/'\r\n'
-'''
+"""
 
 #------------------------------------------------------------------------------
 # Airspace component classes
@@ -142,13 +140,16 @@ class Unlimited(Vertitude):
 #------------------------------------------------------------------------------
 # TNP parsing class
 class TnpProcessor:
+    """Splits airspace into list of segments and class "virtual"
+       add_airspace method. This class should be sub-classed with an
+       application specific add_airspace method.
+
+    """
     def __init__(self, data):
         self.data = data
 
-    # Splits airspace into lists of segments and calls "virtual" add_airspace
-    # method. The class should be sub-classed with an application specific
-    # add_airspace method
     def process(self, production):
+        """Process data from simpleparse and call add_airspace method."""
         if production:
             for tag, beg, end, parts in production:
                 if tag == 'airspace':
