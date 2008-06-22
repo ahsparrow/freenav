@@ -2,14 +2,18 @@
 #
 # Extract airspace data from Tim Newport-Peace format file
 #
+import math
+from simpleparse.parser import Parser
+from latlon import Latitude, Longitude
 
+# EBNF grammar for TNP airspace format
 decl = r'''
 >file<          := (comment/nullline/exclude_block/include_yes/airspace/
                     airtype/class/end)*
-airspace        := title,body
+airspace        := title,header,body
 title           := 'TITLE',eq,title_val,eol
->body<          := (comment/nullline/include_yes/statement)*
->statement<     := point/circle/cw_arc/ccw_arc/airtype/base/tops/class/active
+>header<        := (comment/nullline/class/airtype/base/tops/active)*
+>body<          := (comment/nullline/point/circle/cw_arc/ccw_arc)*
 <exclude_block> := include_no, -include_yes*, include_yes
 <end>           := 'END',ts,eol*
 
@@ -33,59 +37,58 @@ latitude        := ('N'/'S'),digit,digit,digit,digit,digit,digit
 longitude       := ('W'/'E'),digit,digit,digit,digit,digit,digit,digit
 flight_level    := 'FL',digit+
 altitude        := digit+,'ALT'
-height          := (digit+,'AAL')/(digit+,'AGL')/'SFC'
+height          := (digit+,'AGL')/'SFC'
 unlimited       := 'UNLTD'
-title_val       := (letter/'*'),-[#\n]*
-airtype_val     := [A-Z/]*
+title_val       := ('*',letter)/letter,-[#\n]*
+airtype_val     := ctr/airways/restricted/prohibited/danger/other/training/
+                   info/gsec/matz/tmz/boundary/unknown
 class_val       := [A-GX]
 active_val      := [A-Z]*
 
+ctr             :='CTA/CTR'/'CTR'/'C'
+airways         :='AIRWAYS'/'A'
+restricted      :='RESTRICTED'/'R'
+prohibited      :='PROHIBITED'/'P'
+danger          :='DANGER'/'D'
+other           :='OTHER'/'O'
+training        :='TRAINING ZONE'/'Z'
+info            :='TRAFFIC INFO'/'I'
+gsec            :='GSEC'/'G'
+matz            :='MATZ'/'M'
+tmz             :='TMZ'/'T'
+boundary        :='BOUNDARY'/'B'
+unknown         :='X'/ts
+
 <eol>           := (ts,comment)/nullline
-<include_yes>   := 'INCLUDE',eq,'YES',ts,'\n'
-<include_no>    := 'INCLUDE',eq,'NO',ts,'\n'
-<comment>       := '#',-'\n'*,'\n'
-<nullline>      := ts,'\n'
+<include_yes>   := 'INCLUDE',eq,'YES',ts,newline
+<include_no>    := 'INCLUDE',eq,'NO',ts,newline
+<comment>       := '#',-newline*,newline
+<nullline>      := ts,newline
 <eq>            := ts,'=',ts
 <ts>            := [ \t]*
 <digit>         := [0-9]
 <letter>        := [A-Za-z]
+<newline>       := '\n'/'\r\n'
 '''
 
-from simpleparse.parser import Parser
-import math
-
-LEVEL_UNLIMITED = 50000
-
-# Returns (initial) course from point1 to point2, degrees relative to North
-# Return value will be in the range +/- 180 degrees
-def tc(lat1, lon1, lat2, lon2):
-    lat1 = math.radians(lat1)
-    lon1 = math.radians(lon1)
-    lat2 = math.radians(lat2)
-    lon2 = math.radians(lon2)
-    d1 = math.sin(lon2-lon1)*math.cos(lat2)
-    d2 = math.cos(lat1)*math.sin(lat2)-\
-         math.sin(lat1)*math.cos(lat2)*math.cos(lon2-lon1)
-    return math.degrees(math.atan2(d1, d2))
+#------------------------------------------------------------------------------
+# Airspace component classes
 
 class Point:
-    def __init__(self, lat, lon):
-        self.lat = lat
-        self.lon = lon
+    def __init__(self, lat_str, lon_str):
+        self.lat = Latitude(lat_str)
+        self.lon = Longitude(lon_str)
 
 class Circle:
-    def __init__(self, lat, lon, radius):
-        self.lat = lat
-        self.lon = lon
-        self.radius = radius
+    def __init__(self, lat_str, lon_str, radius):
+        self.centre = Point(lat_str, lon_str) 
+        self.radius = float(radius)
 
 class Arc:
-    def __init__(self, lat, lon, clat, clon, radius):
-        self.lat = lat
-        self.lon = lon
-        self.clat = clat
-        self.clon = clon
-        self.radius = radius
+    def __init__(self, lat_str, lon_str, clat_str, clon_str, radius):
+        self.end = Point(lat_str, lon_str)
+        self.centre = Point(clat_str, clon_str)
+        self.radius = float(radius)
 
 class CcwArc(Arc):
     pass
@@ -93,6 +96,51 @@ class CcwArc(Arc):
 class CwArc(Arc):
     pass
 
+#------------------------------------------------------------------------------
+# Height classes
+class Vertitude:
+    def __str__(self):
+        return self.fmt_str % self.level
+
+    def __int__(self):
+        return self.level
+
+class FlightLevel(Vertitude):
+    def __init__(self, fl_str):
+        self.level = int(fl_str[2:])
+        self.fmt_str = "FL%03d"
+
+    def __int__(self):
+        return self.level * 100
+
+class Height(Vertitude):
+    def __init__(self, height_str):
+        if height_str=="SFC":
+            self.level = 0
+        else:
+            self.level = int(height_str[:-3])
+        self.fmt_str = "%dAGL"
+
+    def __str__(self):
+        if self.level==0:
+            return "SFC"
+        else:
+            return Vertitude.__str__(self)
+
+class Altitude(Vertitude):
+    def __init__(self, altitude):
+        self.level = int(altitude[:-3])
+        self.fmt_str = "%dALT"
+
+class Unlimited(Vertitude):
+    def __init__(self):
+        self.fmt_str = "FL999"
+
+    def __int__(self):
+        return 99999
+
+#------------------------------------------------------------------------------
+# TNP parsing class
 class TnpProcessor:
     def __init__(self, data):
         self.data = data
@@ -110,8 +158,8 @@ class TnpProcessor:
                 self.process(parts)
 
                 if tag == 'airspace':
-                    self.add_airspace(self.title, self.airtype, self.base,
-                                      self.airlist)
+                    self.add_airspace(self.title, self.airclass, self.airtype,
+                                      self.base, self.tops, self.airlist)
                 elif tag == 'point':
                     self.airlist.append(Point(self.lat, self.lon))
                 elif tag == 'circle':
@@ -124,39 +172,31 @@ class TnpProcessor:
                                                self.clon, self.radius))
                 elif tag == 'base':
                     self.base = self.level
+                elif tag == 'tops':
+                    self.tops = self.level
                 elif tag == 'centre':
                     self.clat = self.lat
                     self.clon = self.lon
                 elif tag == 'title_val':
                     self.title = val.strip()
                 elif tag == 'latitude':
-                    self.lat =\
-                        int(val[1:3])+int(val[3:5])/60.0+int(val[5:7])/3600.0
-                    if val[0] == 'S':
-                        self.lat = -self.lat
+                    self.lat = val
                 elif tag == 'longitude':
-                    self.lon = \
-                        int(val[1:4])+int(val[4:6])/60.0+int(val[6:8])/3600.0
-                    if val[0] == 'W':
-                        self.lon = -self.lon
+                    self.lon = val
                 elif tag == 'radius_val':
-                    self.radius = float(val)
+                    self.radius = val
                 elif tag == 'unlimited':
-                    self.level = LEVEL_UNLIMITED
+                    self.level = Unlimited("FL999")
                 elif tag == 'altitude':
-                    self.level = int(val[:-3])
+                    self.level = Altitude(val)
                 elif tag == 'height':
-                    if val == 'SFC':
-                        self.level = 0
-                    else:
-                        self.level = int(val[:-3])
-                elif tag == 'height':
-                    self.level = int(val[:-3])
+                    self.level = Height(val)
                 elif tag == 'flight_level':
-                    self.level = 100*int(val[2:])
+                    self.level = FlightLevel(val)
                 elif tag == 'airtype_val':
-                    self.airtype = val.strip()
-
+                    self.airtype = parts[0][0]
+                elif tag == 'class_val':
+                    self.airclass = val
 
 if __name__ == '__main__':
     main()
