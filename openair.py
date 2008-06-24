@@ -8,8 +8,8 @@ from optparse import OptionParser
 
 import tnp
 
-open_air_colours = """* Class B
-AC B
+open_air_colours = """* Class A
+AC A
 SP 0,2,255,0,0
 SB -1,-1,-1
 * Class C
@@ -63,8 +63,7 @@ class OpenairProcessor(tnp.TnpProcessor):
         if int(base)>self.max_level:
             return
 
-        # Map TNP airspace class/type onto single Openair airspace class. Note
-        # WinPilot doesn't have class A user airspace - how crap is that?
+        # Map TNP airspace class/type onto single Openair airspace class.
         if air_type=='danger':
             openair_type = 'Q'
         elif air_type=='matz':
@@ -79,17 +78,17 @@ class OpenairProcessor(tnp.TnpProcessor):
             elif air_class == 'X':
                 openair_type = 'Q'
             elif air_class == 'A':
-                openair_type = 'B'
+                openair_type = 'A'
             elif air_class == 'D':
                 openair_type = 'D'
             else:
                 print "Unknown airspace type for "+name
                 openair_type = 'Q'
         elif air_type=='airways':
-            openair_type = 'B'
+            openair_type = 'A'
         elif air_type=='ctr':
             if air_class=='A':
-                openair_type = 'B'
+                openair_type = 'A'
             elif air_class=='D':
                 openair_type = 'D'
             elif air_class=='E':
@@ -98,6 +97,7 @@ class OpenairProcessor(tnp.TnpProcessor):
                 openair_type = 'Q'
         else:
             print "Unknown airspace type for "+name
+        # WinPilot doesn't have class A user airspace - how crap is that?
             openair_type = 'Q'
 
         self.f.write('*\n')
@@ -156,7 +156,7 @@ def main():
     # Report any syntax errors
     if not (success and next_char==len(airdata)):
         print "%s: Syntax error at line %d" % \
-            (in_filename, len(airdata[:next_char].splitlines())+1)
+            (tnp_filename, len(airdata[:next_char].splitlines())+1)
         sys.exit(1)
 
     # Process the parsed data
