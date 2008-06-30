@@ -1,11 +1,9 @@
 #!/usr/bin/env python
-"""Convert (sensibly formatted) TNP format airspace into (barking) Openair
-   format
-"""
+"""Convert (sensible) TNP format airspace into (brain-dead) Openair format."""
+
 import sys
 from simpleparse.parser import Parser
 from optparse import OptionParser
-
 import tnp
 
 open_air_colours = """* Class A
@@ -50,16 +48,16 @@ def fmt_lon(lon):
     """Return string with longitude in Openair format."""
     return "%(deg)03d:%(min)02d:%(sec)02d%(ew)s" % lon.dms()
 
-class OpenairProcessor(tnp.TnpProcessor):
+class OpenairProcessor:
     """Class to convert TNP to Openair format."""
-    def __init__(self, data, file_name, max_level):
-        tnp.TnpProcessor.__init__(self, data)
+    def __init__(self, file_name, max_level):
         self.max_level = max_level
 
         self.f = open(file_name, 'w')
         self.f.write(open_air_colours)
 
     def add_airspace(self, name, air_class, air_type, base, tops, air_list):
+    """Method called by TnpProcessor object to add an airspace region."""
         if int(base)>self.max_level:
             return
 
@@ -97,7 +95,6 @@ class OpenairProcessor(tnp.TnpProcessor):
                 openair_type = 'Q'
         else:
             print "Unknown airspace type for "+name
-        # WinPilot doesn't have class A user airspace - how crap is that?
             openair_type = 'Q'
 
         self.f.write('*\n')
@@ -149,20 +146,18 @@ def main():
         openair_filename = args[1]
 
     # Read and parse input file
-    airdata = open(tnp_filename).read()
-    parser = Parser(tnp.decl, 'file')
-    (success, parse_result, next_char) = parser.parse(airdata)
+    parser = Parser(tnp.tnp_decl, "tnp_file")
+    output_processor = OpenairProcessor(openair_filename, options.max_level)
+    tnp_processor = tnp.TnpProcessor(output_processor)
 
+    airdata = open(tnp_filename).read()
+    (success, parse_result, next_char) = parser.parse(airdata,
+                                                      processor=tnp_processor)
     # Report any syntax errors
     if not (success and next_char==len(airdata)):
-        print "%s: Syntax error at line %d" % \
+        print "%s: Syntax error at (or near) line %d" % \
             (tnp_filename, len(airdata[:next_char].splitlines())+1)
         sys.exit(1)
-
-    # Process the parsed data
-    air_processor = OpenairProcessor(airdata, openair_filename,
-                                     options.max_level)
-    air_processor.process(parse_result)
 
 if __name__ == '__main__':
     main()
