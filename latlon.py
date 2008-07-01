@@ -32,7 +32,7 @@ class Latitude(LatLon):
     def dms(self):
         """Return dict with deg, min, sec and ns."""
         deg, min, sec = self.dms_split()
-        ns = 'N' if self>0 else 'S'
+        ns = 'N' if self.val>0 else 'S'
         return {'deg': deg, 'min': min, 'sec': sec, 'ns': ns}
 
 class Longitude(LatLon):
@@ -52,6 +52,6 @@ class Longitude(LatLon):
     def dms(self):
         """Return dict with deg, min, sec and ew."""
         deg, min, sec = self.dms_split()
-        ew = ('E' if self>0 else 'W')
+        ew = 'E' if self.val>0 else 'W'
         return {'deg': deg, 'min': min, 'sec': sec, 'ew': ew}
 
