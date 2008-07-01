@@ -57,7 +57,7 @@ class OpenairProcessor:
         self.f.write(open_air_colours)
 
     def add_airspace(self, name, air_class, air_type, base, tops, air_list):
-    """Method called by TnpProcessor object to add an airspace region."""
+        """Method called by TnpProcessor object to add an airspace region."""
         if int(base)>self.max_level:
             return
 
