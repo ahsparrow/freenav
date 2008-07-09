@@ -11,9 +11,9 @@ class LatLon(object):
         deg = mins/60
         return deg, min, sec
 
-    def rad(self):
+    def radians(self):
         """Return value in radians."""
-        return val
+        return self.val
 
 class Latitude(LatLon):
     def __init__(self, a):

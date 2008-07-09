@@ -89,6 +89,8 @@ class NmeaGen:
             easting = 'W'
             lon = -lon
 
+        lat = math.degrees(lat)
+        lon = math.degrees(lon)
         lat = int(lat*60000)
         lat_deg = lat/60000
         lat_min = (lat % 60000) / 1000.0

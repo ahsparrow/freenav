@@ -45,7 +45,8 @@ class Nav:
         self.calc()
 
     def update(self, utc, fix, vario):
-        x, y = self.projection.forward(fix.latitude, fix.longitude)
+        x, y = self.projection.forward(math.radians(fix.latitude),
+                                       math.radians(fix.longitude))
         self.x = int(x)
         self.y = int(y)
         self.altitude = int(fix.altitude)

@@ -20,7 +20,7 @@ def importwp(db, csv_file, projection):
         if wp['East/West'] == 'W':
             lon = -lon
 
-        x, y = projection.forward(lat, lon)
+        x, y = projection.forward(math.radians(lat), math.radians(lon))
 
         db.insert_waypoint(wp['Name'], wp['ID'], int(x), int(y),
                            int(int(wp['Elevation [Feet]'])*FT_TO_M),

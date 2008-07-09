@@ -12,57 +12,9 @@ import getopt
 MAX_LEVEL = 7000
 NM_TO_M = 1852
 
-# Airspace processor to generate data for navplot
-class NavProcessor(tnp.TnpProcessor):
-    def add_airspace(self, name, airtype, base, airlist):
-        p = airlist[0]
-        if base<=5000:
-            print '# -b'
-            if isinstance(p, tnp.Circle):
-                rad = p.radius/60.0
-                lon_scale = math.cos(math.radians(p.lat))
-                for i in range(101):
-                    ang = 2*math.pi*i/100.0
-                    lat = p.lat + rad*math.sin(ang)
-                    lon = p.lon + rad*math.cos(ang)/lon_scale
-                    print '%f\t%f' % (lon, lat)
-            else:
-                self.add_segments(p.lat, p.lon, airlist[1:])
-
-    def add_segments(self, lat, lon, airlist):
-        print '%f\t%f' % (lon, lat)
-        if airlist:
-            p = airlist[0]
-
-            if isinstance(p, tnp.Arc):
-                radius = p.radius/60.0
-                start = tnp.tc(p.clat, p.clon, lat, lon)
-                end = tnp.tc(p.clat, p.clon, p.lat, p.lon)
-                len = end - start
-
-                # Kludge nasty 360 degree wrap-around problem
-                if isinstance(p, tnp.CwArc):
-                    if len < 0:
-                        len += 360
-                else:
-                    if len > 0:
-                        len -= 360
-
-                # Draw arc using approx 3 degree segments
-                n = int(abs(len)/3.0)
-                lon_scale = math.cos(math.radians(p.clat))
-                for i in range(n):
-                    ang = math.radians(start + i*len/n)
-                    lat = p.clat + radius*math.cos(ang)
-                    lon = p.clon + radius*math.sin(ang)/lon_scale
-                    print '%f\t%f' % (lon, lat)
-
-            self.add_segments(p.lat, p.lon, airlist[1:])
-
 # Airspace processor to generate data for freenav
-class AirProcessor(tnp.TnpProcessor):
-    def __init__(self, data, db, projection):
-        tnp.TnpProcessor.__init__(self, data)
+class AirProcessor():
+    def __init__(self, db, projection):
         self.db = db
         self.projection = projection
         self.id = 0
@@ -70,14 +22,18 @@ class AirProcessor(tnp.TnpProcessor):
     def add_segments(self, id, x, y, airlist):
         if airlist:
             p = airlist[0]
-            x1, y1 = self.projection.forward(p.lat, p.lon)
 
             if isinstance(p, tnp.Point):
+                x1, y1 = self.projection.forward(p.lat.radians(),
+                                                 p.lon.radians())
                 self.db.insert_airspace_line(id, x1, y1, x, y)
                 xmin, ymin, xmax, ymax = \
                         min(x, x1), min(y, y1), max(x, x1), max(y, y1)
             elif isinstance(p, tnp.Arc):
-                xc, yc, = self.projection.forward(p.clat, p.clon)
+                x1, y1 = self.projection.forward(p.end.lat.radians(),
+                                                 p.end.lon.radians())
+                xc, yc, = self.projection.forward(p.centre.lat.radians(),
+                                                  p.centre.lon.radians())
                 radius = p.radius*NM_TO_M
                 start = math.degrees(math.atan2(y-yc, x-xc))
                 end = math.degrees(math.atan2(y1-yc, x1-xc))
@@ -98,20 +54,23 @@ class AirProcessor(tnp.TnpProcessor):
         else:
             return x, y, x, y
 
-    def add_airspace(self, name, airtype, base, airlist):
-        if base <= MAX_LEVEL:
+    def add_airspace(self, name, airclass, airtype, base, tops, airlist):
+        print name
+        if int(base) <= MAX_LEVEL:
             self.id += 1
             id = 'A'+str(self.id)
             p = airlist[0]
 
-            x, y = self.projection.forward(p.lat, p.lon)
             if isinstance(p, tnp.Circle):
+                x, y = self.projection.forward(p.centre.lat.radians(),
+                                               p.centre.lon.radians())
                 radius = p.radius*NM_TO_M
                 self.db.insert_airspace_circle(id, x, y, radius)
                 xmin, ymin, xmax, ymax = x-radius, y-radius, x+radius, y+radius
             else:
+                x, y = self.projection.forward(p.lat.radians(), p.lon.radians())
                 xmin, ymin, xmax, ymax = \
-                    self.add_segments(id, x, y, self.airlist[1:])
+                    self.add_segments(id, x, y, airlist[1:])
             self.db.insert_airspace_parent(id, name, xmin, ymin, xmax, ymax)
 
 def usage():
@@ -143,28 +102,31 @@ def main():
     else:
         filename = args[0]
 
-    airdata = file(filename).read()
+    # Initialise data base
+    db = freedb.Freedb()
+    db.delete_airspace()
 
-    parser = Parser(tnp.decl, 'file')
-    success, parse_result, next_char = parser.parse(airdata)
-    assert success and next_char==len(airdata),\
-        "Error - next char is %d" % next_char
+    # Initialise parser
+    parser = Parser(tnp.tnp_decl, 'tnp_file')
+    proj = projection.Lambert(*db.get_projection())
+    output_processor = AirProcessor(db, proj)
+    tnp_processor = tnp.TnpProcessor(output_processor)
 
-    if not navFlag:
-        db = freedb.Freedb()
-        db.delete_airspace()
+    # Read data and parse
+    airdata = open(filename).read()
+    success, parse_result, next_char = parser.parse(airdata,
+                                                    processor=tnp_processor)
 
-        air_processor = AirProcessor(airdata, db,
-                                     projection.Lambert(*db.get_projection()))
-        air_processor.process(parse_result)
+    # Report any syntax errors
+    if not (success and next_char==len(airdata)):
+        print "%s: Syntax error at (or near) line %d" % \
+            (tnp_filename, len(airdata[:next_char].splitlines())+1)
+        sys.exit(1)
 
-        db.create_airspace_indices()
-        db.commit()
-        db.vacuum()
-    else:
-        air_processor = NavProcessor(airdata)
-        air_processor.process(parse_result)
-
+    # Create indices and tidy up
+    db.create_airspace_indices()
+    db.commit()
+    db.vacuum()
 
 if __name__ == '__main__':
     main()

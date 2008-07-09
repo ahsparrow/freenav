@@ -6,10 +6,10 @@
 from pysqlite2 import dbapi2 as sqlite
 import math, os
 
-PARALLEL1 = 49
-PARALLEL2 = 55
-REF_LAT = 52
-REF_LON = 0
+PARALLEL1 = math.radians(49)
+PARALLEL2 = math.radians(55)
+REF_LAT = math.radians(52)
+REF_LON = math.radians(0)
 
 class Freedb:
     def __init__(self, file=''):
