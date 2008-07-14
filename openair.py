@@ -6,7 +6,9 @@ from simpleparse.parser import Parser
 from optparse import OptionParser
 import tnp
 
-open_air_colours = """* Class A
+open_air_colours = """* Airspace colours
+*
+* Class A
 AC A
 SP 0,2,255,0,0
 SB -1,-1,-1
@@ -42,6 +44,7 @@ SB -1,-1,-1
 AC W
 SP 0,1,128,128,128
 SB -1,-1,-1
+*
 """
 
 def fmt_lat(lat):
@@ -58,7 +61,11 @@ class OpenairProcessor:
         self.max_level = max_level
 
         self.f = open(file_name, 'w')
+        self.f.write("*\n* Auto-generated from TNP file by openair.py\n*\n")
         self.f.write(open_air_colours)
+
+    def add_comment(self, comment):
+        self.f.write("*%s\n" % comment)
 
     def add_airspace(self, name, air_class, air_type, base, tops, air_list):
         """Method called by TnpProcessor object to add an airspace region."""
