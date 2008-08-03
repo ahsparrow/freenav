@@ -35,7 +35,8 @@ class Nav:
         self.glide_margin = 0
         self.arrival_height = 0
 
-    def set_dest(self, x, y, altitude):
+    def set_dest(self, name, x, y, altitude):
+        self.tp_name = name
         self.tpx = x
         self.tpy = y
         self.tp_altitude = altitude

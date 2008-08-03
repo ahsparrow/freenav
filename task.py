@@ -174,8 +174,8 @@ class TaskApp:
         if len(task) <= 1:
             return 0
         else:
-            name, x1, y1 = self.task_db.get_waypoint(task[0])
-            name, x2, y2 = self.task_db.get_waypoint(task[1])
+            x1, y1, alt = self.task_db.get_waypoint(task[0])
+            x2, y2, alt = self.task_db.get_waypoint(task[1])
             dist = self.lambert.dist(x1, y1, x2, y2) + \
                 self.calc_distance(task[1:])
             return dist

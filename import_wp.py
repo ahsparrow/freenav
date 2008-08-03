@@ -22,9 +22,15 @@ def importwp(db, csv_file, projection):
 
         x, y = projection.forward(math.radians(lat), math.radians(lon))
 
+        control_p = wp['Control P']
+        if set(control_p).intersection("ADHLYyZz"):
+            landable_flag = 1
+        else:
+            landable_flag = 0
+
         db.insert_waypoint(wp['Name'], wp['ID'], int(x), int(y),
                            int(int(wp['Elevation [Feet]'])*FT_TO_M),
-                           wp['Turnpoint'], wp['Comments'])
+                           wp['Turnpoint'], wp['Comments'], landable_flag)
 
 def main():
     wp_file = sys.argv[1]

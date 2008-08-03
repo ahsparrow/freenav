@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-import gps
-import freedb, nav, projection, logger, wind_calc
-import gtk, gobject, pango
 import getopt, math, os.path, sys, time
 import socket
+import gtk, gobject, pango
+import gps
+import nav, projection, logger, wind_calc, freenavdb
 
 M_TO_FT = 1/0.3048
 MPS_TO_KTS = 1/nav.KTS_TO_MPS
@@ -19,63 +19,6 @@ SCALE = [25, 35, 50, 71, 100, 141, 200]
 
 # Log file location
 LOG_DIR = "/mnt/card/igc"
-
-class FreeflightDb(freedb.Freedb):
-    def __init__(self):
-        freedb.Freedb.__init__(self)
-        self.ref_x = 0
-        self.ref_y = 0
-        self.ref_width = 0
-        self.ref_height = 0
-
-    def set_view(self, x, y, width, height):
-        if width==self.ref_width and height==self.ref_height and\
-           abs(x-self.ref_x)<width/20 and abs(y-self.ref_y)<height/20:
-            return
-
-        self.ref_x = x
-        self.ref_y = y
-        self.ref_width = width
-        self.ref_height = height
-
-        xmin = x-width/2
-        xmax = x+width/2
-        ymin = y-height/2
-        ymax = y+height/2
-
-        sql = 'SELECT ID, X, Y FROM Waypoint WHERE X>? AND X<? AND Y>? AND Y<?'
-        self.c.execute(sql, (xmin, xmax, ymin, ymax))
-        self.wps = self.c.fetchall()
-
-        sql = 'SELECT Id, Name, X_Min, Y_Min, X_Max, Y_Max FROM Airspace_Par '\
-              'WHERE ?<X_Max AND ?>X_Min AND ?<Y_Max AND ?>Y_Min'
-        self.c.execute(sql, (xmin, xmax, ymin, ymax))
-        self.bdrys = self.c.fetchall()
-
-        self.bdry_lines = {}
-        self.bdry_arcs = {}
-        for bdry in self.bdrys:
-            id = bdry[0]
-            sql = 'SELECT X1, Y1, X2, Y2 FROM Airspace_Lines WHERE Id=?'
-            self.c.execute(sql, (id,))
-            self.bdry_lines[id] = self.c.fetchall()
-
-            sql = 'SELECT X, Y, Radius, Start_Angle, Arc_Length '\
-                  'FROM Airspace_Arcs WHERE Id=?'
-            self.c.execute(sql, (id,))
-            self.bdry_arcs[id] = self.c.fetchall()
-
-    def view_wps(self):
-        return self.wps
-
-    def view_bdry(self):
-        return self.bdrys
-
-    def view_bdry_lines(self, id):
-        return self.bdry_lines[id]
-
-    def view_bdry_arcs(self, id):
-        return self.bdry_arcs[id]
 
 class Base:
     def __init__(self, gps, nav, db, logger, fullscreen):
@@ -97,13 +40,15 @@ class Base:
         self.task = self.db.get_task()
         self.wp_index = 0
         wp = self.task[0]
-        self.nav.set_dest(wp[1], wp[2], wp[3])
+        self.nav.set_dest(wp[0], wp[1], wp[2], wp[3])
 
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
 
         self.area = gtk.DrawingArea()
         self.area_expose_handler_id = \
             self.area.connect('expose-event', self.area_expose)
+        self.window.add_events(gtk.gdk.BUTTON_PRESS_MASK)
+        self.window.connect('button_press_event', self.button_press)
         self.window.add(self.area)
 
         self.window.add_events(gtk.gdk.KEY_PRESS_MASK)
@@ -118,10 +63,17 @@ class Base:
         self.area.show()
         self.window.show()
 
-        self.airspace_gc = self.area.window.new_gc(line_width=2)
-        cmap = self.area.get_colormap()
-        c = cmap.alloc_color('blue')
-        self.airspace_gc.set_foreground(c)
+    def button_press(self, widget, event, *args):
+        x, y = self.win_to_view(event.x, event.y)
+        wp_id = self.db.find_landable(x, y)
+
+        if wp_id:
+            x, y, alt = self.db.get_waypoint(wp_id)
+            self.nav.set_dest(wp_id, x, y, alt)
+
+            self.window.queue_draw()
+
+        return True
 
     def key_press(self, widget, event, *args):
         keyname = gtk.gdk.keyval_name(event.keyval)
@@ -151,7 +103,7 @@ class Base:
         if wp_index>=len(self.task) or self.task[wp_index][0]==self.task[0][0]:
             wp_index = 0
         wp = self.task[wp_index]
-        self.nav.set_dest(wp[1], wp[2], wp[3])
+        self.nav.set_dest(wp[0], wp[1], wp[2], wp[3])
         self.wp_index = wp_index
 
     def decr_waypoint(self):
@@ -162,7 +114,7 @@ class Base:
             if self.task[wp_index][0]==self.task[0][0] and wp_index:
                 wp_index -= 1
         wp = self.task[wp_index]
-        self.nav.set_dest(wp[1], wp[2], wp[3])
+        self.nav.set_dest(wp[0], wp[1], wp[2], wp[3])
         self.wp_index = wp_index
 
     def timeout(self):
@@ -197,57 +149,45 @@ class Base:
 
         x1 = (x-self.viewx)*win_width/view_width+win_width/2
         y1 = win_height/2-(y-self.viewy)*win_height/view_height
-
         return x1, y1
 
-    def area_expose(self, area, event):
-        win = area.window
-        gc = win.new_gc()
-        pl = pango.Layout(self.area.create_pango_context())
-        font_description = pango.FontDescription('sans normal 10')
-        pl.set_font_description(font_description)
-
+    def win_to_view(self, x1, y1):
         win_width, win_height = self.window.get_size()
-        view_width = win_width*self.view_scale
-        view_height = win_height*self.view_scale
-        self.db.set_view(self.viewx, self.viewy, view_width, view_height)
+        view_width = win_width * self.view_scale
+        view_height = win_height * self.view_scale
 
-        # Start with a blank sheet...
-        win.draw_rectangle(self.area.get_style().white_gc, True,
-                           0, 0, win_width, win_height)
+        x = view_width * (x1 - win_width/2) / win_width + self.viewx
+        y = (win_height/2 - y1) * view_height / win_height + self.viewy
+        return x, y
 
+    def draw_airspace(self, gc, win):
         # Draw airspace lines
-        cmap = self.area.get_colormap()
-        c = cmap.alloc_color('#00F')
-        gc.set_foreground(c)
         for id in self.db.view_bdry():
             for x1, y1, x2, y2 in self.db.view_bdry_lines(id[0]):
                 x1, y1 = self.view_to_win(x1, y1)
                 x2, y2 = self.view_to_win(x2, y2)
-                win.draw_line(self.airspace_gc, x1, y1, x2, y2)
+                win.draw_line(gc, x1, y1, x2, y2)
 
             # Draw airspace arcs & circles
             for x, y, radius, start, len in self.db.view_bdry_arcs(id[0]):
                 x, y = self.view_to_win(x-radius, y+radius)
                 width = 2*radius/self.view_scale
-                win.draw_arc(self.airspace_gc, False, x, y, width, width, start, len)
+                win.draw_arc(gc, False, x, y, width, width, start, len)
 
-        # Draw task
-        c = cmap.alloc_color('#000')
-        gc.set_foreground(c)
-        gc.line_width = 1
+    def draw_task(self, gc, win):
         points = [self.view_to_win(x, y) for wp, x, y, alt in self.task]
         win.draw_polygon(gc, False, points)
 
+    def draw_waypoints(self, gc, pl, win):
         # Draw waypoints
-        for wp_id, x, y in self.db.view_wps():
+        for wp_id, x, y, landable_flag in self.db.view_wps():
             x, y = self.view_to_win(x, y)
-            win.draw_arc(gc, False, x-3, y-3, 6, 6, 0, 23040)
+            win.draw_arc(gc, landable_flag, x-3, y-3, 6, 6, 0, 23040)
 
             pl.set_markup(wp_id)
             win.draw_layout(gc, x+3, y+3, pl)
 
-        # Draw annotation
+    def draw_annotation(self, gc, pl, win, win_height, win_width):
         bg = gtk.gdk.color_parse('white')
         pl.set_markup('<big>ALT:<b>%d</b></big>' % (self.nav.altitude*M_TO_FT))
         x, y = pl.get_pixel_size()
@@ -271,7 +211,7 @@ class Base:
         if bearing < 0:
             bearing += 360
         pl.set_markup('<big><b>%s %.1f/%.0f</b></big>' % 
-            (self.task[self.wp_index][0], self.nav.dist/1000, bearing))
+            (self.nav.tp_name, self.nav.dist/1000, bearing))
         x, y = pl.get_pixel_size()
         win.draw_layout(gc, 2, win_height-row_height-y, pl, background=bg)
 
@@ -285,8 +225,8 @@ class Base:
         win.draw_layout(gc, win_width-x-3, win_height-row_height-y, pl,
                         background=bg)
 
-        # Draw final glide chevrons
-        gc.line_width = 2
+    def draw_glide(self, gc, pl, win, win_height, win_width):
+        # Draw chevrons
         y = win_height/2
         win.draw_line(gc, win_width-25, y, win_width-1, y)
 
@@ -320,7 +260,7 @@ class Base:
         win.draw_layout(gc, win_width-x-27, win_height/2-y/3, pl, 
                         background=None)
 
-        # Draw glider heading
+    def draw_heading(self, gc, win, win_height, win_width):
         xc = win_width/2
         yc = win_height/2
 
@@ -335,7 +275,7 @@ class Base:
             win.draw_line(gc, int(xc+x1+0.5), int(yc+y1+0.5),
                               int(xc+x2+0.5), int(yc+y2+0.5))
 
-        # Draw course indicator
+    def draw_course_indicator(self, gc, win, win_width):
         ci = self.nav.bearing - self.nav.track
         x = math.sin(ci)
         y = -math.cos(ci)
@@ -349,9 +289,9 @@ class Base:
         yp = [y0, -y0+x*c, -y*b, -y0-x*c]
         poly = [(int(x+xc+0.5), int(y+yc+0.5)) for x, y in zip(xp, yp)]
 
-        gc.line_width = 1
         win.draw_polygon(gc, True, poly)
 
+    def draw_wind(self, gc, win, pl):
         # Draw wind speed/direction
         x = math.sin(self.wind_calc.direction)
         y = -math.cos(self.wind_calc.direction)
@@ -368,6 +308,43 @@ class Base:
         pl.set_markup('<big><b>%d</b></big>' % self.wind_calc.speed)
         x, y = pl.get_pixel_size()
         win.draw_layout(gc, xc-x/2, yc+a+3, pl, background=None)
+
+    def area_expose(self, area, event):
+        win = area.window
+        gc = win.new_gc()
+        pl = pango.Layout(self.area.create_pango_context())
+        font_description = pango.FontDescription('sans normal 10')
+        pl.set_font_description(font_description)
+
+        win_width, win_height = self.window.get_size()
+        view_width = win_width*self.view_scale
+        view_height = win_height*self.view_scale
+        self.db.set_view(self.viewx, self.viewy, view_width, view_height)
+
+        # Start with a blank sheet...
+        win.draw_rectangle(self.area.get_style().white_gc, True,
+                           0, 0, win_width, win_height)
+
+        cmap = self.area.get_colormap()
+        color = cmap.alloc_color("blue")
+        gc.foreground = color
+        gc.line_width = 2
+        self.draw_airspace(gc, win)
+
+        color = cmap.alloc_color("black")
+        gc.foreground = color
+        gc.line_width = 1
+        self.draw_task(gc, win)
+        self.draw_waypoints(gc, pl, win)
+        self.draw_annotation(gc, pl, win, win_height, win_width)
+
+        gc.line_width = 2
+        self.draw_glide(gc, pl, win, win_height, win_width)
+        self.draw_heading(gc, win, win_height, win_width)
+
+        gc.line_width = 1
+        self.draw_course_indicator(gc, win, win_width)
+        self.draw_wind(gc, win, pl)
 
         return True
 
@@ -392,7 +369,7 @@ def main():
         elif o == '-l':
             log_dir = a
 
-    db = FreeflightDb()
+    db = freenavdb.FreenavDb()
     lambert = projection.Lambert(*db.get_projection())
 
     height_margin = 305

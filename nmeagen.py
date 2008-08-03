@@ -24,7 +24,7 @@ class NmeaGen:
     def __init__(self):
         self.db = freedb.Freedb()
         self.lambert = projection.Lambert(*self.db.get_projection())
-        name, self.x, self.y = self.db.get_waypoint('RIV')
+        self.x, self.y, alt = self.db.get_waypoint('RIV')
         self.time = time.time()
 
         self.master_fd, slave_fd = pty.openpty()

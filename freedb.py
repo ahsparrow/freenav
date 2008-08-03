@@ -36,7 +36,7 @@ class Freedb:
 
         sql = 'CREATE TABLE Waypoint '\
               '(Name TEXT, ID TEXT, X INTEGER, Y INTEGER, Altitude INTEGER, '\
-              'Turnpoint TEXT, Comment TEXT)'
+              'Turnpoint TEXT, Landable_Flag INTEGER, Comment TEXT)'
         self.c.execute(sql)
 
         sql = 'CREATE TABLE Task '\
@@ -67,11 +67,13 @@ class Freedb:
     def delete_waypoints(self):
         self.c.execute('DELETE FROM Waypoint')
 
-    def insert_waypoint(self, name, id, x, y, altitude, turnpoint, comment):
+    def insert_waypoint(self, name, id, x, y, altitude, turnpoint, comment,
+                        landable_flag):
         sql = 'INSERT INTO Waypoint '\
-              '(Name, ID, X, Y, Altitude, Turnpoint, Comment) '\
-              'VALUES (?, ?, ?, ?, ?, ?, ?)'
-        self.c.execute(sql, (name, id, x, y,altitude, turnpoint, comment))
+              '(Name, ID, X, Y, Altitude, Turnpoint, Comment, Landable_Flag) '\
+              'VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        self.c.execute(sql, (name, id, x, y,altitude, turnpoint, comment,
+                             landable_flag))
 
     def get_waypoint_list(self):
         sql = 'SELECT ID, Name FROM Waypoint ORDER BY ID'
@@ -79,7 +81,7 @@ class Freedb:
         return self.c.fetchall()
 
     def get_waypoint(self, id):
-        sql = 'SELECT Name, X, Y FROM Waypoint WHERE ID=?'
+        sql = 'SELECT X, Y, Altitude FROM Waypoint WHERE ID=?'
         self.c.execute(sql, (id,))
         return self.c.fetchone()
 
