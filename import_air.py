@@ -55,7 +55,6 @@ class AirProcessor():
             return x, y, x, y
 
     def add_airspace(self, name, airclass, airtype, base, tops, airlist):
-        print name
         if int(base) <= MAX_LEVEL:
             self.id += 1
             id = 'A'+str(self.id)
@@ -71,7 +70,8 @@ class AirProcessor():
                 x, y = self.projection.forward(p.lat.radians(), p.lon.radians())
                 xmin, ymin, xmax, ymax = \
                     self.add_segments(id, x, y, airlist[1:])
-            self.db.insert_airspace_parent(id, name, xmin, ymin, xmax, ymax)
+            self.db.insert_airspace_parent(id, name, str(base), str(tops),
+                                           xmin, ymin, xmax, ymax)
 
 def usage():
     print 'usage: import_air [options] input_file'

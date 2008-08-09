@@ -32,6 +32,8 @@ class Base:
         self.viewy = 0
         self.view_scale = SCALE[-3]
 
+        self.wp_select_flag = False
+
         if time.localtime().tm_isdst:
             self.tz_offset = time.altzone/3600
         else:
@@ -64,14 +66,50 @@ class Base:
         self.window.show()
 
     def button_press(self, widget, event, *args):
-        x, y = self.win_to_view(event.x, event.y)
-        wp_id = self.db.find_landable(x, y)
+        win_width, win_height = self.window.get_size()
 
-        if wp_id:
-            x, y, alt = self.db.get_waypoint(wp_id)
-            self.nav.set_dest(wp_id, x, y, alt)
+        # Change to WP select mode if click is in bottom left corner
+        if event.x < 60 and event.y > (win_height - 40):
+            self.wp_select_flag = True
+            self.window.queue_draw()
+            return True
+
+        x, y = self.win_to_view(event.x, event.y)
+
+        if self.wp_select_flag:
+            # Select waypoint
+            wp_id = self.db.find_landable(x, y)
+            if wp_id:
+                # Change to alternate waypoint
+                x, y, alt = self.db.get_waypoint(wp_id)
+                self.nav.set_dest(wp_id, x, y, alt)
+            else:
+                # Revert to existing task waypoint
+                wp_id, x, y, alt = self.task[self.wp_index]
+                self.nav.set_dest(wp_id, x, y, alt)
 
             self.window.queue_draw()
+            self.wp_select_flag = False
+        else:
+            # Get airspace info
+            x, y = self.win_to_view(event.x, event.y)
+            airspace_segments = self.db.get_airspace(x, y)
+
+            msgs = []
+            for seg in airspace_segments:
+                msgs.append("<big><b>%s</b>\n%s, %s</big>" % seg)
+
+            if msgs:
+                dialog = gtk.Dialog("Airspace", None,
+                                    gtk.DIALOG_MODAL | gtk.DIALOG_NO_SEPARATOR,
+                                    (gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
+                msg = "\n\n".join(msgs)
+                label = gtk.Label(msg)
+                label.set_use_markup(True)
+                dialog.vbox.pack_start(label)
+                label.show()
+                dialog.run()
+                dialog.destroy()
 
         return True
 
@@ -162,14 +200,14 @@ class Base:
 
     def draw_airspace(self, gc, win):
         # Draw airspace lines
-        for id in self.db.view_bdry():
-            for x1, y1, x2, y2 in self.db.view_bdry_lines(id[0]):
+        for bdry in self.db.view_bdry():
+            for x1, y1, x2, y2 in self.db.view_bdry_lines(bdry[0]):
                 x1, y1 = self.view_to_win(x1, y1)
                 x2, y2 = self.view_to_win(x2, y2)
                 win.draw_line(gc, x1, y1, x2, y2)
 
             # Draw airspace arcs & circles
-            for x, y, radius, start, len in self.db.view_bdry_arcs(id[0]):
+            for x, y, radius, start, len in self.db.view_bdry_arcs(bdry[0]):
                 x, y = self.view_to_win(x-radius, y+radius)
                 width = 2*radius/self.view_scale
                 win.draw_arc(gc, False, x, y, width, width, start, len)
@@ -210,8 +248,11 @@ class Base:
         bearing = math.degrees(self.nav.bearing)
         if bearing < 0:
             bearing += 360
-        pl.set_markup('<big><b>%s %.1f/%.0f</b></big>' % 
-            (self.nav.tp_name, self.nav.dist/1000, bearing))
+        if self.wp_select_flag:
+            markup = '<big><b><u>%s %.1f/%.0f</u></b></big>'
+        else:
+            markup = '<big><b>%s %.1f/%.0f</b></big>'
+        pl.set_markup(markup % (self.nav.tp_name, self.nav.dist/1000, bearing))
         x, y = pl.get_pixel_size()
         win.draw_layout(gc, 2, win_height-row_height-y, pl, background=bg)
 

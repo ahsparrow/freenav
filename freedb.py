@@ -44,7 +44,7 @@ class Freedb:
         self.c.execute(sql)
 
         sql = 'CREATE TABLE Airspace_Par '\
-              '(Id TEXT, Name TEXT, '\
+              '(Id TEXT, Name TEXT, Base TEXT, Top TEXT, '\
                'X_Min INTEGER, Y_Min INTEGER, X_Max INTEGER, Y_Max INTEGER)'
         self.c.execute(sql)
 
@@ -132,11 +132,13 @@ class Freedb:
         self.c.execute('DELETE FROM Airspace_Lines')
         self.c.execute('DELETE FROM Airspace_Arcs')
 
-    def insert_airspace_parent(self, id, name, xmin, ymin, xmax, ymax):
-        sql = 'INSERT INTO Airspace_Par (Id, Name, X_Min, Y_Min, X_Max, Y_Max) '\
-              'VALUES (?, ?, ?, ?, ?, ?)'
+    def insert_airspace_parent(self,
+                               id, name, base, top, xmin, ymin, xmax, ymax):
+        sql = 'INSERT INTO Airspace_Par '\
+              '(Id, Name, Base, Top, X_Min, Y_Min, X_Max, Y_Max) '\
+              'VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         self.c.execute(sql,
-            (id, name, int(xmin), int(ymin), int(xmax), int(ymax)))
+            (id, name, base, top, int(xmin), int(ymin), int(xmax), int(ymax)))
 
     def insert_airspace_line(self, id, x1, y1, x2, y2):
         sql = 'INSERT INTO Airspace_Lines (Id, X1, Y1, X2, Y2) '\
