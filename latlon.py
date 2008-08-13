@@ -15,6 +15,13 @@ class LatLon(object):
         """Return value in radians."""
         return self.val
 
+    def degrees(self):
+        """Return value in degrees."""
+        return math.degrees(self.val)
+
+    def __float__(self):
+        return self.val
+
 class Latitude(LatLon):
     def __init__(self, a):
         """Construct from a NDDMMSS string or a value in radians."""
