@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import getopt, math, os.path, sys, time
+import getopt, math, sys, time
 import socket
 import gtk, gobject, pango
 import gps
@@ -21,7 +21,7 @@ SCALE = [25, 35, 50, 71, 100, 141, 200]
 LOG_DIR = "/mnt/card/igc"
 
 class Base:
-    def __init__(self, gps, nav, db, logger, fullscreen):
+    def __init__(self, gps, nav, db, logger, fullscreen, invert):
         self.gps = gps
         self.nav = nav
         self.db = db
@@ -50,6 +50,16 @@ class Base:
         self.area_expose_handler_id = \
             self.area.connect('expose-event', self.area_expose)
         self.window.add_events(gtk.gdk.BUTTON_PRESS_MASK)
+
+        cmap = self.area.get_colormap()
+        self.airspace_color = cmap.alloc_color("blue")
+        if invert:
+            self.bg_color = cmap.alloc_color("black")
+            self.fg_color = cmap.alloc_color("white")
+        else:
+            self.bg_color = cmap.alloc_color("white")
+            self.fg_color = cmap.alloc_color("black")
+
         self.window.connect('button_press_event', self.button_press)
         self.window.add(self.area)
 
@@ -211,10 +221,10 @@ class Base:
                 win.draw_line(gc, x1, y1, x2, y2)
 
             # Draw airspace arcs & circles
-            for x, y, radius, start, len in self.db.view_bdry_arcs(bdry[0]):
+            for x, y, radius, start, arc_len in self.db.view_bdry_arcs(bdry[0]):
                 x, y = self.view_to_win(x-radius, y+radius)
                 width = 2*radius/self.view_scale
-                win.draw_arc(gc, False, x, y, width, width, start, len)
+                win.draw_arc(gc, False, x, y, width, width, start, arc_len)
 
     def draw_task(self, gc, win):
         points = [self.view_to_win(x, y) for wp, x, y, alt in self.task]
@@ -230,7 +240,7 @@ class Base:
             win.draw_layout(gc, x+3, y+3, pl)
 
     def draw_annotation(self, gc, pl, win, win_height, win_width):
-        bg = gtk.gdk.color_parse('white')
+        bg = self.bg_color
         pl.set_markup('<big>ALT:<b>%d</b></big>' % (self.nav.altitude*M_TO_FT))
         x, y = pl.get_pixel_size()
         win.draw_layout(gc, 2, win_height-y, pl, background=bg)
@@ -357,6 +367,7 @@ class Base:
     def area_expose(self, area, event):
         win = area.window
         gc = win.new_gc()
+
         pl = pango.Layout(self.area.create_pango_context())
         font_description = pango.FontDescription('sans normal 10')
         pl.set_font_description(font_description)
@@ -367,17 +378,14 @@ class Base:
         self.db.set_view(self.viewx, self.viewy, view_width, view_height)
 
         # Start with a blank sheet...
-        win.draw_rectangle(self.area.get_style().white_gc, True,
-                           0, 0, win_width, win_height)
+        gc.foreground = self.bg_color
+        win.draw_rectangle(gc, True, 0, 0, win_width, win_height)
 
-        cmap = self.area.get_colormap()
-        color = cmap.alloc_color("blue")
-        gc.foreground = color
+        gc.foreground = self.airspace_color
         gc.line_width = 2
         self.draw_airspace(gc, win)
 
-        color = cmap.alloc_color("black")
-        gc.foreground = color
+        gc.foreground = self.fg_color
         gc.line_width = 1
         self.draw_task(gc, win)
         self.draw_waypoints(gc, pl, win)
@@ -398,7 +406,7 @@ class Base:
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'fg:l:')
+        opts, args = getopt.getopt(sys.argv[1:], 'fg:il:')
     except getopt.GetoptError:
         print "Bad options"
         sys.exit(2)
@@ -406,11 +414,14 @@ def main():
     gpshost = 'localhost'
     fullscreen = False
     log_dir = LOG_DIR
+    invert = False
     for o, a in opts:
         if o == '-g':
             gpshost = a
         elif o == '-f':
             fullscreen = True
+        elif o == '-i':
+            invert = True
         elif o == '-l':
             log_dir = a
 
@@ -425,7 +436,7 @@ def main():
 
     log = logger.Logger(log_dir)
 
-    base = Base(gps.gps(host=gpshost), nv, db, log, fullscreen)
+    base = Base(gps.gps(host=gpshost), nv, db, log, fullscreen, invert)
     base.main()
 
 if __name__ == '__main__':
