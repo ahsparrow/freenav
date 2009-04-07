@@ -120,7 +120,7 @@ def main():
     # Report any syntax errors
     if not (success and next_char==len(airdata)):
         print "%s: Syntax error at (or near) line %d" % \
-            (tnp_filename, len(airdata[:next_char].splitlines())+1)
+            (filename, len(airdata[:next_char].splitlines())+1)
         sys.exit(1)
 
     # Create indices and tidy up
