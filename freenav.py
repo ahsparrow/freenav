@@ -18,7 +18,15 @@ POLAR_C = -1.560
 SCALE = [25, 35, 50, 71, 100, 141, 200]
 
 # Log file location
-LOG_DIR = "/mnt/card/igc"
+LOG_DIR = "/media/card/igc"
+
+def html_escape(text):
+    text = text.replace('&', '&amp;')
+    text = text.replace('"', '&quot;')
+    text = text.replace("'", '&#39;')
+    text = text.replace(">", '&gt;')
+    text = text.replace("<", '&lt;')
+    return text
 
 class Base:
     def __init__(self, gps, nav, db, logger, fullscreen, invert):
@@ -111,8 +119,8 @@ class Base:
 
             msgs = []
             for seg in airspace_segments:
-                msgs.append("<big><b>%s</b>\n%s, %s</big>" % seg)
-
+                msgs.append("<big><b>%s</b>\n%s, %s</big>" %
+                            tuple(map(html_escape, seg)))
             if msgs:
                 dialog = gtk.Dialog("Airspace", None,
                                     gtk.DIALOG_MODAL | gtk.DIALOG_NO_SEPARATOR,
