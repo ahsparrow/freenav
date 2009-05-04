@@ -235,8 +235,21 @@ class Base:
                 win.draw_arc(gc, False, x, y, width, width, start, arc_len)
 
     def draw_task(self, gc, win):
+        # Task
         points = [self.view_to_win(x, y) for wp, x, y, alt in self.task]
-        win.draw_polygon(gc, False, points)
+        win.draw_lines(gc, points)
+
+        # Start line
+        if len(self.task) > 1:
+            wps, xs, ys, alts = self.task[0]
+            wp1, x1, y1, alt1 = self.task[1]
+
+            bearing = math.atan2(x1 - xs, y1 - ys) + math.pi/2
+            dx = int(3000 * math.sin(bearing))
+            dy = int(3000 * math.cos(bearing))
+            p1 = self.view_to_win(xs - dx, ys - dy)
+            p2 = self.view_to_win(xs + dx, ys + dy)
+            win.draw_lines(gc, [p1, p2])
 
     def draw_waypoints(self, gc, pl, win):
         # Draw waypoints
