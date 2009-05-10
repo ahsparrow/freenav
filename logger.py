@@ -69,7 +69,7 @@ class Logger:
         if self.state == LOG:
             self.f.close()
 
-    def log(self, utc_str, lat, lon, alt, ground_speed, air_speed, track):
+    def log(self, utc, lat, lon, alt, ground_speed, air_speed, track):
         if self.state == CLOSED:
             return
 
@@ -78,9 +78,7 @@ class Logger:
 
         if self.state == LOG:
             fields = ['B']
-            fields.append(utc_str[11:13])
-            fields.append(utc_str[14:16])
-            fields.append(utc_str[17:19])
+            fields.append("%02d%02d%02d" % (utc.tm_hour, utc.tm_min, utc.tm_sec))
             fields.append('%02d%02d%03d' % self.latlon_to_dmm(lat))
             if lat < 0:
                 fields.append('S')

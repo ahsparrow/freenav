@@ -29,7 +29,7 @@ class Nav:
         self.track = 0
         self.ground_speed = 0
         self.air_speed = 0
-        self.utc = ''
+        self.utc = ()
         self.bearing = 0
         self.ete = 0
         self.glide_margin = 0

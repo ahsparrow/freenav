@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 
-import getopt, math, sys, time
+import getopt
+import math
 import socket
+import sys
+import time
 import gtk, gobject, pango
 import gps
 import nav, projection, logger, wind_calc, freenavdb
@@ -190,12 +193,13 @@ class Base:
 
         fix = self.gps.fix
         borgelt = self.gps.borgelt
-        self.logger.log(self.gps.utc, fix.latitude, fix.longitude, fix.altitude,
-                        fix.speed, borgelt.air_speed, fix.track)
+        utc = time.strptime(self.gps.utc[:19], "%Y-%m-%dT%H:%M:%S")
 
-        self.nav.update(self.gps.utc, fix, borgelt)
-        self.wind_calc.update(self.nav.ground_speed, self.nav.air_speed,
-                              self.nav.track)
+        self.logger.log(utc, fix.latitude, fix.longitude, fix.altitude,
+                        fix.speed, borgelt.air_speed, fix.track)
+        self.nav.update(utc, fix, borgelt)
+        #self.wind_calc.update(self.nav.ground_speed, self.nav.air_speed,
+        #                      self.nav.track)
 
         self.viewx = self.nav.x
         self.viewy = self.nav.y
@@ -273,9 +277,9 @@ class Base:
         win.draw_layout(gc, win_width/2-27, win_height-y, pl, background=bg)
 
         if self.nav.utc:
-            hour = (int(self.nav.utc[11:13]) - self.tz_offset) % 24
-            mins = self.nav.utc[14:16]
-            pl.set_markup('<big><b>%d:%s</b></big>' % (hour, mins))
+            hour = (self.nav.utc.tm_hour - self.tz_offset) % 24
+            mins = self.nav.utc.tm_min
+            pl.set_markup('<big><b>%d:%02d</b></big>' % (hour, mins))
             x, y = pl.get_pixel_size()
             win.draw_layout(gc, win_width-x-3, win_height-y, pl, background=bg)
 
