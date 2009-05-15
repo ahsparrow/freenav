@@ -17,7 +17,7 @@ class WindCalc:
         self.turn_angle_acc = 0
 
         self.wind_speed = 0
-        self.wind_direction = math.pi
+        self.wind_direction = 0
 
     def restart_turn_search(self, turn_direction, new_vec):
         """Restart search by clearing deques and resetting accumulators"""
