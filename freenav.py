@@ -193,17 +193,18 @@ class Base:
 
         fix = self.gps.fix
         borgelt = self.gps.borgelt
-        utc = time.strptime(self.gps.utc[:19], "%Y-%m-%dT%H:%M:%S")
+        utc = self.gps.utc
 
-        self.logger.log(utc, fix.latitude, fix.longitude, fix.altitude,
-                        fix.speed, borgelt.air_speed, fix.track)
-        self.nav.update(utc, fix, borgelt)
-        #self.wind_calc.update(self.nav.ground_speed, self.nav.air_speed,
-        #                      self.nav.track)
+        if self.nav.update(utc, fix, borgelt):
+            self.logger.log(utc, fix.latitude, fix.longitude, fix.altitude,
+                            fix.speed, borgelt.air_speed, fix.track)
 
-        self.viewx = self.nav.x
-        self.viewy = self.nav.y
-        self.window.queue_draw()
+            self.viewx = self.nav.x
+            self.viewy = self.nav.y
+            self.wind_calc.update(self.nav.x, self.nav.y, self.nav.utc)
+
+            self.window.queue_draw()
+
         return True
 
     def view_to_win(self, x, y):
@@ -373,8 +374,8 @@ class Base:
 
     def draw_wind(self, gc, win, pl):
         # Draw wind speed/direction
-        x = math.sin(self.wind_calc.direction)
-        y = -math.cos(self.wind_calc.direction)
+        x = math.sin(self.wind_calc.wind_direction)
+        y = -math.cos(self.wind_calc.wind_direction)
         xc = yc = 17
         a, b, c = 15, 3, 7
 
@@ -385,7 +386,8 @@ class Base:
 
         win.draw_polygon(gc, False, poly)
 
-        pl.set_markup('<big><b>%d</b></big>' % self.wind_calc.speed)
+        speed = self.wind_calc.wind_speed * MPS_TO_KTS
+        pl.set_markup('<big><b>%d</b></big>' % speed)
         x, y = pl.get_pixel_size()
         win.draw_layout(gc, xc-x/2, yc+a+3, pl, background=None)
 
