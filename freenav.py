@@ -6,6 +6,7 @@ import socket
 import sys
 import time
 import gtk, gobject, pango
+import gtk.gdk
 import gps
 import nav, projection, logger, wind_calc, freenavdb
 
@@ -196,8 +197,9 @@ class Base:
         utc = self.gps.utc
 
         if self.nav.update(utc, fix, borgelt):
-            self.logger.log(utc, fix.latitude, fix.longitude, fix.altitude,
-                            fix.speed, borgelt.air_speed, fix.track)
+            self.logger.log(self.nav.utc, fix.latitude, fix.longitude,
+                            fix.altitude, fix.speed, borgelt.air_speed,
+                            fix.track)
 
             self.viewx = self.nav.x
             self.viewy = self.nav.y
