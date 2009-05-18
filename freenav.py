@@ -391,7 +391,7 @@ class Base:
         speed = self.wind_calc.wind_speed * MPS_TO_KTS
         pl.set_markup('<big><b>%d</b></big>' % speed)
         x, y = pl.get_pixel_size()
-        win.draw_layout(gc, xc-x/2, yc+a+3, pl, background=None)
+        win.draw_layout(gc, xc+a+5, yc-y/2, pl, background=None)
 
     def area_expose(self, area, event):
         win = area.window
