@@ -2,8 +2,13 @@
 # Import file format is tab delimitted from Worldwide Soaring Turnpoint
 # Exchange
 
-import freedb, projection
-import csv, math, sys
+import csv
+import getopt
+import math
+import sys
+
+import freedb
+import projection
 
 FT_TO_M = 0.3048
 
@@ -32,11 +37,38 @@ def importwp(db, csv_file, projection):
                            int(int(wp['Elevation [Feet]'])*FT_TO_M),
                            wp['Turnpoint'], wp['Comments'], landable_flag)
 
+def usage():
+    print 'usage: import_wp [options] input_file'
+    print ''
+    print 'Options:'
+    print '    -a   Append data to existing database'
+
 def main():
-    wp_file = sys.argv[1]
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], 'ha')
+    except getopt.GetoptError:
+        usage()
+        sys.exit(2)
+
+    append_flag = False
+    for o, a in opts:
+        if o == '-h':
+            usage()
+            sys.exit()
+        if o == '-a':
+            append_flag = True
+
+    if len(args) != 1:
+        usage()
+        sys.exit(2)
+    else:
+        wp_file = args[0]
+
     db = freedb.Freedb()
 
-    db.delete_waypoints()
+    if not append_flag:
+        db.delete_waypoints()
+
     db.drop_waypoint_indices()
     importwp(db, file(wp_file), projection.Lambert(*db.get_projection()))
 
