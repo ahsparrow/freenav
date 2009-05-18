@@ -7,15 +7,12 @@ MAX_DRIFT_TIME = 90
 
 class WindCalc:
     def __init__(self):
+        self.drift_store = collections.deque()
         self.vector_store = collections.deque()
         self.vector_store.append({'x': 0, 'y': 0, 'dx': 0, 'dy': 0, 'mag': 0,
                                   'turn_angle': 0, 'tim': 0})
-
-        self.drift_store = collections.deque()
-
         self.turn_direction = 0
         self.turn_angle_acc = 0
-
         self.wind_speed = 0
         self.wind_direction = 0
 
@@ -28,11 +25,15 @@ class WindCalc:
         self.turn_direction = turn_direction
         self.turn_angle_acc = 0
 
-    def drop_old_vectors(self, tim):
-        """Drop old data from vector_store. Return True if data dropped"""
-        if len(self.vector_store) == 0:
-            return False
+    def drop_old_drifts(self, tim):
+        """Recursively drop old data from drift store"""
+        if (tim - self.drift_store[0]['tim']) > MAX_DRIFT_TIME:
+            self.drift_store.popleft()
+            self.drop_old_drifts(tim)
 
+    def drop_old_vectors(self, tim):
+        """Recursively drop old data from vector_store. Return True if data
+           dropped"""
         if (tim - self.vector_store[0]['tim']) > MAX_CIRCLE_TIME:
             p = self.vector_store.popleft()
             self.turn_angle_acc -= p['turn_angle']
@@ -42,18 +43,11 @@ class WindCalc:
         else:
             return False
 
-    def drop_old_drifts(self, tim):
-        """Drop old data from drift store"""
-        if len(self.drift_store) > 0:
-            if (tim - self.drift_store[0]['tim']) > MAX_DRIFT_TIME:
-                self.drift_store.popleft()
-                self.drop_old_drifts(tim)
-
     def wind_calc(self, x, y, t):
         """Calculated wind speed and direction"""
         # Discard any old drift measurements and add the new one
-        self.drop_old_drifts(t)
         self.drift_store.append({'x': x, 'y': y, 'tim': t})
+        self.drop_old_drifts(t)
 
         # If we have two or more drift measurements then update the wind calc
         if len(self.drift_store) > 1:
@@ -66,11 +60,12 @@ class WindCalc:
 
     def drift_calc(self, new_vec):
         """Update drift calculation with new vector"""
+        self.vector_store.append(new_vec)
+
         # If we need to drop old vectors then restart wind calculation
         if self.drop_old_vectors(new_vec['tim']):
             self.drift_store.clear()
 
-        self.vector_store.append(new_vec)
         self.turn_angle_acc += new_vec['turn_angle']
 
         # If we've accumated 360 degrees of turn then update wind calculation
@@ -88,7 +83,7 @@ class WindCalc:
 
             self.wind_calc(xavg, yavg, tavg)
 
-            # Re-initialise vector store and angle accumulator
+            # Re-initialise vector store and zero angle accumulator
             self.vector_store.clear()
             self.vector_store.append(new_vec)
             self.turn_angle_acc = 0
