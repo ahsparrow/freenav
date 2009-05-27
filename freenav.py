@@ -183,7 +183,7 @@ class Base:
 
     def timeout(self):
         try:
-            self.gps.query('patvdg\n')
+            self.gps.query('patvdgy\n')
         except socket.error:
             md = gtk.MessageDialog(buttons=gtk.BUTTONS_OK,
                 type=gtk.MESSAGE_ERROR,
@@ -297,6 +297,10 @@ class Base:
         pl.set_markup(markup % (self.nav.tp_name, self.nav.dist/1000, bearing))
         x, y = pl.get_pixel_size()
         win.draw_layout(gc, 2, win_height-row_height-y, pl, background=bg)
+
+        pl.set_markup('<big><b>%d</b></big>' % self.gps.satellites_used)
+        x, y = pl.get_pixel_size()
+        win.draw_layout(gc, 2, win_height-2*row_height-y, pl, background=bg)
 
         if self.nav.ete == nav.INVALID_ETE:
             timestr = '-:--'
