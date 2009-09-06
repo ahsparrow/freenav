@@ -6,10 +6,15 @@ import gobject
 from pysqlite2 import dbapi2 as sqlite
 import projection
 
+TASKS = 'ABCDEFGH'
+NUM_TASKS = len(TASKS)
+
 class TaskApp:
     def __init__(self):
         self.task_db = freedb.Freedb()
         self.lambert = projection.Lambert(*self.task_db.get_projection())
+
+        self.task_index, self.tasks = self.load_tasks()
 
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.window.set_title('Task')
@@ -42,8 +47,7 @@ class TaskApp:
         # Create task list
         self.task_saved = True
         self.task_store = gtk.ListStore(gobject.TYPE_STRING)
-        for wp, x, y, alt in self.task_db.get_task():
-            self.task_store.append((wp,))
+        self.load_task_store(self.task_index)
 
         col = gtk.TreeViewColumn('ID')
         col.pack_start(cell, True)
@@ -56,11 +60,22 @@ class TaskApp:
         task_view.append_column(col)
         task_view.connect('row-activated', self.wp_activated, self.task_store)
 
+        # Task distance
         self.dist_label = gtk.Label('')
         self.dist_label.set_alignment(1, 0)
 
+        # Task select
+        combobox = gtk.combo_box_new_text()
+        for t in TASKS:
+            combobox.append_text(t)
+        combobox.set_active(self.task_index)
+        combobox.connect('changed', self.change_task)
+
+        # Waypoint delete
         del_button = gtk.Button('Del')
         del_button.connect('clicked', self.delete_wp)
+
+        # Task save
         save_button = gtk.Button('Save')
         save_button.connect('clicked', self.save_task)
 
@@ -69,14 +84,15 @@ class TaskApp:
         vbox.set_spacing(5)
         vbox.pack_start(task_view, expand=True)
         vbox.pack_start(self.dist_label, expand=False)
+        vbox.pack_start(del_button, expand=False)
+        vbox.pack_start(gtk.HSeparator(), expand=False)
         vbox.pack_end(save_button, expand=False)
-        vbox.pack_end(del_button, expand=False)
+        vbox.pack_end(combobox, expand=False)
 
         hbox = gtk.HBox()
         hbox.set_spacing(3)
         hbox.pack_start(wp_window, expand=True)
         hbox.pack_end(vbox, expand=False)
-
         self.window.add(hbox)
 
         # Drag and drop
@@ -153,17 +169,37 @@ class TaskApp:
         self.update_distance()
         self.task_saved = False
 
+    def load_tasks(self):
+        tasks = {}
+        for i in range(NUM_TASKS):
+            tasks[i] = self.task_db.get_task(i)
+
+        task_index = self.task_db.get_task_index()
+
+        return (task_index, tasks)
+
     def save_task(self, button):
+        self.save_task_store(self.task_index)
+        for i in range(NUM_TASKS):
+            self.task_db.set_task(self.tasks[i], i)
+        self.task_db.set_task_index(self.task_index)
+        self.task_saved = True
+
+    def change_task(self, combobox):
+        self.save_task_store(self.task_index)
+        self.task_index = combobox.get_active()
+        self.load_task_store(self.task_index)
+        self.task_saved = False
+        self.update_distance()
+
+    def load_task_store(self, task_index):
+        self.task_store.clear()
+        for wp in self.tasks[task_index]:
+            self.task_store.append((wp,))
+
+    def save_task_store(self, task_index):
         task = [wp[0] for wp in self.task_store]
-        if task:
-            self.task_db.set_task(task)
-            self.task_saved = True
-        else:
-            dialog = gtk.MessageDialog(buttons=gtk.BUTTONS_OK,
-               message_format='The task must contain at least one waypoint',
-               type=gtk.MESSAGE_ERROR)
-            dialog.run()
-            dialog.destroy()
+        self.tasks[task_index] = task
 
     def update_distance(self):
         task = [wp[0] for wp in self.task_store]
@@ -192,9 +228,6 @@ class TaskApp:
     def main(self):
         gtk.main()
 
-def main():
+if __name__ == '__main__':
     task_app = TaskApp()
     task_app.main()
-
-if __name__ == '__main__':
-    main()

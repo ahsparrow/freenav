@@ -40,7 +40,7 @@ class Freedb:
         self.c.execute(sql)
 
         sql = 'CREATE TABLE Task '\
-              '(Task_Num INTEGER, Seq_Num INTEGER, Waypoint_ID TEXT)'
+              '(Task_Index INTEGER, Seq_Num INTEGER, Waypoint_ID TEXT)'
         self.c.execute(sql)
 
         sql = 'CREATE TABLE Airspace_Par '\
@@ -55,6 +55,12 @@ class Freedb:
         sql = 'CREATE TABLE Airspace_Arcs '\
               '(Id TEXT, X INTEGER, Y INTEGER, Radius INTEGER, '\
                'Start_Angle INTEGER, Arc_Length INTEGER)'
+        self.c.execute(sql)
+
+        sql = 'CREATE TABLE Config (Task_Index INTEGER)'
+        self.c.execute(sql)
+
+        sql = 'INSERT INTO Config (Task_Index) VALUES (0)'
         self.c.execute(sql)
 
         self.commit()
@@ -101,23 +107,34 @@ class Freedb:
         self.c.execute('CREATE INDEX X_Index ON Waypoint (X)')
         self.c.execute('CREATE INDEX Y_Index ON Waypoint (Y)')
 
-    def set_task(self, task):
-        sql = 'DELETE FROM Task'
-        self.c.execute(sql)
+    def set_task(self, task, task_index=0):
+        sql = 'DELETE FROM Task WHERE Task_Index=? '
+        self.c.execute(sql, (task_index,))
 
-        sql = 'INSERT INTO Task (Task_Num, Seq_Num, Waypoint_Id) '\
+        sql = 'INSERT INTO Task (Task_Index, Seq_Num, Waypoint_Id) '\
               'VALUES (?, ?, ?)'
-        for num, wp in enumerate(task):
-            self.c.execute(sql, (1, num, wp))
+        for wp_num, wp in enumerate(task):
+            self.c.execute(sql, (task_index, wp_num, wp))
 
         self.commit()
 
-    def get_task(self):
-        sql = 'SELECT Waypoint_Id, X, Y, Altitude '\
-              'FROM Task LEFT JOIN Waypoint ON Waypoint_Id = Id '\
-              'WHERE Task_Num = 1 ORDER BY Seq_Num'
+    def get_task(self, task_index=0):
+        sql = 'SELECT Waypoint_Id FROM Task WHERE Task_Index = ? '\
+              'ORDER BY Seq_Num'
+        self.c.execute(sql, (task_index,))
+
+        task = [wp for (wp,) in self.c.fetchall()]
+        return task
+
+    def get_task_index(self):
+        sql = 'SELECT Task_Index FROM Config'
         self.c.execute(sql)
-        return self.c.fetchall()
+        return self.c.fetchone()[0]
+
+    def set_task_index(self, task_index):
+        sql = 'UPDATE Config SET Task_Index = ?'
+        self.c.execute(sql, (task_index,))
+        self.commit()
 
     def delete_airspace(self):
         try:
