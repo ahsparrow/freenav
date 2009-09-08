@@ -64,16 +64,19 @@ class TaskApp:
         self.dist_label = gtk.Label('')
         self.dist_label.set_alignment(1, 0)
 
+        # Waypoint delete
+        del_button = gtk.Button('Del')
+        del_button.connect('clicked', self.delete_wp)
+
+        oz_button = gtk.Button('OZ...')
+        oz_button.connect('clicked', self.set_oz)
+
         # Task select
         combobox = gtk.combo_box_new_text()
         for t in TASKS:
             combobox.append_text(t)
         combobox.set_active(self.task_index)
         combobox.connect('changed', self.change_task)
-
-        # Waypoint delete
-        del_button = gtk.Button('Del')
-        del_button.connect('clicked', self.delete_wp)
 
         # Task save
         save_button = gtk.Button('Save')
@@ -85,6 +88,7 @@ class TaskApp:
         vbox.pack_start(task_view, expand=True)
         vbox.pack_start(self.dist_label, expand=False)
         vbox.pack_start(del_button, expand=False)
+        vbox.pack_start(oz_button, expand=False)
         vbox.pack_start(gtk.HSeparator(), expand=False)
         vbox.pack_end(save_button, expand=False)
         vbox.pack_end(combobox, expand=False)
@@ -120,6 +124,7 @@ class TaskApp:
         model, iter = wpsel.get_selected()
         id = model.get_value(iter, 0)
         selection.set('text/plain', 8, id)
+        print "Get", id
 
     def drag_data_received(self,
                            task_view, context, x, y, selection, info, etime):
@@ -159,7 +164,7 @@ class TaskApp:
             path = model.get_path(iter)
             model.remove(iter)
 
-            n = model.iter_n_children(None)
+            n = len(model)
             if n > 0:
                 if n == path[0]:
                     selection.select_path(n-1)
@@ -168,6 +173,14 @@ class TaskApp:
 
         self.update_distance()
         self.task_saved = False
+
+    def set_oz(self, button):
+        selection = self.task_view.get_selection()
+        model, iter = selection.get_selected()
+        if iter:
+            n = model.get_path(iter)[0]
+            if n > 0 and n < (len(model) - 1):
+                print n
 
     def load_tasks(self):
         tasks = {}
