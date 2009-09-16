@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=0.0.1
+Encoding=UTF-8
+Name=Task
+Exec=/home/user/task.py
+Icon=skype
+Type=Application
+X-Window-Icon=skype
+X-Window-Icon-Dimmed=skype
+X-Osso-Service=uk.org.freeflight.task
+X-Osso-Type=application/x-executable
