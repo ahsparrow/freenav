@@ -1,11 +1,9 @@
 [Desktop Entry]
-Version=0.0.1
+Version=1.0
 Encoding=UTF-8
-Name=Task
-Exec=/home/user/task.py
-Icon=skype
+Name=TaskEdit
+Exec=/usr/bin/taskedit
+Icon=qgn_list_cntlpane
 Type=Application
-X-Window-Icon=skype
-X-Window-Icon-Dimmed=skype
-X-Osso-Service=uk.org.freeflight.task
+X-Osso-Service=uk.org.freeflight.taskedit
 X-Osso-Type=application/x-executable
