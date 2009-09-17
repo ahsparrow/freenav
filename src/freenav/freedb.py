@@ -6,11 +6,6 @@
 from pysqlite2 import dbapi2 as sqlite
 import math, os
 
-PARALLEL1 = math.radians(49)
-PARALLEL2 = math.radians(55)
-REF_LAT = math.radians(52)
-REF_LON = math.radians(0)
-
 class Freedb:
     def __init__(self, file=''):
         if not file:
@@ -177,11 +172,3 @@ class Freedb:
         self.c.execute('CREATE INDEX Xmax_Index ON Airspace_Par (X_Max)')
         self.c.execute('CREATE INDEX Ymin_Index ON Airspace_Par (Y_Min)')
         self.c.execute('CREATE INDEX Ymax_Index ON Airspace_Par (Y_Max)')
-
-
-def main():
-    db = Freedb()
-    db.create(PARALLEL1, PARALLEL2, REF_LAT, REF_LON)
-
-if __name__ == '__main__':
-    main()
