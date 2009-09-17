@@ -9,8 +9,8 @@ try:
 except ImportError:
     is_hildon_app = False
 
-import freedb
-import projection
+import freenav.freedb
+import freenav.projection
 
 TASKS = 'ABCDEFGH'
 NUM_TASKS = len(TASKS)
@@ -24,8 +24,9 @@ class TaskApp(AppBase):
     def __init__(self):
         AppBase.__init__(self)
 
-        self.task_db = freedb.Freedb()
-        self.lambert = projection.Lambert(*self.task_db.get_projection())
+        self.task_db = freenav.freedb.Freedb()
+        self.lambert = \
+            freenav.projection.Lambert(*self.task_db.get_projection())
         self.task_index, self.tasks = self.load_tasks()
 
         # Create window and add event handlers
