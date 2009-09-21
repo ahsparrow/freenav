@@ -3,11 +3,14 @@
 # Import airspace data from Tim Newport-Peace format file
 #
 
-import tnp
-from simpleparse.parser import Parser
-import freedb, projection
-import math, sys
+import math
 import getopt
+import sys
+
+from simpleparse.parser import Parser
+import freenav.freedb
+import freenav.projection
+import freenav.tnp as tnp
 
 MAX_LEVEL = 7000
 NM_TO_M = 1852
@@ -103,12 +106,12 @@ def main():
         filename = args[0]
 
     # Initialise data base
-    db = freedb.Freedb()
+    db = freenav.freedb.Freedb()
     db.delete_airspace()
 
     # Initialise parser
     parser = Parser(tnp.tnp_decl, 'tnp_file')
-    proj = projection.Lambert(*db.get_projection())
+    proj = freenav.projection.Lambert(*db.get_projection())
     output_processor = AirProcessor(db, proj)
     tnp_processor = tnp.TnpProcessor(output_processor)
 

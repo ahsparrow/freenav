@@ -7,8 +7,8 @@ import getopt
 import math
 import sys
 
-import freedb
-import projection
+import freenav.freedb
+import freenav.projection
 
 FT_TO_M = 0.3048
 
@@ -64,13 +64,14 @@ def main():
     else:
         wp_file = args[0]
 
-    db = freedb.Freedb()
-
+    db = freenav.freedb.Freedb()
     if not append_flag:
         db.delete_waypoints()
 
-    db.drop_waypoint_indices()
-    importwp(db, file(wp_file), projection.Lambert(*db.get_projection()))
+    p = db.get_projection()
+    importwp(db, open(wp_file),
+        freenav.projection.Lambert(p['Parallel1'], p['Parallel2'],
+                                   p['Ref_Lat'], p['Ref_Lon']))
 
     db.create_waypoint_indices()
     db.commit()

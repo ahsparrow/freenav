@@ -3,15 +3,55 @@
 # Database management class
 #
 
-from pysqlite2 import dbapi2 as sqlite
-import math, os
+import os
+
+#from pysqlite2 import dbapi2 as sqlite3
+import sqlite3
+
+SCHEMA = {
+    'Projection': [
+        ('Parallel1', 'REAL'), ('Parallel2', 'REAL'),
+        ('Ref_Lat', 'REAL'), ('Ref_Lon', 'REAL')],
+
+    'Waypoints': [
+        ('Id', 'TEXT'), ('Name', 'TEXT'), ('X', 'INTEGER'), ('Y', 'INTEGER'),
+        ('Altitude', 'INTEGER'), ('Turnpoint', 'TEXT'),
+        ('Landable_Flag', 'INTEGER'), ('Comment', 'TEXT')],
+
+    'Airspace': [
+        ('Id', 'TEXT'), ('Name', 'TEXT'), ('Base', 'TEXT'), ('Top', 'TEXT'),
+        ('X_Min', 'INTEGER'), ('Y_Min', 'INTEGER'),
+        ('X_Max', 'INTEGER'), ('Y_Max', 'INTEGER')],
+
+    'Airspace_Lines': [
+        ('Airspace_Id', 'TEXT'), ('X1', 'INTEGER'), ('Y1', 'INTEGER'),
+        ('X2', 'INTEGER'), ('Y2', 'INTEGER')],
+
+    'Airspace_Arcs': [
+        ('Airspace_Id', 'TEXT'), ('X', 'INTEGER'), ('Y', 'INTEGER'),
+        ('Radius', 'INTEGER'), ('Start_Angle', 'INTEGER'),
+        ('Arc_Length', 'INTEGER')],
+
+    'Tasks': [
+        ('Id', 'INTEGER'), ('Seq_Num', 'INTEGER'), ('Waypoint_Id', 'TEXT'),
+        ('Radius1', 'INTEGER'), ('Angle1', 'REAL'),
+        ('Radius2', 'INTEGER'), ('Angle2', 'REAL'),
+        ('Direction', 'TEXT'), ('Angle12', 'REAL')],
+
+    'Config': [('Task_Id', 'INTEGER')]}
 
 class Freedb:
     def __init__(self, file=''):
         if not file:
             file = os.path.join(os.getenv('HOME'), '.freeflight', 'free.db')
-        self.db = sqlite.connect(file)
+        self.db = sqlite3.connect(file)
+        self.db.row_factory = sqlite3.Row
         self.c = self.db.cursor()
+
+    def create_table(self, table_name, columns):
+        col_str = ','.join([cname + ' ' + ctype for (cname, ctype) in columns])
+        sql = 'CREATE TABLE %s (%s)' % (table_name, col_str)
+        self.c.execute(sql)
 
     def commit(self):
         self.db.commit()
@@ -20,42 +60,16 @@ class Freedb:
         self.c.execute('vacuum')
 
     def create(self, parallel1, parallel2, refLat, refLon):
-        sql = 'CREATE TABLE Projection '\
-              '(Parallel1 REAL, Parallel2 REAL, Ref_Lat REAL, Ref_Lon REAL)'
-        self.c.execute(sql)
+        """Create tables from schema and add initial values"""
+        for table_name in SCHEMA:
+            self.create_table(table_name, SCHEMA[table_name])
 
         sql = 'INSERT INTO Projection '\
               '(Parallel1, Parallel2, Ref_Lat, Ref_Lon) '\
               'VALUES (?, ?, ?, ?)'
         self.c.execute(sql, (parallel1, parallel2, refLat, refLon))
 
-        sql = 'CREATE TABLE Waypoint '\
-              '(Name TEXT, ID TEXT, X INTEGER, Y INTEGER, Altitude INTEGER, '\
-              'Turnpoint TEXT, Landable_Flag INTEGER, Comment TEXT)'
-        self.c.execute(sql)
-
-        sql = 'CREATE TABLE Task '\
-              '(Task_Index INTEGER, Seq_Num INTEGER, Waypoint_ID TEXT)'
-        self.c.execute(sql)
-
-        sql = 'CREATE TABLE Airspace_Par '\
-              '(Id TEXT, Name TEXT, Base TEXT, Top TEXT, '\
-               'X_Min INTEGER, Y_Min INTEGER, X_Max INTEGER, Y_Max INTEGER)'
-        self.c.execute(sql)
-
-        sql = 'CREATE TABLE Airspace_Lines '\
-              '(Id TEXT, X1 INTEGER, Y1 INTEGER, X2 INTEGER, Y2 INTEGER)'
-        self.c.execute(sql)
-
-        sql = 'CREATE TABLE Airspace_Arcs '\
-              '(Id TEXT, X INTEGER, Y INTEGER, Radius INTEGER, '\
-               'Start_Angle INTEGER, Arc_Length INTEGER)'
-        self.c.execute(sql)
-
-        sql = 'CREATE TABLE Config (Task_Index INTEGER)'
-        self.c.execute(sql)
-
-        sql = 'INSERT INTO Config (Task_Index) VALUES (0)'
+        sql = 'INSERT INTO Config (Task_Id) VALUES (0)'
         self.c.execute(sql)
 
         self.commit()
@@ -66,79 +80,79 @@ class Freedb:
         return self.c.fetchone()
 
     def delete_waypoints(self):
-        self.c.execute('DELETE FROM Waypoint')
+        """Delete all the waypoints"""
+        self.c.execute('DELETE FROM Waypoints')
 
     def insert_waypoint(self, name, id, x, y, altitude, turnpoint, comment,
                         landable_flag):
-        sql = 'INSERT INTO Waypoint '\
-              '(Name, ID, X, Y, Altitude, Turnpoint, Comment, Landable_Flag) '\
+        sql = 'INSERT INTO Waypoints '\
+              '(Name, Id, X, Y, Altitude, Turnpoint, Comment, Landable_Flag) '\
               'VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         self.c.execute(sql, (name, id, x, y,altitude, turnpoint, comment,
                              landable_flag))
 
+    def get_waypoint(self, id):
+        """Return waypoint data"""
+        sql = 'SELECT X, Y, Altitude, Name, Turnpoint, Comment '\
+              'FROM Waypoints WHERE Id=?'
+        self.c.execute(sql, (id,))
+        return self.c.fetchone()
+
     def get_waypoint_list(self):
-        sql = 'SELECT ID, Name FROM Waypoint ORDER BY ID'
+        """Return a list of waypoint Id's and names"""
+        sql = 'SELECT Id, Name FROM Waypoints ORDER BY Id'
         self.c.execute(sql)
         return self.c.fetchall()
 
-    def get_waypoint(self, id):
-        sql = 'SELECT X, Y, Altitude FROM Waypoint WHERE ID=?'
-        self.c.execute(sql, (id,))
-        return self.c.fetchone()
-
-    def get_waypoint_info(self, id):
-        sql = 'SELECT Name, Turnpoint, Comment FROM Waypoint WHERE ID=?'
-        self.c.execute(sql, (id,))
-        return self.c.fetchone()
-
-    def drop_waypoint_indices(self):
-        try:
-            self.c.execute('DROP INDEX X_Index')
-            self.c.execute('DROP INDEX Y_Index')
-        except:
-            pass
-
     def create_waypoint_indices(self):
-        self.c.execute('CREATE INDEX X_Index ON Waypoint (X)')
-        self.c.execute('CREATE INDEX Y_Index ON Waypoint (Y)')
+        """Create waypoint indices on X and Y"""
+        self.c.execute('CREATE INDEX X_Index ON Waypoints (X)')
+        self.c.execute('CREATE INDEX Y_Index ON Waypoints (Y)')
 
-    def set_task(self, task, task_index=0):
-        sql = 'DELETE FROM Task WHERE Task_Index=? '
-        self.c.execute(sql, (task_index,))
+    def set_task(self, task, id=0):
+        sql = 'DELETE FROM Tasks WHERE Id=? '
+        self.c.execute(sql, (id,))
 
-        sql = 'INSERT INTO Task (Task_Index, Seq_Num, Waypoint_Id) '\
-              'VALUES (?, ?, ?)'
-        for wp_num, wp in enumerate(task):
-            self.c.execute(sql, (task_index, wp_num, wp))
-
+        sql = 'INSERT INTO Tasks (Id, Seq_Num, Waypoint_Id, '\
+              'Radius1, Angle1, Radius2, Angle2, Direction, Angle12) '\
+              'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        for tp_num, tp in enumerate(task):
+            self.c.execute(sql, (id, tp_num, tp['wp_id'],
+                                 tp['rad1'], tp['ang1'],
+                                 tp['rad2'], tp['ang2'],
+                                 tp['dirn'], tp['ang12']))
         self.commit()
 
-    def get_task(self, task_index=0):
-        sql = 'SELECT Waypoint_Id FROM Task WHERE Task_Index = ? '\
-              'ORDER BY Seq_Num'
-        self.c.execute(sql, (task_index,))
+    def get_task(self, id=0):
+        sql = 'SELECT * FROM Tasks WHERE Id = ? ORDER BY Seq_Num'
+        self.c.execute(sql, (id,))
 
-        task = [wp for (wp,) in self.c.fetchall()]
+        task = []
+        for tp in self.c:
+            task.append({'wp_id': tp['Waypoint_Id'],
+                         'rad1':  tp['Radius1'],
+                         'ang1':  tp['Angle1'],
+                         'rad2':  tp['Radius2'],
+                         'ang2':  tp['Angle2'],
+                         'dirn':  tp['Direction'],
+                         'ang12': tp['Angle12']})
         return task
 
-    def get_task_index(self):
-        sql = 'SELECT Task_Index FROM Config'
+    def get_task_id(self):
+        sql = 'SELECT Task_Id FROM Config'
         self.c.execute(sql)
         return self.c.fetchone()[0]
 
-    def set_task_index(self, task_index):
-        sql = 'UPDATE Config SET Task_Index = ?'
-        self.c.execute(sql, (task_index,))
+    def set_task_id(self, task_id):
+        sql = 'UPDATE Config SET Task_Id = ?'
+        self.c.execute(sql, (task_id,))
         self.commit()
 
     def delete_airspace(self):
-        try:
-            self.c.execute('DROP INDEX Xmin_Index')
-            self.c.execute('DROP INDEX Xmax_Index')
-            self.c.execute('DROP INDEX Ymin_Index')
-            self.c.execute('DROP INDEX Ymax_Index')
-        except:
-            pass
+        self.c.execute('DROP INDEX Xmin_Index')
+        self.c.execute('DROP INDEX Xmax_Index')
+        self.c.execute('DROP INDEX Ymin_Index')
+        self.c.execute('DROP INDEX Ymax_Index')
 
         self.c.execute('DELETE FROM Airspace_Par')
         self.c.execute('DELETE FROM Airspace_Lines')

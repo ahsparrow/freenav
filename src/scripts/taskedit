@@ -2,7 +2,7 @@
 
 import gtk
 import gobject
-from pysqlite2 import dbapi2 as sqlite
+
 is_hildon_app = True
 try:
     import hildon
@@ -15,6 +15,26 @@ import freenav.projection
 TASKS = 'ABCDEFGH'
 NUM_TASKS = len(TASKS)
 
+RAD1 = 0.5
+ANG1 = 360
+RAD2 = 0
+ANG2 = 0
+START_RAD = 3
+FINISH_RAD = 0.5
+
+def make_tp(wp_id, rad1=RAD1, ang1=ANG1, rad2=RAD2, ang2=ANG2, dirn='SYM',
+            ang12=0):
+    return {'wp_id': wp_id,
+            'rad1': rad1, 'ang1': ang1,
+            'rad2': rad2, 'ang2': ang2,
+            'dirn': dirn, 'ang12': ang12}
+
+def make_start_tp(wp_id, rad1=START_RAD, dirn='NEXT', ang12=0):
+    return make_tp(wp_id, rad1=rad1, dirn=dirn, ang12=ang12)
+
+def make_finish_tp(wp_id, rad1=FINISH_RAD, dirn='PREV', ang12=0):
+    return make_tp(wp_id, rad1=rad1, dirn=dirn, ang12=ang12)
+
 if is_hildon_app:
     AppBase = hildon.Program
 else:
@@ -25,8 +45,11 @@ class TaskApp(AppBase):
         AppBase.__init__(self)
 
         self.task_db = freenav.freedb.Freedb()
-        self.lambert = \
-            freenav.projection.Lambert(*self.task_db.get_projection())
+
+        p = self.task_db.get_projection()
+        self.projection = freenav.projection.Lambert(
+            p['Parallel1'], p['Parallel2'], p['Ref_Lat'], p['Ref_Lon'])
+
         self.task_index, self.tasks = self.load_tasks()
 
         # Create window and add event handlers
@@ -37,20 +60,22 @@ class TaskApp(AppBase):
         self.window.set_title('Task')
         self.window.set_border_width(3)
         self.window.connect('destroy', gtk.main_quit)
-        self.window.connect('delete_event', self.quit)
+        self.window.connect('delete_event', self.on_quit)
         self.window.connect('key-press-event', self.on_keypress)
         self.window.connect('window-state-event', self.on_window_state_change)
 
         # Create waypoint list
         wp_store = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
         for wp in self.task_db.get_waypoint_list():
-            wp_store.append((wp[0], wp[1]))
+            wp_store.append((wp['Id'], wp['Name']))
 
         cell = gtk.CellRendererText()
+
         col1 = gtk.TreeViewColumn('ID')
         col1.pack_start(cell, True)
         col1.add_attribute(cell, 'text', 0)
         col1.set_sort_column_id(0)
+
         col2 = gtk.TreeViewColumn('Name')
         col2.pack_start(cell, True)
         col2.add_attribute(cell, 'text', 1)
@@ -60,14 +85,15 @@ class TaskApp(AppBase):
         wp_view.set_headers_visible(True)
         wp_view.append_column(col1)
         wp_view.append_column(col2)
+        wp_view.connect('row-activated', self.on_wp_activated, wp_store)
+
         wp_window = gtk.ScrolledWindow()
         wp_window.add(wp_view)
-        wp_view.connect('row-activated', self.wp_activated, wp_store)
 
         # Create task list
         self.task_saved = True
         self.task_store = gtk.ListStore(gobject.TYPE_STRING)
-        self.load_task_store(self.task_index)
+        self.update_task_store()
 
         col = gtk.TreeViewColumn('ID')
         col.pack_start(cell, True)
@@ -77,7 +103,7 @@ class TaskApp(AppBase):
         self.task_view.set_headers_visible(False)
         self.task_view.set_reorderable(True)
         self.task_view.append_column(col)
-        self.task_view.connect('row-activated', self.wp_activated,
+        self.task_view.connect('row-activated', self.on_wp_activated,
                                self.task_store)
 
         # Task distance
@@ -86,22 +112,22 @@ class TaskApp(AppBase):
 
         # Waypoint delete
         del_button = gtk.Button('Del')
-        del_button.connect('clicked', self.delete_wp)
+        del_button.connect('clicked', self.on_tp_delete)
 
         # Observation zone set...
         oz_button = gtk.Button('OZ...')
-        oz_button.connect('clicked', self.set_oz)
+        oz_button.connect('clicked', self.on_oz_set)
 
         # Task select
         combobox = gtk.combo_box_new_text()
         for t in TASKS:
             combobox.append_text(t)
         combobox.set_active(self.task_index)
-        combobox.connect('changed', self.change_task)
+        combobox.connect('changed', self.on_task_select)
 
         # Task save
         save_button = gtk.Button('Save')
-        save_button.connect('clicked', self.save_task)
+        save_button.connect('clicked', self.on_save)
 
         # Packing
         vbox = gtk.VBox()
@@ -124,7 +150,7 @@ class TaskApp(AppBase):
         wp_view.enable_model_drag_source(gtk.gdk.BUTTON1_MASK,
             [('WP_MODEL_ROW', gtk.TARGET_SAME_APP, 0)],
             gtk.gdk.ACTION_COPY)
-        wp_view.connect('drag-data-get', self.wp_drag_data_get)
+        wp_view.connect('drag-data-get', self.on_wp_drag_data_get)
 
         self.task_view.enable_model_drag_source(gtk.gdk.BUTTON1_MASK,
             [('TASK_MODEL_ROW', gtk.TARGET_SAME_WIDGET, 0)],
@@ -133,125 +159,20 @@ class TaskApp(AppBase):
             [('TASK_MODEL_ROW', gtk.TARGET_SAME_WIDGET, 0),
              ('WP_MODEL_ROW', gtk.TARGET_SAME_APP, 0)],
             gtk.gdk.ACTION_DEFAULT)
-        self.task_view.connect('drag-data-get', self.task_drag_data_get)
-        self.task_view.connect('drag-data-received', self.drag_data_received)
+        self.task_view.connect('drag-data-get', self.on_task_drag_data_get)
+        self.task_view.connect('drag-data-received',
+                               self.on_drag_data_received)
 
         self.update_distance()
 
-    def wp_drag_data_get(self, view, context, selection, info, etime):
-        sel = view.get_selection()
-        model, iter = sel.get_selected()
-        id = model.get_value(iter, 0)
-        selection.set('WP_DATA', 8, id)
-
-    def task_drag_data_get(self, view, context, selection, info, etime):
-        sel = view.get_selection()
-        model, paths = sel.get_selected_rows()
-        row = paths[0][0]
-        selection.set('TASK_DATA', 8, str(row))
-
-    def drag_data_received(self, view, context, x, y, selection, info, etime):
-        model = view.get_model()
-        wp = selection.data
-        print "Received", wp, selection.type
-        if selection.type == 'TASK_DATA':
-            model.clear()
-            return
-
-        drop_info = view.get_dest_row_at_pos(x, y)
-        if drop_info:
-            path, position = drop_info
-            iter = model.get_iter(path)
-            if (position == gtk.TREE_VIEW_DROP_BEFORE or
-                position == gtk.TREE_VIEW_DROP_INTO_OR_BEFORE):
-                model.insert_before(iter, [wp])
-            else:
-                model.insert_after(iter, [wp])
-        else:
-             model.append([wp])
-
-        self.update_distance()
-        self.task_saved = False
-
-    def wp_activated(self, treeview, path, column, model):
-        id = model[path][0]
-        (name, turnpoint, comment) = self.task_db.get_waypoint_info(id)
-        msg = "%s\n%s\n%s\n%s" % (id, name, turnpoint, comment)
-        md = gtk.MessageDialog(None, gtk.DIALOG_MODAL, gtk.MESSAGE_INFO, 
-                               gtk.BUTTONS_CLOSE, msg)
-        md.run()
-        md.destroy()
-
-    def delete_wp(self, button):
-        selection = self.task_view.get_selection()
-        model, iter = selection.get_selected()
-        if iter:
-            path = model.get_path(iter)
-            model.remove(iter)
-
-            n = len(model)
-            if n > 0:
-                if n == path[0]:
-                    selection.select_path(n-1)
-                else:
-                    selection.select_path(path)
-
-        self.update_distance()
-        self.task_saved = False
-
-    def set_oz(self, button):
-        selection = self.task_view.get_selection()
-        model, iter = selection.get_selected()
-        if iter:
-            n = model.get_path(iter)[0]
-            if n > 0 and n < (len(model) - 1):
-                print n
-
-    def load_tasks(self):
-        tasks = {}
-        for i in range(NUM_TASKS):
-            tasks[i] = self.task_db.get_task(i)
-
-        task_index = self.task_db.get_task_index()
-        return (task_index, tasks)
-
-    def save_task(self, button):
-        self.save_task_store(self.task_index)
-        for i in range(NUM_TASKS):
-            self.task_db.set_task(self.tasks[i], i)
-        self.task_db.set_task_index(self.task_index)
-        self.task_saved = True
-
-    def change_task(self, combobox):
-        self.save_task_store(self.task_index)
-        self.task_index = combobox.get_active()
-        self.load_task_store(self.task_index)
-        self.task_saved = False
-        self.update_distance()
-
-    def load_task_store(self, task_index):
-        self.task_store.clear()
-        for wp in self.tasks[task_index]:
-            self.task_store.append((wp,))
-
-    def save_task_store(self, task_index):
-        task = [wp[0] for wp in self.task_store]
-        self.tasks[task_index] = task
-
-    def update_distance(self):
-        task = [wp[0] for wp in self.task_store]
-        dist = self.calc_distance(task)
-        self.dist_label.set_text('%.1fkm' % (dist/1000))
-
-    def calc_distance(self, task):
-        if len(task) <= 1:
-            return 0
-        else:
-            x1, y1, alt = self.task_db.get_waypoint(task[0])
-            x2, y2, alt = self.task_db.get_waypoint(task[1])
-            dist = self.lambert.dist(x1, y1, x2, y2) + \
-                self.calc_distance(task[1:])
-            return dist
+    def on_quit(self, widget, event, data=None):
+        if not self.task_saved:
+            dialog = gtk.MessageDialog(buttons=gtk.BUTTONS_YES_NO,
+                message_format='Task updated, are you sure you want to quit?',
+                type=gtk.MESSAGE_QUESTION)
+            ret = dialog.run()
+            dialog.destroy()
+            return (ret == gtk.RESPONSE_NO)
 
     def on_window_state_change(self, widget, event, *args):
         if event.new_window_state & gtk.gdk.WINDOW_STATE_FULLSCREEN:
@@ -266,14 +187,175 @@ class TaskApp(AppBase):
             else:
                 self.window.fullscreen()
 
-    def quit(self, widget, event, data=None):
-        if not self.task_saved:
-            dialog = gtk.MessageDialog(buttons=gtk.BUTTONS_YES_NO,
-                message_format='Task updated, are you sure you want to quit?',
-                type=gtk.MESSAGE_QUESTION)
-            ret = dialog.run()
-            dialog.destroy()
-            return (ret == gtk.RESPONSE_NO)
+    def on_save(self, button):
+        for i in range(NUM_TASKS):
+            self.task_db.set_task(self.tasks[i], i)
+        self.task_db.set_task_id(self.task_index)
+        self.task_saved = True
+
+    def on_wp_activated(self, treeview, path, column, model):
+        id = model[path][0]
+        wp = self.task_db.get_waypoint(id)
+        msg = "%s\n%s\n%s\n%s" % (id, wp['Name'], wp['Turnpoint'],
+                                  wp['Comment'])
+        md = gtk.MessageDialog(None, gtk.DIALOG_MODAL, gtk.MESSAGE_INFO, 
+                               gtk.BUTTONS_CLOSE, msg)
+        md.run()
+        md.destroy()
+
+    def on_tp_delete(self, button):
+        selection = self.task_view.get_selection()
+        model, iter = selection.get_selected()
+        if iter:
+            path = model.get_path(iter)
+            self.delete_tp(path[0])
+            self.update_task_store()
+
+            n = len(model)
+            if n > 0:
+                if n == path[0]:
+                    selection.select_path(n-1)
+                else:
+                    selection.select_path(path)
+
+        self.update_distance()
+        self.task_saved = False
+
+    def on_oz_set(self, button):
+        selection = self.task_view.get_selection()
+        model, iter = selection.get_selected()
+        if iter:
+            n = model.get_path(iter)[0]
+            if n > 0 and n < (len(model) - 1):
+                print n
+
+    def on_task_select(self, combobox):
+        self.task_index = combobox.get_active()
+        self.update_task_store()
+        self.task_saved = False
+        self.update_distance()
+
+    def on_wp_drag_data_get(self, view, context, selection, info, etime):
+        sel = view.get_selection()
+        model, iter = sel.get_selected()
+        id = model.get_value(iter, 0)
+        selection.set('WP_DATA', 8, id)
+
+    def on_task_drag_data_get(self, view, context, selection, info, etime):
+        sel = view.get_selection()
+        model, paths = sel.get_selected_rows()
+        row = paths[0][0]
+        selection.set('TASK_DATA', 8, str(row))
+
+    def on_drag_data_received(self, view, context, x, y, selection, info,
+                              etime):
+        model = view.get_model()
+        drop_info = view.get_dest_row_at_pos(x, y)
+        if drop_info:
+            path, position = drop_info
+            if (position == gtk.TREE_VIEW_DROP_BEFORE or
+                position == gtk.TREE_VIEW_DROP_INTO_OR_BEFORE):
+                drop_posn = path[0]
+            else:
+                drop_posn = path[0] + 1
+        else:
+            drop_posn = len(model)
+
+        if selection.type == 'WP_DATA':
+            self.insert_tp(selection.data, drop_posn)
+        else:
+            from_posn = int(selection.data)
+            self.move_tp(from_posn, drop_posn)
+
+        self.update_task_store()
+
+        self.update_distance()
+        self.task_saved = False
+
+    def load_tasks(self):
+        """Get tasks and task index from database"""
+        tasks =[] 
+        for i in range(NUM_TASKS):
+            tasks.append(self.task_db.get_task(i))
+
+        task_index = self.task_db.get_task_id()
+        return (task_index, tasks)
+
+    def update_task_store(self):
+        """Load waypoint list into task view ListStore"""
+        self.task_store.clear()
+        for tp in self.tasks[self.task_index]:
+            self.task_store.append((tp['wp_id'],))
+
+    def insert_tp(self, wp_id, posn):
+        task = self.tasks[self.task_index]
+        task_len = len(task)
+
+        if task_len == 0:
+            task.append(make_tp(wp_id))
+        else:
+            if posn == 0:
+                old_start_id = task[0]['wp_id']
+                if task_len == 1:
+                    task[0] = make_finish_tp(old_start_id)
+                else:
+                    task[0] = make_tp(old_start_id)
+                task.insert(0, make_start_tp(wp_id))
+
+            elif posn == task_len:
+                old_finish_id = task[-1]['wp_id']
+                if task_len == 1:
+                    task[0] = make_start_tp(old_finish_id)
+                else:
+                    task[-1] = make_tp(old_finish_id)
+                task.append(make_finish_tp(wp_id))
+
+            else:
+                task.insert(posn, make_tp(wp_id))
+
+    def move_tp(self, from_posn, to_posn):
+        task = self.tasks[self.task_index]
+
+        if (from_posn != to_posn) and (from_posn != to_posn - 1):
+            print "Move"
+            wp_id = task[from_posn]['wp_id']
+            self.delete_tp(from_posn)
+
+            if to_posn < from_posn:
+                self.insert_tp(wp_id, to_posn)
+            else:
+                self.insert_tp(wp_id, to_posn - 1)
+
+    def delete_tp(self, posn):
+        task = self.tasks[self.task_index]
+        del task[posn]
+        task_len = len(task)
+
+        if task_len == 1:
+            wp_id = task[0]['wp_id']
+            task[0] = make_tp(wp_id)
+        elif task_len > 1:
+            if posn == 0:
+                wp_id = task[0]['wp_id']
+                task[0] = make_start_tp(wp_id)
+            elif posn == task_len:
+                wp_id = task[-1]['wp_id']
+                task[-1] = make_finish_tp(wp_id)
+
+    def update_distance(self):
+        wp_list = [tp['wp_id'] for tp in self.tasks[self.task_index]]
+        dist = self.calc_distance(wp_list)
+        self.dist_label.set_text('%.1fkm' % (dist / 1000))
+
+    def calc_distance(self, wp_list):
+        if len(wp_list) <= 1:
+            return 0
+        else:
+            w1 = self.task_db.get_waypoint(wp_list[0])
+            w2 = self.task_db.get_waypoint(wp_list[1])
+            dist = (self.projection.dist(w1['X'], w1['Y'], w2['X'], w2['Y']) +
+                    self.calc_distance(wp_list[1:]))
+            return dist
 
     def run(self):
         self.window.show_all()
