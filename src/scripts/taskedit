@@ -40,6 +40,56 @@ if is_hildon_app:
 else:
     AppBase = object
 
+class OzDialog(gtk.Dialog):
+    def __init__(self, parent, task, tp_index):
+        title = 'Obs. Zone - ' + task[tp_index]['wp_id']
+        gtk.Dialog.__init__(self, title, parent,
+                            gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT,
+                            (gtk.STOCK_CANCEL, gtk.RESPONSE_REJECT,
+                             gtk.STOCK_OK, gtk.RESPONSE_OK))
+
+        table = gtk.Table(6, 2, True)
+        table.set_col_spacing(0, 5)
+        table.set_row_spacings(3)
+        for n, txt in enumerate(['Radius1 (m)', 'Angle1 (deg)',
+                                 'Radius2 (m)', 'Angle2 (deg)',
+                                 'Dirn', 'Angle12 (deg)']):
+            label = gtk.Label(txt)
+            label.set_alignment(1, 0.5)
+            table.attach(label, 0, 1, n, n + 1)
+
+        rad1_adj = gtk.Adjustment(0, 0, 50000, 100)
+        ang1_adj = gtk.Adjustment(0, 0, 360, 1)
+        rad2_adj = gtk.Adjustment(0, 0, 50000, 100)
+        ang2_adj = gtk.Adjustment(0, 0, 360, 1)
+        ang12_adj = gtk.Adjustment(0, 0, 360, 1)
+
+        rad1_spin = gtk.SpinButton(rad1_adj, 0, 0)
+        ang1_spin = gtk.SpinButton(ang1_adj, 0, 1)
+        rad2_spin = gtk.SpinButton(rad2_adj, 0, 0)
+        ang2_spin = gtk.SpinButton(ang2_adj, 0, 1)
+        ang12_spin = gtk.SpinButton(ang12_adj, 0, 1)
+
+        for s in [rad1_spin, ang1_spin, rad2_spin, ang2_spin, ang12_spin]:
+            s.set_numeric(True)
+            s.set_snap_to_ticks(True)
+        ang12_spin.set_wrap(True)
+
+        table.attach(rad1_spin, 1, 2, 0, 1)
+        table.attach(ang1_spin, 1, 2, 1, 2)
+        table.attach(rad2_spin, 1, 2, 2, 3)
+        table.attach(ang2_spin, 1, 2, 3, 4)
+        table.attach(ang12_spin, 1, 2, 5, 6)
+
+        combobox = gtk.combo_box_new_text()
+        for t in ['SYM', 'NEXT', 'PREV', 'FIX']:
+            combobox.append_text(t)
+        combobox.set_active(0)
+        table.attach(combobox, 1, 2, 4, 5)
+
+        self.vbox.pack_start(table)
+        self.show_all()
+
 class TaskApp(AppBase):
     def __init__(self):
         AppBase.__init__(self)
@@ -225,9 +275,10 @@ class TaskApp(AppBase):
         selection = self.task_view.get_selection()
         model, iter = selection.get_selected()
         if iter:
-            n = model.get_path(iter)[0]
-            if n > 0 and n < (len(model) - 1):
-                print n
+            path  = model.get_path(iter)[0]
+            dialog = OzDialog(self.window, self.tasks[self.task_index], path)
+            dialog.run()
+            dialog.destroy()
 
     def on_task_select(self, combobox):
         self.task_index = combobox.get_active()
@@ -313,19 +364,6 @@ class TaskApp(AppBase):
             else:
                 task.insert(posn, make_tp(wp_id))
 
-    def move_tp(self, from_posn, to_posn):
-        task = self.tasks[self.task_index]
-
-        if (from_posn != to_posn) and (from_posn != to_posn - 1):
-            print "Move"
-            wp_id = task[from_posn]['wp_id']
-            self.delete_tp(from_posn)
-
-            if to_posn < from_posn:
-                self.insert_tp(wp_id, to_posn)
-            else:
-                self.insert_tp(wp_id, to_posn - 1)
-
     def delete_tp(self, posn):
         task = self.tasks[self.task_index]
         del task[posn]
@@ -341,6 +379,19 @@ class TaskApp(AppBase):
             elif posn == task_len:
                 wp_id = task[-1]['wp_id']
                 task[-1] = make_finish_tp(wp_id)
+
+    def move_tp(self, from_posn, to_posn):
+        task = self.tasks[self.task_index]
+
+        if (from_posn != to_posn) and (from_posn != to_posn - 1):
+            print "Move"
+            wp_id = task[from_posn]['wp_id']
+            self.delete_tp(from_posn)
+
+            if to_posn < from_posn:
+                self.insert_tp(wp_id, to_posn)
+            else:
+                self.insert_tp(wp_id, to_posn - 1)
 
     def update_distance(self):
         wp_list = [tp['wp_id'] for tp in self.tasks[self.task_index]]
