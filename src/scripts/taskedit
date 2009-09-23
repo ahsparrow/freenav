@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python2.5
 
 import gtk
 import gobject
@@ -22,6 +22,8 @@ ANG2 = 0
 START_RAD = 3
 FINISH_RAD = 0.5
 
+TP_DIRNS = ['SYM', 'NEXT', 'PREV', 'FIX']
+
 def make_tp(wp_id, rad1=RAD1, ang1=ANG1, rad2=RAD2, ang2=ANG2, dirn='SYM',
             ang12=0):
     return {'wp_id': wp_id,
@@ -42,7 +44,8 @@ else:
 
 class OzDialog(gtk.Dialog):
     def __init__(self, parent, task, tp_index):
-        title = 'Obs. Zone - ' + task[tp_index]['wp_id']
+        tp = task[tp_index]
+        title = 'Obs. Zone - ' + tp['wp_id']
         gtk.Dialog.__init__(self, title, parent,
                             gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT,
                             (gtk.STOCK_CANCEL, gtk.RESPONSE_REJECT,
@@ -58,11 +61,11 @@ class OzDialog(gtk.Dialog):
             label.set_alignment(1, 0.5)
             table.attach(label, 0, 1, n, n + 1)
 
-        rad1_adj = gtk.Adjustment(0, 0, 50000, 100)
-        ang1_adj = gtk.Adjustment(0, 0, 360, 1)
-        rad2_adj = gtk.Adjustment(0, 0, 50000, 100)
-        ang2_adj = gtk.Adjustment(0, 0, 360, 1)
-        ang12_adj = gtk.Adjustment(0, 0, 360, 1)
+        rad1_adj = gtk.Adjustment(tp['rad1'], 0, 50000, 100)
+        ang1_adj = gtk.Adjustment(tp['ang1'], 0, 360, 1)
+        rad2_adj = gtk.Adjustment(tp['rad2'], 0, 0, 50000, 100)
+        ang2_adj = gtk.Adjustment(tp['ang2'], 0, 0, 360, 1)
+        ang12_adj = gtk.Adjustment(tp['ang12'], 0, 360, 1)
 
         rad1_spin = gtk.SpinButton(rad1_adj, 0, 0)
         ang1_spin = gtk.SpinButton(ang1_adj, 0, 1)
@@ -72,7 +75,6 @@ class OzDialog(gtk.Dialog):
 
         for s in [rad1_spin, ang1_spin, rad2_spin, ang2_spin, ang12_spin]:
             s.set_numeric(True)
-            s.set_snap_to_ticks(True)
         ang12_spin.set_wrap(True)
 
         table.attach(rad1_spin, 1, 2, 0, 1)
@@ -82,9 +84,9 @@ class OzDialog(gtk.Dialog):
         table.attach(ang12_spin, 1, 2, 5, 6)
 
         combobox = gtk.combo_box_new_text()
-        for t in ['SYM', 'NEXT', 'PREV', 'FIX']:
-            combobox.append_text(t)
-        combobox.set_active(0)
+        for d in TP_DIRNS:
+            combobox.append_text(d)
+        combobox.set_active(TP_DIRNS.index(tp['dirn']))
         table.attach(combobox, 1, 2, 4, 5)
 
         self.vbox.pack_start(table)
@@ -275,8 +277,9 @@ class TaskApp(AppBase):
         selection = self.task_view.get_selection()
         model, iter = selection.get_selected()
         if iter:
-            path  = model.get_path(iter)[0]
-            dialog = OzDialog(self.window, self.tasks[self.task_index], path)
+            path = model.get_path(iter)
+            dialog = OzDialog(self.window, self.tasks[self.task_index],
+                              path[0])
             dialog.run()
             dialog.destroy()
 
