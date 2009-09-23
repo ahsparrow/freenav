@@ -1,12 +1,12 @@
 Source: freenav
-Section: unknown
-Priority: extra
-Maintainer: unknown <alan@freeflight.org.uk>
+Section: user/other
+Priority: optional
+Maintainer: Alan Sparrow <alan@freeflight.org.uk>
 Build-Depends: debhelper (>= 5)
 Standards-Version: 3.7.2
 
 Package: freenav
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: <insert up to 60 chars description>
- <insert long description, indented with spaces>
+Architecture: all
+Depends: python2.5 python2.5-hildon python2.5-gtk2
+Description: A short description
+ A long description
