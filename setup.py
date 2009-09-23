@@ -7,7 +7,7 @@ setup(name='freenav',
       scripts=['src/scripts/taskedit'],
       packages=['freenav'],
       package_dir={'freenav': 'src/freenav'},
-      data_files=[('/usr/share/applications/hildon', ['data/taskedit.desktop']),
-                  ('/usr/share/dbus-1/services', ['data/taskedit.service'])
+      data_files=[('share/applications/hildon', ['data/taskedit.desktop']),
+                  ('share/dbus-1/services', ['data/taskedit.service'])
                  ]
      )
