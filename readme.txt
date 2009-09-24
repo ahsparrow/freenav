@@ -18,3 +18,7 @@ BUILDING THE DATABASE
      pc> scp free.gz ipaq:free.gz
      ipaq> rm .freeflight/free.gz
      ipaq> zcat free.gz | sqlite3 .freeflight/free.db
+
+Generate Debian package:
+    Login to Scratchbox...
+    [ .../freenav-0.0.1] > dpkg-buildpackage -rfakeroot
