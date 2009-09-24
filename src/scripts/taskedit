@@ -15,12 +15,12 @@ import freenav.projection
 TASKS = 'ABCDEFGH'
 NUM_TASKS = len(TASKS)
 
-RAD1 = 0.5
+RAD1 = 500
 ANG1 = 360
 RAD2 = 0
 ANG2 = 0
-START_RAD = 3
-FINISH_RAD = 0.5
+START_RAD = 3000
+FINISH_RAD = 500
 
 TP_DIRNS = ['SYM', 'NEXT', 'PREV', 'FIX']
 
@@ -31,11 +31,11 @@ def make_tp(wp_id, rad1=RAD1, ang1=ANG1, rad2=RAD2, ang2=ANG2, dirn='SYM',
             'rad2': rad2, 'ang2': ang2,
             'dirn': dirn, 'ang12': ang12}
 
-def make_start_tp(wp_id, rad1=START_RAD, dirn='NEXT', ang12=0):
-    return make_tp(wp_id, rad1=rad1, dirn=dirn, ang12=ang12)
+def make_start_tp(wp_id, rad1=START_RAD, ang1=0, dirn='NEXT', ang12=0):
+    return make_tp(wp_id, rad1=rad1, ang1=ang1, dirn=dirn, ang12=ang12)
 
-def make_finish_tp(wp_id, rad1=FINISH_RAD, dirn='PREV', ang12=0):
-    return make_tp(wp_id, rad1=rad1, dirn=dirn, ang12=ang12)
+def make_finish_tp(wp_id, rad1=FINISH_RAD, ang1=0, dirn='PREV', ang12=0):
+    return make_tp(wp_id, rad1=rad1, ang1=0, dirn=dirn, ang12=ang12)
 
 if is_hildon_app:
     AppBase = hildon.Program
@@ -54,43 +54,59 @@ class OzDialog(gtk.Dialog):
         table = gtk.Table(6, 2, True)
         table.set_col_spacing(0, 5)
         table.set_row_spacings(3)
-        for n, txt in enumerate(['Radius1 (m)', 'Angle1 (deg)',
-                                 'Radius2 (m)', 'Angle2 (deg)',
-                                 'Dirn', 'Angle12 (deg)']):
+        for n, txt in enumerate(['Outer Radius (m)', 'Angle (deg)',
+                                 'Inner Radius (m)', 'Angle (deg)',
+                                 'Dirn', 'Bisect (deg)']):
             label = gtk.Label(txt)
             label.set_alignment(1, 0.5)
             table.attach(label, 0, 1, n, n + 1)
 
-        rad1_adj = gtk.Adjustment(tp['rad1'], 0, 50000, 100)
-        ang1_adj = gtk.Adjustment(tp['ang1'], 0, 360, 1)
-        rad2_adj = gtk.Adjustment(tp['rad2'], 0, 0, 50000, 100)
-        ang2_adj = gtk.Adjustment(tp['ang2'], 0, 0, 360, 1)
+        rad1_adj = gtk.Adjustment(tp['rad1'], 0, 50000, 500)
+        ang1_adj = gtk.Adjustment(tp['ang1'], 0, 360, 45)
+        rad2_adj = gtk.Adjustment(tp['rad2'], 0, 50000, 500)
+        ang2_adj = gtk.Adjustment(tp['ang2'], 0, 360, 45)
         ang12_adj = gtk.Adjustment(tp['ang12'], 0, 360, 1)
 
-        rad1_spin = gtk.SpinButton(rad1_adj, 0, 0)
-        ang1_spin = gtk.SpinButton(ang1_adj, 0, 1)
-        rad2_spin = gtk.SpinButton(rad2_adj, 0, 0)
-        ang2_spin = gtk.SpinButton(ang2_adj, 0, 1)
-        ang12_spin = gtk.SpinButton(ang12_adj, 0, 1)
+        self.rad1_spin = gtk.SpinButton(rad1_adj, 0, 0)
+        self.ang1_spin = gtk.SpinButton(ang1_adj, 0, 1)
+        self.rad2_spin = gtk.SpinButton(rad2_adj, 0, 0)
+        self.ang2_spin = gtk.SpinButton(ang2_adj, 0, 1)
+        self.ang12_spin = gtk.SpinButton(ang12_adj, 0.5, 1)
 
-        for s in [rad1_spin, ang1_spin, rad2_spin, ang2_spin, ang12_spin]:
+        for s in [self.rad1_spin, self.ang1_spin, self.rad2_spin,
+                  self.ang2_spin, self.ang12_spin]:
             s.set_numeric(True)
-        ang12_spin.set_wrap(True)
+        self.ang12_spin.set_wrap(True)
 
-        table.attach(rad1_spin, 1, 2, 0, 1)
-        table.attach(ang1_spin, 1, 2, 1, 2)
-        table.attach(rad2_spin, 1, 2, 2, 3)
-        table.attach(ang2_spin, 1, 2, 3, 4)
-        table.attach(ang12_spin, 1, 2, 5, 6)
+        table.attach(self.rad1_spin, 1, 2, 0, 1)
+        table.attach(self.ang1_spin, 1, 2, 1, 2)
+        table.attach(self.rad2_spin, 1, 2, 2, 3)
+        table.attach(self.ang2_spin, 1, 2, 3, 4)
+        table.attach(self.ang12_spin, 1, 2, 5, 6)
 
-        combobox = gtk.combo_box_new_text()
+        self.dirn_combobox = gtk.combo_box_new_text()
         for d in TP_DIRNS:
-            combobox.append_text(d)
-        combobox.set_active(TP_DIRNS.index(tp['dirn']))
-        table.attach(combobox, 1, 2, 4, 5)
+            self.dirn_combobox.append_text(d)
+        self.dirn_combobox.set_active(TP_DIRNS.index(tp['dirn']))
+        table.attach(self.dirn_combobox, 1, 2, 4, 5)
+        self.dirn_combobox.connect('changed', self.on_dirn_select)
+
+        self.ang12_spin.set_sensitive(tp['dirn'] == 'FIX')
 
         self.vbox.pack_start(table)
         self.show_all()
+
+    def on_dirn_select(self, combobox):
+        self.ang12_spin.set_sensitive(
+            TP_DIRNS[combobox.get_active()] == 'FIX')
+
+    def get_values(self):
+        return {'rad1': self.rad1_spin.get_value_as_int(),
+                'rad2': self.rad2_spin.get_value_as_int(),
+                'ang1': self.ang1_spin.get_value(),
+                'ang2': self.ang2_spin.get_value(),
+                'ang12': self.ang12_spin.get_value(),
+                'dirn': TP_DIRNS[self.dirn_combobox.get_active()]}
 
 class TaskApp(AppBase):
     def __init__(self):
@@ -280,7 +296,14 @@ class TaskApp(AppBase):
             path = model.get_path(iter)
             dialog = OzDialog(self.window, self.tasks[self.task_index],
                               path[0])
-            dialog.run()
+            response = dialog.run()
+            if response == gtk.RESPONSE_OK:
+                self.task_saved = False
+                oz_values = dialog.get_values()
+                tp = self.tasks[self.task_index][path[0]]
+                for k in oz_values:
+                    tp[k] = oz_values[k]
+
             dialog.destroy()
 
     def on_task_select(self, combobox):
@@ -387,7 +410,6 @@ class TaskApp(AppBase):
         task = self.tasks[self.task_index]
 
         if (from_posn != to_posn) and (from_posn != to_posn - 1):
-            print "Move"
             wp_id = task[from_posn]['wp_id']
             self.delete_tp(from_posn)
 
