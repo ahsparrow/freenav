@@ -7,6 +7,5 @@ Standards-Version: 3.7.2
 
 Package: freenav
 Architecture: all
-Depends: python2.5, python2.5-hildon, python2.5-gtk2
-Description: A short description
- A long description
+Depends: python2.5, python2.5-hildon, python2.5-gtk2, python2.5-pysqlite2
+Description: FreeNav task editor
