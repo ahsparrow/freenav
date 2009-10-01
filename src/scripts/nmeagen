@@ -1,12 +1,19 @@
 #!/usr/bin/env python
 
-import freedb
-import projection
-
-import gtk
-import gobject
 import math
-import os, time, pty, signal, termios
+import optparse
+import os
+import time
+import pty
+import signal
+import termios
+
+import bluetooth
+import gobject
+import gio
+import gtk
+
+from freenav import freedb, projection
 
 FT_TO_METERS = 0.3048
 KTS_TO_MPS = 0.5144444444
@@ -23,36 +30,14 @@ ENTRIES = (('ALT', 'Altititude (ft)', '4000'),
 class NmeaGen:
     def __init__(self):
         self.db = freedb.Freedb()
-        self.lambert = projection.Lambert(*self.db.get_projection())
-        self.x, self.y, alt = self.db.get_waypoint('RIV')
+        p = self.db.get_projection()
+        self.lambert = projection.Lambert(
+            p['Parallel1'], p['Parallel2'], p['Ref_Lat'], p['Ref_Lon'])
+
+        wp = self.db.get_waypoint('RIV')
+        self.x = wp['X']
+        self.y = wp['Y']
         self.time = time.time()
-
-        self.master_fd, slave_fd = pty.openpty()
-        slave = os.ttyname(slave_fd)
-
-        pidfile = "/tmp/gpsfake_pid-%s" % os.getpid()
-        spawncmd = "/usr/local/sbin/xgpsd -N -P%s %s" % (pidfile, slave)
-        if os.system(spawncmd + ' &'):
-            print 'Spawn failed'
-            sys.exit(1)
-        else:
-            time.sleep(1)
-            fp = open(pidfile)
-            self.pid = int(fp.read())
-            fp.close()
-            os.remove(pidfile)
-
-        speed = 0
-        ttyfp = open(slave, 'rw')
-        raw = termios.tcgetattr(ttyfp.fileno())
-        raw[0] = 0
-        raw[1] = termios.ONLCR
-        raw[2] &= ~(termios.PARENB | termios.CRTSCTS)
-        raw[2] |= (termios.CSIZE & termios.CS8)
-        raw[2] |= termios.CREAD | termios.CLOCAL
-        raw[3] = 0
-        raw[4] = raw[5] = eval("termios.B" + `speed`)
-        termios.tcsetattr(ttyfp.fileno(), termios.TCSANOW, raw)
 
     def set_values(self, altitude, air_speed, ground_speed, course, maccready,
                    ballast, bugs):
@@ -64,7 +49,7 @@ class NmeaGen:
         self.ballast = float(ballast)
         self.bugs = int(bugs)
 
-    def update(self):
+    def update(self, stream):
         t = time.time()
         dt = t - self.time
         self.time = t
@@ -102,26 +87,26 @@ class NmeaGen:
                 % (tstr, lat_deg, lat_min, northing, lon_deg, lon_min, easting, 
                    self.ground_speed*MPS_TO_KTS, self.course, datestr)
         data = self.add_checksum(data)
-        os.write(self.master_fd, data)
+        stream.write(data)
         time.sleep(0.1)
 
         data = '$GPGGA,%s,%02d%06.3f,%s,%03d%06.3f,%s,1,12,1.0,%d,M,0.0,M,,' % \
                 (tstr, lat_deg, lat_min, northing, lon_deg, lon_min, easting,
                  int(self.altitude))
         data = self.add_checksum(data)
-        os.write(self.master_fd, data)
+        stream.write(data)
         time.sleep(0.1)
 
         data = '$GPGSA,A,3,1,2,3,4,5,6,7,8,9,10,11,12,1.0,1.0,1.0'
         data = self.add_checksum(data)
-        os.write(self.master_fd, data)
+        stream.write(data)
         time.sleep(0.1)
 
         data = '$PBB50,%d,.0,%03.1f,0,%d,%03.1f,1,23' % \
                 (int(self.air_speed*MPS_TO_KTS),
                  self.maccready, self.bugs, self.ballast)
         data = self.add_checksum(data)
-        os.write(self.master_fd, data)
+        stream.write(data)
 
     def add_checksum(self, data):
         checksum = 0;
@@ -132,7 +117,11 @@ class NmeaGen:
         return data + '*' + checksum + '\r\n'
 
 class NmeaApp:
-    def __init__(self):
+    def __init__(self, gpsd_flag, rfcomm_ch_num):
+        self.gpsd_flag = gpsd_flag
+        self.stream_is_open = False
+
+        self.open_stream(gpsd_flag, rfcomm_ch_num)
         self.nmea_gen = NmeaGen()
 
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -176,8 +165,52 @@ class NmeaApp:
         self.window.add(vbox)
         self.window.show_all()
 
+    def open_stream(self, gpsd_flag, rfcomm_ch_num): 
+        if rfcomm_ch_num != 0:
+            self.serv_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+            self.serv_sock.bind(("", rfcomm_ch_num))
+            self.serv_sock.listen(1)
+            gobject.io_add_watch(self.serv_sock, gobject.IO_IN,
+                                 self.socket_listener)
+            print "Listening for Bluetooth connection..."
+        else:
+            master_fd, slave_fd = pty.openpty()
+            self.stream = gio.unix.OutputStream(master_fd, True)
+            self.stream_is_open = True
+
+            slave_name = os.ttyname(slave_fd)
+            if self.gpsd_flag:
+                pidfile = "/tmp/gpsfake_pid-%s" % os.getpid()
+                spawncmd = "/usr/local/sbin/xgpsd -N -P%s %s" % (pidfile,
+                                                                 slave_name)
+                if os.system(spawncmd + ' &'):
+                    print 'Spawn failed'
+                    sys.exit(1)
+                else:
+                    time.sleep(1)
+                    fp = open(pidfile)
+                    self.pid = int(fp.read())
+                    fp.close()
+                    os.remove(pidfile)
+            else:
+                print "TTY", slave_name
+
+    def socket_listener(self, *args):
+        self.client_sock, addr = self.serv_sock.accept()
+        print "Accept", addr
+
+        self.stream = gio.unix.OutputStream(self.client_sock.fileno(), True)
+        self.stream_is_open = True
+        return True
+
     def timeout_callback(self):
-        self.nmea_gen.update()
+        if self.stream_is_open:
+            try:
+                self.nmea_gen.update(self.stream)
+            except gio.Error, err:
+                print err
+                #self.stream.close()
+                self.stream_is_open = False
         return True
 
     def apply_callback(self, widget, data=None):
@@ -193,14 +226,24 @@ class NmeaApp:
         self.quit()
 
     def quit(self):
-        os.kill(self.nmea_gen.pid, signal.SIGTERM)
+        if self.gpsd_flag:
+            os.kill(self.nmea_gen.pid, signal.SIGTERM)
         gtk.main_quit()
 
     def main(self):
         gtk.main()
 
 def main():
-    nmea_app = NmeaApp()
+    parser = optparse.OptionParser()
+    parser.add_option("-g", "--gpsd", dest="gpsd_flag",
+                      action="store_true", default=False,
+                      help="Run GPSD daemon")
+    parser.add_option("-r", "--rfcomm", dest="rfcomm_ch_num",
+                      default=0,
+                      help="Bluetooth RFCOMM channel number")
+    (options, args) = parser.parse_args()
+
+    nmea_app = NmeaApp(options.gpsd_flag, int(options.rfcomm_ch_num))
     nmea_app.main()
 
 if __name__ == '__main__':
