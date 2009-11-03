@@ -72,6 +72,13 @@ class Freedb:
         sql = 'INSERT INTO Config (Task_Id) VALUES (0)'
         self.c.execute(sql)
 
+        self.c.execute('CREATE INDEX X_Index ON Waypoints (X)')
+        self.c.execute('CREATE INDEX Y_Index ON Waypoints (Y)')
+        self.c.execute('CREATE INDEX Xmin_Index ON Airspace (X_Min)')
+        self.c.execute('CREATE INDEX Xmax_Index ON Airspace (X_Max)')
+        self.c.execute('CREATE INDEX Ymin_Index ON Airspace (Y_Min)')
+        self.c.execute('CREATE INDEX Ymax_Index ON Airspace (Y_Max)')
+
         self.commit()
 
     def get_projection(self):
@@ -103,11 +110,6 @@ class Freedb:
         sql = 'SELECT Id, Name FROM Waypoints ORDER BY Id'
         self.c.execute(sql)
         return self.c.fetchall()
-
-    def create_waypoint_indices(self):
-        """Create waypoint indices on X and Y"""
-        self.c.execute('CREATE INDEX X_Index ON Waypoints (X)')
-        self.c.execute('CREATE INDEX Y_Index ON Waypoints (Y)')
 
     def set_task(self, task, id=0):
         sql = 'DELETE FROM Tasks WHERE Id=? '
@@ -149,31 +151,26 @@ class Freedb:
         self.commit()
 
     def delete_airspace(self):
-        self.c.execute('DROP INDEX Xmin_Index')
-        self.c.execute('DROP INDEX Xmax_Index')
-        self.c.execute('DROP INDEX Ymin_Index')
-        self.c.execute('DROP INDEX Ymax_Index')
-
-        self.c.execute('DELETE FROM Airspace_Par')
+        self.c.execute('DELETE FROM Airspace')
         self.c.execute('DELETE FROM Airspace_Lines')
         self.c.execute('DELETE FROM Airspace_Arcs')
 
     def insert_airspace_parent(self,
                                id, name, base, top, xmin, ymin, xmax, ymax):
-        sql = 'INSERT INTO Airspace_Par '\
+        sql = 'INSERT INTO Airspace '\
               '(Id, Name, Base, Top, X_Min, Y_Min, X_Max, Y_Max) '\
               'VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         self.c.execute(sql,
             (id, name, base, top, int(xmin), int(ymin), int(xmax), int(ymax)))
 
     def insert_airspace_line(self, id, x1, y1, x2, y2):
-        sql = 'INSERT INTO Airspace_Lines (Id, X1, Y1, X2, Y2) '\
+        sql = 'INSERT INTO Airspace_Lines (Airspace_Id, X1, Y1, X2, Y2) '\
               'VALUES (?, ?, ?, ?, ?)'
         self.c.execute(sql, (id, int(x1), int(y1), int(x2), int(y2)))
 
     def insert_airspace_arc(self, id, x, y, radius, startAngle, arcLength):
         sql = 'INSERT INTO Airspace_Arcs '\
-              '(Id, X, Y, Radius, Start_Angle, Arc_Length)'\
+              '(Airspace_Id, X, Y, Radius, Start_Angle, Arc_Length)'\
               'VALUES (?, ?, ?, ?, ?, ?)'
         self.c.execute(sql, (id, int(x), int(y), int(radius),
                              int(startAngle * 64), int(arcLength * 64)))
@@ -182,7 +179,7 @@ class Freedb:
         self.insert_airspace_arc(id, x, y, radius, 0, 360)
 
     def create_airspace_indices(self):
-        self.c.execute('CREATE INDEX Xmin_Index ON Airspace_Par (X_Min)')
-        self.c.execute('CREATE INDEX Xmax_Index ON Airspace_Par (X_Max)')
-        self.c.execute('CREATE INDEX Ymin_Index ON Airspace_Par (Y_Min)')
-        self.c.execute('CREATE INDEX Ymax_Index ON Airspace_Par (Y_Max)')
+        self.c.execute('CREATE INDEX Xmin_Index ON Airspace (X_Min)')
+        self.c.execute('CREATE INDEX Xmax_Index ON Airspace (X_Max)')
+        self.c.execute('CREATE INDEX Ymin_Index ON Airspace (Y_Min)')
+        self.c.execute('CREATE INDEX Ymax_Index ON Airspace (Y_Max)')

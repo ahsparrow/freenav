@@ -28,12 +28,12 @@ class FreenavDb( freedb.Freedb):
         ymax = y+height/2
 
         # Update (and cache) waypoints and airspace
-        sql = 'SELECT ID, X, Y, Landable_Flag FROM Waypoint '\
+        sql = 'SELECT ID, X, Y, Landable_Flag FROM Waypoints '\
               'WHERE X>? AND X<? AND Y>? AND Y<?'
         self.c.execute(sql, (xmin, xmax, ymin, ymax))
         self.wps = self.c.fetchall()
 
-        sql = 'SELECT Id, Name, Base, Top FROM Airspace_Par '\
+        sql = 'SELECT Id, Name, Base, Top FROM Airspace '\
               'WHERE ? < X_Max AND ? > X_Min AND ? < Y_Max AND ? > Y_Min'
         self.c.execute(sql, (xmin, xmax, ymin, ymax))
         self.bdrys = self.c.fetchall()
@@ -42,12 +42,13 @@ class FreenavDb( freedb.Freedb):
         self.bdry_arcs = {}
         for bdry in self.bdrys:
             id = bdry[0]
-            sql = 'SELECT X1, Y1, X2, Y2 FROM Airspace_Lines WHERE Id=?'
+            sql = 'SELECT X1, Y1, X2, Y2 FROM Airspace_Lines WHERE '\
+                  'Airspace_Id=?'
             self.c.execute(sql, (id,))
             self.bdry_lines[id] = self.c.fetchall()
 
             sql = 'SELECT X, Y, Radius, Start_Angle, Arc_Length '\
-                  'FROM Airspace_Arcs WHERE Id=?'
+                  'FROM Airspace_Arcs WHERE Airspace_Id=?'
             self.c.execute(sql, (id,))
             self.bdry_arcs[id] = self.c.fetchall()
 
@@ -69,7 +70,7 @@ class FreenavDb( freedb.Freedb):
         xmax = x + self.ref_width/10
         ymin = y - self.ref_height/10
         ymax = y + self.ref_height/10
-        sql = "SELECT Id, X, Y FROM Waypoint "\
+        sql = "SELECT Id, X, Y FROM Waypoints "\
               "WHERE X>? AND X<? AND Y>? AND Y<? AND Landable_Flag=1"
         self.c.execute(sql, (xmin, xmax, ymin, ymax))
         landable_wps = self.c.fetchall()
@@ -95,17 +96,21 @@ class FreenavDb( freedb.Freedb):
            position cross the boundary. If it's odd then point is inside."""
 
         airspace_segments = []
-        for id, name, base, top in self.bdrys:
+        for bdry in self.bdrys:
             odd_node = False
 
             # Count boundary line crossings
-            for x1, y1, x2, y2 in self.bdry_lines[id]:
+            for line in self.bdry_lines[bdry['id']]:
+                x1, y1 = (line['x1'], line['y1'])
+                x2, y2 = (line['x2'], line['y2'])
                 if (y1 < y and y2 >= y) or (y2 < y and y1 >= y):
                     if (x1 + (y - y1) / (y2 - y1) * (x2 -x1)) < x:
                         odd_node = not odd_node
 
             # Count boundary arc (and circle) crossings
-            for xc, yc, radius, start, len in self.bdry_arcs[id]:
+            for arc in self.bdry_arcs[bdry['id']]:
+                xc, yc, radius = (arc['x'], arc['y'], arc['radius'])
+                start, len = (arc['start_angle'], arc['arc_length'])
                 if y >= (yc - radius) and y < (yc + radius):
                     # Each arc has potentially two crossings
                     ang1 = math.degrees(math.asin((y - yc) / radius)) * 64
@@ -119,6 +124,7 @@ class FreenavDb( freedb.Freedb):
                                 odd_node = not odd_node
 
             if odd_node:
-                airspace_segments.append((name, base, top))
+                airspace_segments.append(
+                        (bdry['name'], bdry['base'], bdry['top']))
 
         return airspace_segments

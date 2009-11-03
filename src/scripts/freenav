@@ -1,14 +1,24 @@
 #!/usr/bin/env python
 
+import ConfigParser
 import getopt
 import math
 import socket
 import sys
 import time
+
 import gtk, gobject, pango
 import gtk.gdk
-import gps
-import nav, projection, logger, wind_calc, freenavdb
+import dbus, dbus.mainloop.glib
+
+from freenav import nav, projection, logger, wind_calc, navdb
+
+DBUS_SERVICE = "org.freedesktop.Gypsy"
+DBUS_PATH = "/org/freedesktop/Gypsy"
+
+CONTROL_INTERFACE = "org.freedesktop.Gypsy.Server"
+DEVICE_INTERFACE = "org.freedesktop.Gypsy.Device"
+POSITION_INTERFACE = "org.freedesktop.Gypsy.Position"
 
 M_TO_FT = 1/0.3048
 MPS_TO_KTS = 1/nav.KTS_TO_MPS
@@ -33,8 +43,7 @@ def html_escape(text):
     return text
 
 class Base:
-    def __init__(self, gps, nav, db, logger, fullscreen, invert):
-        self.gps = gps
+    def __init__(self, nav, db, logger, fullscreen, invert):
         self.nav = nav
         self.db = db
         self.logger = logger
@@ -51,8 +60,14 @@ class Base:
         else:
             self.tz_offset = time.timezone/3600
 
-        self.task = self.db.get_task()
+        self.task = []
         self.wp_index = 0
+
+        wp_ids = [t['wp_id'] for t in self.db.get_task()]
+        for wp_id in wp_ids:
+            wp = self.db.get_waypoint(wp_id)
+            self.task.append((wp_id, wp['x'], wp['y'], wp['altitude']))
+
         wp = self.task[0]
         self.nav.set_dest(wp[0], wp[1], wp[2], wp[3])
 
@@ -77,9 +92,21 @@ class Base:
 
         self.window.add_events(gtk.gdk.KEY_PRESS_MASK)
         self.window.connect('key_press_event', self.key_press)
-        gobject.timeout_add(2000, self.timeout)
 
         self.window.connect('destroy', gtk.main_quit)
+
+        dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+        bus = dbus.SystemBus()
+        control = bus.get_object(DBUS_SERVICE, DBUS_PATH)
+
+        path = control.Create('/dev/pts/2', dbus_interface=CONTROL_INTERFACE)
+        gps = bus.get_object(DBUS_SERVICE, path)
+
+        position = dbus.Interface(gps, dbus_interface=POSITION_INTERFACE)
+        gps.connect_to_signal("PositionChanged", self.position_changed)
+
+        device = dbus.Interface(gps, dbus_interface=DEVICE_INTERFACE)
+        device.Start()
 
         if fullscreen:
             self.window.fullscreen()
@@ -162,7 +189,6 @@ class Base:
         return True
 
     def incr_waypoint(self):
-        self.task = self.db.get_task()
         wp_index = self.wp_index+1
         if wp_index>=len(self.task) or self.task[wp_index][0]==self.task[0][0]:
             wp_index = 0
@@ -171,7 +197,6 @@ class Base:
         self.wp_index = wp_index
 
     def decr_waypoint(self):
-        self.task = self.db.get_task()
         wp_index = self.wp_index - 1 
         if wp_index < 0:
             wp_index = len(self.task) - 1
@@ -181,33 +206,19 @@ class Base:
         self.nav.set_dest(wp[0], wp[1], wp[2], wp[3])
         self.wp_index = wp_index
 
-    def timeout(self):
-        try:
-            self.gps.query('patvdgy\n')
-        except socket.error:
-            md = gtk.MessageDialog(buttons=gtk.BUTTONS_OK,
-                type=gtk.MESSAGE_ERROR,
-                message_format='Lost connection to gpsd server')
-            md.run()
-            gtk.main_quit()
-            return True
-
-        fix = self.gps.fix
-        borgelt = self.gps.borgelt
-        utc = self.gps.utc
-
-        if self.nav.update(utc, fix, borgelt):
-            self.logger.log(self.nav.utc, fix.latitude, fix.longitude,
-                            fix.altitude, fix.speed, borgelt.air_speed,
-                            fix.track)
+    def position_changed(self, field_set, timestamp, latitude, longitude,
+                         altitude):
+        if self.nav.update(timestamp, latitude, longitude, altitude, 0,
+                           0, 0, 0, 0, 1):
+            # XXX self.logger.log(self.nav.utc, fix.latitude, fix.longitude,
+            #                fix.altitude, fix.speed, borgelt.air_speed,
+            #                fix.track)
 
             self.viewx = self.nav.x
             self.viewy = self.nav.y
             self.wind_calc.update(self.nav.x, self.nav.y, self.nav.utc)
 
             self.window.queue_draw()
-
-        return True
 
     def view_to_win(self, x, y):
         win_width, win_height = self.window.get_size()
@@ -230,16 +241,18 @@ class Base:
     def draw_airspace(self, gc, win):
         # Draw airspace lines
         for bdry in self.db.view_bdry():
-            for x1, y1, x2, y2 in self.db.view_bdry_lines(bdry[0]):
-                x1, y1 = self.view_to_win(x1, y1)
-                x2, y2 = self.view_to_win(x2, y2)
+            for line in self.db.view_bdry_lines(bdry['id']):
+                x1, y1 = self.view_to_win(line['x1'], line['y1'])
+                x2, y2 = self.view_to_win(line['x2'], line['y2'])
                 win.draw_line(gc, x1, y1, x2, y2)
 
             # Draw airspace arcs & circles
-            for x, y, radius, start, arc_len in self.db.view_bdry_arcs(bdry[0]):
-                x, y = self.view_to_win(x-radius, y+radius)
-                width = 2*radius/self.view_scale
-                win.draw_arc(gc, False, x, y, width, width, start, arc_len)
+            for arc in self.db.view_bdry_arcs(bdry[0]):
+                radius = arc['radius']
+                x, y = self.view_to_win(arc['x'] - radius, arc['y'] + radius)
+                width = 2 * arc['radius'] / self.view_scale
+                win.draw_arc(gc, False, x, y, width, width, arc['start_angle'],
+                             arc['arc_length'])
 
     def draw_task(self, gc, win):
         # Task
@@ -260,11 +273,12 @@ class Base:
 
     def draw_waypoints(self, gc, pl, win):
         # Draw waypoints
-        for wp_id, x, y, landable_flag in self.db.view_wps():
-            x, y = self.view_to_win(x, y)
-            win.draw_arc(gc, landable_flag, x-3, y-3, 6, 6, 0, 23040)
+        wps = self.db.view_wps()
+        for wp in wps:
+            x, y = self.view_to_win(wp['x'], wp['y'])
+            win.draw_arc(gc, wp['landable_flag'], x-3, y-3, 6, 6, 0, 23040)
 
-            pl.set_markup(wp_id)
+            pl.set_markup(wp['id'])
             win.draw_layout(gc, x+3, y+3, pl)
 
     def draw_annotation(self, gc, pl, win, win_height, win_width):
@@ -298,9 +312,9 @@ class Base:
         x, y = pl.get_pixel_size()
         win.draw_layout(gc, 2, win_height-row_height-y, pl, background=bg)
 
-        pl.set_markup('<big><b>%d</b></big>' % self.gps.satellites_used)
-        x, y = pl.get_pixel_size()
-        win.draw_layout(gc, 2, win_height-2*row_height-y, pl, background=bg)
+        # XXX pl.set_markup('<big><b>%d</b></big>' % self.gps.satellites_used)
+        # XXX x, y = pl.get_pixel_size()
+        # XXX win.draw_layout(gc, 2, win_height-2*row_height-y, pl, background=bg)
 
         if self.nav.ete == nav.INVALID_ETE:
             timestr = '-:--'
@@ -439,27 +453,26 @@ class Base:
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'fg:il:')
+        opts, args = getopt.getopt(sys.argv[1:], 'fil:')
     except getopt.GetoptError:
         print "Bad options"
         sys.exit(2)
 
-    gpshost = 'localhost'
     fullscreen = False
     log_dir = LOG_DIR
     invert = False
     for o, a in opts:
-        if o == '-g':
-            gpshost = a
-        elif o == '-f':
+        if o == '-f':
             fullscreen = True
         elif o == '-i':
             invert = True
         elif o == '-l':
             log_dir = a
 
-    db = freenavdb.FreenavDb()
-    lambert = projection.Lambert(*db.get_projection())
+    db = navdb.FreenavDb()
+    p = db.get_projection()
+    lambert = projection.Lambert(
+            p['Parallel1'], p['Parallel2'], p['Ref_Lat'], p['Ref_Lon'])
 
     height_margin = 305
     polar = {'a': -0.002117, 'b': 0.08998, 'c': -1.56}
@@ -469,7 +482,7 @@ def main():
 
     log = logger.Logger(log_dir)
 
-    base = Base(gps.gps(host=gpshost), nv, db, log, fullscreen, invert)
+    base = Base(nv, db, log, fullscreen, invert)
     base.main()
 
 if __name__ == '__main__':

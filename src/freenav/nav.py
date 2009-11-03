@@ -46,33 +46,31 @@ class Nav:
         self.headwind = headwind
         self.calc()
 
-    def update(self, utc, fix, vario):
-        if utc:
-            self.utc = time.strptime(utc[:19], "%Y-%m-%dT%H:%M:%S")
-            x, y = self.projection.forward(math.radians(fix.latitude),
-                                           math.radians(fix.longitude))
-            self.x = int(x)
-            self.y = int(y)
-            self.altitude = int(fix.altitude)
-            self.track = math.radians(fix.track)
-            self.ground_speed = fix.speed*KTS_TO_MPS
+    def update(self, timestamp, latitude, longitude, altitude, track,
+               ground_speed, air_speed, maccready, bugs, ballast):
+        self.utc = time.gmtime(timestamp)
+        x, y = self.projection.forward(math.radians(latitude),
+                                       math.radians(longitude))
+        self.x = int(x)
+        self.y = int(y)
+        self.altitude = int(altitude)
+        self.track = math.radians(track)
+        self.ground_speed = ground_speed*KTS_TO_MPS
 
-            # Correct airspeed for airframe static errors
-            air_speed = vario.air_speed*KTS_TO_MPS
-            if air_speed < self.asi_cal['v1']:
-                a, b = self.asi_cal['a1'], self.asi_cal['b1']
-            else:
-                a, b = self.asi_cal['a2'], self.asi_cal['b2']
-            self.air_speed = a*air_speed + b
-
-            self.maccready = vario.maccready*KTS_TO_MPS
-            self.bugs_ratio = (100 + vario.bugs)/100.0
-            self.ballast_ratio = vario.ballast
-            self.calc()
-
-            return True
+        # Correct airspeed for airframe static errors
+        air_speed = air_speed*KTS_TO_MPS
+        if air_speed < self.asi_cal['v1']:
+            a, b = self.asi_cal['a1'], self.asi_cal['b1']
         else:
-            return False
+            a, b = self.asi_cal['a2'], self.asi_cal['b2']
+        self.air_speed = a * air_speed + b
+
+        self.maccready = maccready * KTS_TO_MPS
+        self.bugs_ratio = (100 + bugs) / 100.0
+        self.ballast_ratio = ballast
+        self.calc()
+
+        return True
 
     def calc(self):
         # Distance and bearing

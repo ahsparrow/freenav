@@ -111,7 +111,9 @@ def main():
 
     # Initialise parser
     parser = Parser(tnp.tnp_decl, 'tnp_file')
-    proj = freenav.projection.Lambert(*db.get_projection())
+    p = db.get_projection()
+    proj = freenav.projection.Lambert(p['Parallel1'], p['Parallel2'],
+                                      p['Ref_Lat'], p['Ref_Lon'])
     output_processor = AirProcessor(db, proj)
     tnp_processor = tnp.TnpProcessor(output_processor)
 
