@@ -16,6 +16,7 @@ import gtk
 from freenav import freedb, projection
 
 RF_COMM_CHANNEL = 1
+GPS_SYMLINK_NAME = "/tmp/gps"
 
 FT_TO_METERS = 0.3048
 KTS_TO_MPS = 0.5144444444
@@ -181,7 +182,11 @@ class NmeaApp:
             self.stream_is_open = True
 
             slave_name = os.ttyname(slave_fd)
-            print "TTY", slave_name
+            try:
+                os.unlink(GPS_SYMLINK_NAME)
+            except OSError:
+                pass
+            os.symlink(slave_name, GPS_SYMLINK_NAME)
 
             (iflag, oflag,
              cflag, lflag, ispeed, ospeed, cc) = termios.tcgetattr(slave_fd)
