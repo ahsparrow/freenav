@@ -34,7 +34,7 @@ class NmeaGen:
         self.db = freedb.Freedb()
         p = self.db.get_projection()
         self.lambert = projection.Lambert(
-            p['Parallel1'], p['Parallel2'], p['Ref_Lat'], p['Ref_Lon'])
+            p['Parallel1'], p['Parallel2'], p['Latitude'], p['Longitude'])
 
         wp = self.db.get_waypoint('RIV')
         self.x = wp['X']

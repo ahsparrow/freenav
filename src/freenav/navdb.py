@@ -28,13 +28,12 @@ class FreenavDb( freedb.Freedb):
         ymax = y+height/2
 
         # Update (and cache) waypoints and airspace
-        sql = 'SELECT ID, X, Y, Landable_Flag FROM Waypoints '\
-              'WHERE X>? AND X<? AND Y>? AND Y<?'
+        sql = 'SELECT * FROM Waypoints WHERE X>? AND X<? AND Y>? AND Y<?'
         self.c.execute(sql, (xmin, xmax, ymin, ymax))
         self.wps = self.c.fetchall()
 
-        sql = 'SELECT Id, Name, Base, Top FROM Airspace '\
-              'WHERE ? < X_Max AND ? > X_Min AND ? < Y_Max AND ? > Y_Min'
+        sql = '''SELECT * FROM Airspace
+              WHERE ? < X_Max AND ? > X_Min AND ? < Y_Max AND ? > Y_Min'''
         self.c.execute(sql, (xmin, xmax, ymin, ymax))
         self.bdrys = self.c.fetchall()
 
@@ -42,13 +41,11 @@ class FreenavDb( freedb.Freedb):
         self.bdry_arcs = {}
         for bdry in self.bdrys:
             id = bdry[0]
-            sql = 'SELECT X1, Y1, X2, Y2 FROM Airspace_Lines WHERE '\
-                  'Airspace_Id=?'
+            sql = 'SELECT * FROM Airspace_Lines WHERE Airspace_Id=?'
             self.c.execute(sql, (id,))
             self.bdry_lines[id] = self.c.fetchall()
 
-            sql = 'SELECT X, Y, Radius, Start_Angle, Arc_Length '\
-                  'FROM Airspace_Arcs WHERE Airspace_Id=?'
+            sql = 'SELECT * FROM Airspace_Arcs WHERE Airspace_Id=?'
             self.c.execute(sql, (id,))
             self.bdry_arcs[id] = self.c.fetchall()
 
@@ -70,20 +67,20 @@ class FreenavDb( freedb.Freedb):
         xmax = x + self.ref_width/10
         ymin = y - self.ref_height/10
         ymax = y + self.ref_height/10
-        sql = "SELECT Id, X, Y FROM Waypoints "\
-              "WHERE X>? AND X<? AND Y>? AND Y<? AND Landable_Flag=1"
+        sql = '''SELECT * FROM Waypoints
+              WHERE X>? AND X<? AND Y>? AND Y<? AND Landable_Flag=1'''
         self.c.execute(sql, (xmin, xmax, ymin, ymax))
         landable_wps = self.c.fetchall()
 
         if landable_wps:
-            wp_id, wp_x, wp_y = landable_wps[0]
-            min_dist = (x - wp_x) ** 2 + (y - wp_y) ** 2
-            closest_wp = wp_id
-            for wp_id, wp_x, wp_y in landable_wps[1:]:
-                dist = (x - wp_x) ** 2 + (y - wp_y) ** 2
+            wp = landable_wps[0]
+            min_dist = (x - wp['x']) ** 2 + (y - wp['y']) ** 2
+            closest_wp = wp['id']
+            for wp in landable_wps[1:]:
+                dist = (x - wp['x']) ** 2 + (y - wp['y']) ** 2
                 if dist < min_dist:
                     min_dist = dist
-                    closest_wp = wp_id
+                    closest_wp = wp['id']
 
             return closest_wp
         else:
@@ -110,7 +107,7 @@ class FreenavDb( freedb.Freedb):
             # Count boundary arc (and circle) crossings
             for arc in self.bdry_arcs[bdry['id']]:
                 xc, yc, radius = (arc['x'], arc['y'], arc['radius'])
-                start, len = (arc['start_angle'], arc['arc_length'])
+                start, len = (arc['start'], arc['length'])
                 if y >= (yc - radius) and y < (yc + radius):
                     # Each arc has potentially two crossings
                     ang1 = math.degrees(math.asin((y - yc) / radius)) * 64

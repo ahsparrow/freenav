@@ -66,10 +66,10 @@ class Base:
         wp_ids = [t['wp_id'] for t in self.db.get_task()]
         for wp_id in wp_ids:
             wp = self.db.get_waypoint(wp_id)
-            self.task.append((wp_id, wp['x'], wp['y'], wp['altitude']))
+            self.task.append(wp)
 
         wp = self.task[0]
-        self.nav.set_dest(wp[0], wp[1], wp[2], wp[3])
+        self.nav.set_dest(wp['id'], wp['x'], wp['y'], wp['altitude'])
 
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
 
@@ -134,12 +134,12 @@ class Base:
             wp_id = self.db.find_landable(x, y)
             if wp_id:
                 # Change to alternate waypoint
-                x, y, alt = self.db.get_waypoint(wp_id)
-                self.nav.set_dest(wp_id, x, y, alt)
+                wp = self.db.get_waypoint(wp_id)
+                self.nav.set_dest(wp_id, wp['x'], wp['y'], wp['altitude'])
             else:
                 # Revert to existing task waypoint
-                wp_id, x, y, alt = self.task[self.wp_index]
-                self.nav.set_dest(wp_id, x, y, alt)
+                wp = self.task[self.wp_index]
+                self.nav.set_dest(wp['id'], wp['x'], wp['y'], wp['altitude'])
 
             self.window.queue_draw()
             self.wp_select_flag = False
@@ -190,20 +190,22 @@ class Base:
 
     def incr_waypoint(self):
         wp_index = self.wp_index+1
-        if wp_index>=len(self.task) or self.task[wp_index][0]==self.task[0][0]:
+        if ((wp_index >= len(self.task)) or
+            (self.task[wp_index]['id'] == self.task[0]['id'])):
             wp_index = 0
+
         wp = self.task[wp_index]
-        self.nav.set_dest(wp[0], wp[1], wp[2], wp[3])
+        self.nav.set_dest(wp['id'], wp['x'], wp['y'], wp['altitude'])
         self.wp_index = wp_index
 
     def decr_waypoint(self):
         wp_index = self.wp_index - 1 
         if wp_index < 0:
             wp_index = len(self.task) - 1
-            if self.task[wp_index][0]==self.task[0][0] and wp_index:
+            if (self.task[wp_index]['id'] == self.task[0]['id']) and wp_index:
                 wp_index -= 1
         wp = self.task[wp_index]
-        self.nav.set_dest(wp[0], wp[1], wp[2], wp[3])
+        self.nav.set_dest(wp['id'], wp['x'], wp['y'], wp['altitude'])
         self.wp_index = wp_index
 
     def position_changed(self, field_set, timestamp, latitude, longitude,
@@ -251,24 +253,25 @@ class Base:
                 radius = arc['radius']
                 x, y = self.view_to_win(arc['x'] - radius, arc['y'] + radius)
                 width = 2 * arc['radius'] / self.view_scale
-                win.draw_arc(gc, False, x, y, width, width, arc['start_angle'],
-                             arc['arc_length'])
+                win.draw_arc(gc, False, x, y, width, width, arc['start'],
+                             arc['length'])
 
     def draw_task(self, gc, win):
         # Task
-        points = [self.view_to_win(x, y) for wp, x, y, alt in self.task]
+        points = [self.view_to_win(tp['x'], tp['y']) for tp in self.task]
         win.draw_lines(gc, points)
 
         # Start line
         if len(self.task) > 1:
-            wps, xs, ys, alts = self.task[0]
-            wp1, x1, y1, alt1 = self.task[1]
+            tps = self.task[0]
+            tp1 = self.task[1]
 
-            bearing = math.atan2(x1 - xs, y1 - ys) + math.pi/2
+            bearing = (math.atan2(tp1['x'] - tps['x'], tp1['y'] - tps['y']) +
+                       math.pi/2)
             dx = int(3000 * math.sin(bearing))
             dy = int(3000 * math.cos(bearing))
-            p1 = self.view_to_win(xs - dx, ys - dy)
-            p2 = self.view_to_win(xs + dx, ys + dy)
+            p1 = self.view_to_win(tps['x'] - dx, tps['y'] - dy)
+            p2 = self.view_to_win(tps['x'] + dx, tps['y'] + dy)
             win.draw_lines(gc, [p1, p2])
 
     def draw_waypoints(self, gc, pl, win):
@@ -472,7 +475,7 @@ def main():
     db = navdb.FreenavDb()
     p = db.get_projection()
     lambert = projection.Lambert(
-            p['Parallel1'], p['Parallel2'], p['Ref_Lat'], p['Ref_Lon'])
+            p['Parallel1'], p['Parallel2'], p['Latitude'], p['Longitude'])
 
     height_margin = 305
     polar = {'a': -0.002117, 'b': 0.08998, 'c': -1.56}
