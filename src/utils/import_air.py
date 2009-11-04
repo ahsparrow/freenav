@@ -73,8 +73,8 @@ class AirProcessor():
                 x, y = self.projection.forward(p.lat.radians(), p.lon.radians())
                 xmin, ymin, xmax, ymax = \
                     self.add_segments(id, x, y, airlist[1:])
-            self.db.insert_airspace_parent(id, name, str(base), str(tops),
-                                           xmin, ymin, xmax, ymax)
+            self.db.insert_airspace(id, name, str(base), str(tops), xmin,
+                                    ymin, xmax, ymax)
 
 def usage():
     print 'usage: import_air [options] input_file'
@@ -112,8 +112,8 @@ def main():
     # Initialise parser
     parser = Parser(tnp.tnp_decl, 'tnp_file')
     p = db.get_projection()
-    proj = freenav.projection.Lambert(p['Parallel1'], p['Parallel2'],
-                                      p['Ref_Lat'], p['Ref_Lon'])
+    proj = freenav.projection.Lambert(p['parallel1'], p['parallel2'],
+                                      p['latitude'], p['longitude'])
     output_processor = AirProcessor(db, proj)
     tnp_processor = tnp.TnpProcessor(output_processor)
 
@@ -129,7 +129,6 @@ def main():
         sys.exit(1)
 
     # Create indices and tidy up
-    db.create_airspace_indices()
     db.commit()
     db.vacuum()
 

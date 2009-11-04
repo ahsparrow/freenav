@@ -116,7 +116,7 @@ class TaskApp(AppBase):
 
         p = self.task_db.get_projection()
         self.projection = freenav.projection.Lambert(
-            p['Parallel1'], p['Parallel2'], p['Ref_Lat'], p['Ref_Lon'])
+            p['Parallel1'], p['Parallel2'], p['Latitude'], p['Longitude'])
 
         self.task_index, self.tasks = self.load_tasks()
 
@@ -258,7 +258,7 @@ class TaskApp(AppBase):
     def on_save(self, button):
         for i in range(NUM_TASKS):
             self.task_db.set_task(self.tasks[i], i)
-        self.task_db.set_task_id(self.task_index)
+        self.task_db.set_active_task_id(self.task_index)
         self.task_saved = True
 
     def on_wp_activated(self, treeview, path, column, model):
@@ -355,7 +355,7 @@ class TaskApp(AppBase):
         for i in range(NUM_TASKS):
             tasks.append(self.task_db.get_task(i))
 
-        task_index = self.task_db.get_task_id()
+        task_index = self.task_db.get_active_task_id()
         return (task_index, tasks)
 
     def update_task_store(self):
