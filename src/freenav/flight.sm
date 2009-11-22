@@ -1,0 +1,122 @@
+%class Flight
+
+%start FlightFSM::Init
+%map FlightFSM
+%%
+// Waiting for first GPS fix
+Init
+{
+    // Restart in air after task start
+    new_position [(ctxt.ground_speed > 10) and ctxt.is_previous_start()]
+        Task
+        {
+        }
+
+    // Restart after launch, but before start
+    new_position [ctxt.ground_speed > 10]
+        Launched
+        {
+        }
+
+    // Start on grid
+    new_position [ctxt.ground_speed < 2]
+        Ground
+        {
+        }
+}
+
+// On the ground, waiting for takeoff
+Ground
+{
+    // Takeoff!!!
+    new_position [ctxt.ground_speed > 10]
+        Launched
+        {
+        }
+}
+
+// Launched, but not ready for start yet
+Launched
+{
+    // Time to go
+    arm_start
+        StartReady
+        {
+        }
+}
+
+// Ready for start - outsite start sector
+StartReady
+{
+    new_position [ctxt.in_start_sector()]
+        StartSector
+        {
+        }
+}
+
+// Ready for start - inside start sector
+StartSector
+{
+    // And we're off...
+    new_position [not ctxt.in_start_sector()]
+        Task
+        {
+            do_start();
+        }
+}
+
+// On task
+Task
+{
+    // Suspend task and go somewhere else
+    divert(waypoint_id)
+        Divert
+        {
+            do_divert(waypoint_id);
+        }
+
+    incr_turnpoint [len(ctxt.tp_list) > 1]
+        nil
+        {
+            do_incr_turnpoint();
+        }
+
+    decr_turnpoint [len(ctxt.task) > (len(ctxt.tp_list) + 1)]
+        nil
+        {
+            do_decr_turnpoint();
+        }
+}
+
+// Diverting to (non-task) waypoint
+Divert
+Exit {do_cancel_divert();}
+{
+    // Finished faffing... back to task
+    cancel_divert
+        Task
+        {
+        }
+}
+
+// Default stuff
+Default
+{
+    arm_restart
+        StartReady
+        {
+            do_arm_restart();
+        }
+
+    force_start
+        StartSector
+        {
+            do_force_start();
+        }
+
+    Default
+        nil
+        {
+        }
+}
+%%
