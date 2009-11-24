@@ -144,15 +144,16 @@ class FreeView:
             win.draw_layout(gc, x + delta, y + delta, layout)
 
     def draw_airspace(self, gc, win):
-        # Draw airspace lines
-        for bdry in self.db.view_bdry():
-            for line in self.db.view_bdry_lines(bdry['id']):
+        """Draw airspace boundary lines and arcs"""
+        for bdry in self.airspace:
+            # Draw airspace lines
+            for line in self.airspace_lines[bdry['id']]:
                 x1, y1 = self.view_to_win(line['x1'], line['y1'])
                 x2, y2 = self.view_to_win(line['x2'], line['y2'])
                 win.draw_line(gc, x1, y1, x2, y2)
 
             # Draw airspace arcs & circles
-            for arc in self.db.view_bdry_arcs(bdry[0]):
+            for arc in self.airspace_arcs[bdry['id']]:
                 radius = arc['radius']
                 x, y = self.view_to_win(arc['x'] - radius, arc['y'] + radius)
                 width = 2 * arc['radius'] / self.view_scale
@@ -322,7 +323,7 @@ class FreeView:
 
         gc.foreground = self.airspace_color
         gc.line_width = 2
-        # XXX self.draw_airspace(gc, win)
+        self.draw_airspace(gc, win)
 
         gc.foreground = self.fg_color
         gc.line_width = 1
@@ -345,6 +346,15 @@ class FreeView:
         width, height = self.get_view_size()
         self.view_wps = self.flight.get_area_waypoint_list(
                                     self.viewx, self.viewy, width, height)
+
+        self.airspace = self.flight.get_area_airspace(
+                                    self.viewx, self.viewy, width, height)
+        self.airspace_lines = {}
+        self.airspace_arcs = {}
+        for a in self.airspace:
+            id = a['id']
+            self.airspace_lines[id] = self.flight.get_airspace_lines(id)
+            self.airspace_arcs[id] = self.flight.get_airspace_arcs(id)
 
     # External methods - for use by controller
     def redraw(self):

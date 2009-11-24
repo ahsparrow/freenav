@@ -121,6 +121,26 @@ class Freedb:
                              y - height/2, y + height/2))
         return self.c.fetchall()
 
+    def get_area_airspace(self, x, y, width, height):
+        """Return list of airspace filtered by area"""
+        sql = '''SELECT * FROM Airspace
+              WHERE ? < X_Max AND ? > X_Min AND ? < Y_Max AND ? > Y_Min'''
+        self.c.execute(sql, (x - width/2, x + width/2,
+                             y - height/2, y + height/2))
+        return self.c.fetchall()
+
+    def get_airspace_lines(self, id):
+        """Return list of boundary lines for given airspace id"""
+        sql = 'SELECT * FROM Airspace_Lines WHERE Airspace_Id=?'
+        self.c.execute(sql, (id,))
+        return self.c.fetchall()
+
+    def get_airspace_arcs(self, id):
+        """Return list of boundary arcs for given airspace id"""
+        sql = 'SELECT * FROM Airspace_Arcs WHERE Airspace_Id=?'
+        self.c.execute(sql, (id,))
+        return self.c.fetchall()
+
     def set_task(self, task, id=0):
         """Delete old task data and add new"""
         sql = 'DELETE FROM Tasks WHERE Id=? '

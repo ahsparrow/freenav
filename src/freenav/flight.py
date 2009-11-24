@@ -126,6 +126,15 @@ class Flight:
     def get_area_waypoint_list(self, x, y, width, height):
         return self.db.get_area_waypoint_list(x, y, width, height)
 
+    def get_area_airspace(self, x, y, width, height):
+        return self.db.get_area_airspace(x, y, width, height)
+
+    def get_airspace_lines(self, id):
+        return self.db.get_airspace_lines(id)
+
+    def get_airspace_arcs(self, id):
+        return self.db.get_airspace_arcs(id)
+
 if __name__ == '__main__':
     f = Flight()
     f.force_start()
