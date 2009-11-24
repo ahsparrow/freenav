@@ -26,10 +26,10 @@ TP_DIRNS = ['SYM', 'NEXT', 'PREV', 'FIX']
 
 def make_tp(wp_id, rad1=RAD1, ang1=ANG1, rad2=RAD2, ang2=ANG2, dirn='SYM',
             ang12=0):
-    return {'wp_id': wp_id,
-            'rad1': rad1, 'ang1': ang1,
-            'rad2': rad2, 'ang2': ang2,
-            'dirn': dirn, 'ang12': ang12}
+    return {'waypoint_id': wp_id,
+            'radius1': rad1, 'angle1': ang1,
+            'radius2': rad2, 'angle2': ang2,
+            'direction': dirn, 'angle12': ang12}
 
 def make_start_tp(wp_id, rad1=START_RAD, ang1=0, dirn='NEXT', ang12=0):
     return make_tp(wp_id, rad1=rad1, ang1=ang1, dirn=dirn, ang12=ang12)
@@ -45,7 +45,7 @@ else:
 class OzDialog(gtk.Dialog):
     def __init__(self, parent, task, tp_index):
         tp = task[tp_index]
-        title = 'Obs. Zone - ' + tp['wp_id']
+        title = 'Obs. Zone - ' + tp['waypoint_id']
         gtk.Dialog.__init__(self, title, parent,
                             gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT,
                             (gtk.STOCK_CANCEL, gtk.RESPONSE_REJECT,
@@ -61,11 +61,11 @@ class OzDialog(gtk.Dialog):
             label.set_alignment(1, 0.5)
             table.attach(label, 0, 1, n, n + 1)
 
-        rad1_adj = gtk.Adjustment(tp['rad1'], 0, 50000, 500)
-        ang1_adj = gtk.Adjustment(tp['ang1'], 0, 360, 45)
-        rad2_adj = gtk.Adjustment(tp['rad2'], 0, 50000, 500)
-        ang2_adj = gtk.Adjustment(tp['ang2'], 0, 360, 45)
-        ang12_adj = gtk.Adjustment(tp['ang12'], 0, 360, 1)
+        rad1_adj = gtk.Adjustment(tp['radius1'], 0, 50000, 500)
+        ang1_adj = gtk.Adjustment(tp['angle1'], 0, 360, 45)
+        rad2_adj = gtk.Adjustment(tp['radius2'], 0, 50000, 500)
+        ang2_adj = gtk.Adjustment(tp['angle2'], 0, 360, 45)
+        ang12_adj = gtk.Adjustment(tp['angle12'], 0, 360, 1)
 
         self.rad1_spin = gtk.SpinButton(rad1_adj, 0, 0)
         self.ang1_spin = gtk.SpinButton(ang1_adj, 0, 1)
@@ -87,11 +87,11 @@ class OzDialog(gtk.Dialog):
         self.dirn_combobox = gtk.combo_box_new_text()
         for d in TP_DIRNS:
             self.dirn_combobox.append_text(d)
-        self.dirn_combobox.set_active(TP_DIRNS.index(tp['dirn']))
+        self.dirn_combobox.set_active(TP_DIRNS.index(tp['direction']))
         table.attach(self.dirn_combobox, 1, 2, 4, 5)
         self.dirn_combobox.connect('changed', self.on_dirn_select)
 
-        self.ang12_spin.set_sensitive(tp['dirn'] == 'FIX')
+        self.ang12_spin.set_sensitive(tp['direction'] == 'FIX')
 
         self.vbox.pack_start(table)
         self.show_all()
@@ -101,12 +101,12 @@ class OzDialog(gtk.Dialog):
             TP_DIRNS[combobox.get_active()] == 'FIX')
 
     def get_values(self):
-        return {'rad1': self.rad1_spin.get_value_as_int(),
-                'rad2': self.rad2_spin.get_value_as_int(),
-                'ang1': self.ang1_spin.get_value(),
-                'ang2': self.ang2_spin.get_value(),
-                'ang12': self.ang12_spin.get_value(),
-                'dirn': TP_DIRNS[self.dirn_combobox.get_active()]}
+        return {'radius1': self.rad1_spin.get_value_as_int(),
+                'radius2': self.rad2_spin.get_value_as_int(),
+                'angle1': self.ang1_spin.get_value(),
+                'angle2': self.ang2_spin.get_value(),
+                'angle12': self.ang12_spin.get_value(),
+                'direction': TP_DIRNS[self.dirn_combobox.get_active()]}
 
 class TaskApp(AppBase):
     def __init__(self):
@@ -362,7 +362,7 @@ class TaskApp(AppBase):
         """Load waypoint list into task view ListStore"""
         self.task_store.clear()
         for tp in self.tasks[self.task_index]:
-            self.task_store.append((tp['wp_id'],))
+            self.task_store.append((tp['waypoint_id'],))
 
     def insert_tp(self, wp_id, posn):
         task = self.tasks[self.task_index]
@@ -372,7 +372,7 @@ class TaskApp(AppBase):
             task.append(make_tp(wp_id))
         else:
             if posn == 0:
-                old_start_id = task[0]['wp_id']
+                old_start_id = task[0]['waypoint_id']
                 if task_len == 1:
                     task[0] = make_finish_tp(old_start_id)
                 else:
@@ -380,7 +380,7 @@ class TaskApp(AppBase):
                 task.insert(0, make_start_tp(wp_id))
 
             elif posn == task_len:
-                old_finish_id = task[-1]['wp_id']
+                old_finish_id = task[-1]['waypoint_id']
                 if task_len == 1:
                     task[0] = make_start_tp(old_finish_id)
                 else:
@@ -396,21 +396,21 @@ class TaskApp(AppBase):
         task_len = len(task)
 
         if task_len == 1:
-            wp_id = task[0]['wp_id']
+            wp_id = task[0]['waypoint_id']
             task[0] = make_tp(wp_id)
         elif task_len > 1:
             if posn == 0:
-                wp_id = task[0]['wp_id']
+                wp_id = task[0]['waypoint_id']
                 task[0] = make_start_tp(wp_id)
             elif posn == task_len:
-                wp_id = task[-1]['wp_id']
+                wp_id = task[-1]['waypoint_id']
                 task[-1] = make_finish_tp(wp_id)
 
     def move_tp(self, from_posn, to_posn):
         task = self.tasks[self.task_index]
 
         if (from_posn != to_posn) and (from_posn != to_posn - 1):
-            wp_id = task[from_posn]['wp_id']
+            wp_id = task[from_posn]['waypoint_id']
             self.delete_tp(from_posn)
 
             if to_posn < from_posn:
@@ -419,7 +419,7 @@ class TaskApp(AppBase):
                 self.insert_tp(wp_id, to_posn - 1)
 
     def update_distance(self):
-        wp_list = [tp['wp_id'] for tp in self.tasks[self.task_index]]
+        wp_list = [tp['waypoint_id'] for tp in self.tasks[self.task_index]]
         dist = self.calc_distance(wp_list)
         self.dist_label.set_text('%.1fkm' % (dist / 1000))
 
