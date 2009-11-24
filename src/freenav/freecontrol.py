@@ -1,4 +1,6 @@
+import ConfigParser
 import math
+import os.path
 import time
 
 import dbus, dbus.mainloop.glib
@@ -22,13 +24,19 @@ class FreeControl:
         self.flight = flight
         self.flight.subscribe(self)
 
+        config = ConfigParser.ConfigParser()
+        config.read(os.path.join(os.path.expanduser('~'),
+                                 '.freeflight',
+                                 'freenav.ini'))
+
         # Set-up all the D-Bus stuff
         dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
         bus = dbus.SystemBus()
         control = bus.get_object(DBUS_SERVICE, DBUS_PATH)
 
-        path = control.Create('/tmp/gps', dbus_interface=CONTROL_INTERFACE)
+        gps_dev = config.get('Devices', 'gps')
+        path = control.Create(gps_dev, dbus_interface=CONTROL_INTERFACE)
         gps = bus.get_object(DBUS_SERVICE, path)
         gps.connect_to_signal("PositionChanged", self.position_changed)
 

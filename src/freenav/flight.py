@@ -123,6 +123,9 @@ class Flight:
     def get_waypoint_list(self):
         return self.db.get_waypoint_list()
 
+    def get_area_waypoint_list(self, x, y, width, height):
+        return self.db.get_area_waypoint_list(x, y, width, height)
+
 if __name__ == '__main__':
     f = Flight()
     f.force_start()

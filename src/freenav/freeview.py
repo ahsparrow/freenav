@@ -101,15 +101,7 @@ class FreeView:
             self.window.set_size_request(800, 480)
         self.window.show_all()
 
-    def redraw(self):
-        """Redraw display"""
-        self.window.queue_draw()
-
-    def update_position(self, x, y):
-        """Update position of view and redraw"""
-        self.viewx = x
-        self.viewy = y
-        self.redraw()
+        self.update_cache()
 
     def view_to_win(self, x, y):
         """Convert real world coordinates to window coordinates"""
@@ -131,21 +123,28 @@ class FreeView:
         y = ((win_height/2 - y1) * view_height / win_height) + self.viewy
         return x, y
 
-    def draw_waypoints(self, gc, pl, win):
+    def get_view_size(self):
+        """Return size of view area, in metres"""
+        win_width, win_height = self.draw_area.window.get_size()
+        width = win_width * self.view_scale
+        height = win_height * self.view_scale
+        return width, height
+
+
+    def draw_waypoints(self, win, gc, layout):
         """Draw waypoints"""
-        wps = self.get_wps()
-        for wp in wps:
+        for wp in self.view_wps:
             x, y = self.view_to_win(wp['x'], wp['y'])
             delta = WP_SIZE / 2
             win.draw_arc(gc, wp['landable_flag'],
                          x - delta, y - delta,
                          WP_SIZE, WP_SIZE, 0, WP_ARC_LEN)
 
-            pl.set_markup(wp['id'])
-            win.draw_layout(gc, x + delta, y + delta, pl)
+            layout.set_markup(wp['id'])
+            win.draw_layout(gc, x + delta, y + delta, layout)
 
     def draw_airspace(self, gc, win):
-        # XXX Draw airspace lines
+        # Draw airspace lines
         for bdry in self.db.view_bdry():
             for line in self.db.view_bdry_lines(bdry['id']):
                 x1, y1 = self.view_to_win(line['x1'], line['y1'])
@@ -310,17 +309,14 @@ class FreeView:
 
     def area_expose(self, area, event):
         win = area.window
-        gc = win.new_gc()
+        win_width, win_height = win.get_size()
 
         pl = pango.Layout(area.create_pango_context())
-        font_description = pango.FontDescription('sans normal 10')
+        font_description = pango.FontDescription('sans normal 14')
         pl.set_font_description(font_description)
 
-        win_width, win_height = self.window.get_size()
-        view_width = win_width * self.view_scale
-        view_height = win_height * self.view_scale
-
         # Start with a blank sheet...
+        gc = win.new_gc()
         gc.foreground = self.bg_color
         win.draw_rectangle(gc, True, 0, 0, win_width, win_height)
 
@@ -331,7 +327,7 @@ class FreeView:
         gc.foreground = self.fg_color
         gc.line_width = 1
         # XXX self.draw_task(gc, win)
-        self.draw_waypoints(gc, pl, win)
+        self.draw_waypoints(win, gc, pl)
         # XXX self.draw_annotation(gc, pl, win, win_height, win_width)
 
         gc.line_width = 2
@@ -344,17 +340,34 @@ class FreeView:
 
         return True
 
-    def get_wps(self):
-        return self.flight.get_waypoint_list()
+    def update_cache(self):
+        """Update cached waypoints and airspace"""
+        width, height = self.get_view_size()
+        self.view_wps = self.flight.get_area_waypoint_list(
+                                    self.viewx, self.viewy, width, height)
+
+    # External methods - for use by controller
+    def redraw(self):
+        """Redraw display"""
+        self.window.queue_draw()
+
+    def update_position(self, x, y):
+        """Update position of view and redraw"""
+        self.viewx = x
+        self.viewy = y
+        self.update_cache()
+        self.redraw()
 
     def zoom_out(self):
         """See some more"""
         ind = SCALE.index(self.view_scale)
         if ind < (len(SCALE) - 1):
             self.view_scale = SCALE[ind + 1]
+        self.update_cache()
 
     def zoom_in(self):
         """See some less"""
         ind = SCALE.index(self.view_scale)
         if ind > 0:
             self.view_scale = SCALE[ind - 1]
+        self.update_cache()

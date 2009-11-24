@@ -109,9 +109,16 @@ class Freedb:
         return self.c.fetchone()
 
     def get_waypoint_list(self):
-        """Return a list of waypoint Id's and names"""
-        sql = 'SELECT Id, Name FROM Waypoints ORDER BY Id'
+        """Return a list of all waypoints"""
+        sql = 'SELECT * FROM Waypoints ORDER BY Id'
         self.c.execute(sql)
+        return self.c.fetchall()
+
+    def get_area_waypoint_list(self, x, y, width, height):
+        """Return list of waypoints filtered by area"""
+        sql = 'SELECT * FROM Waypoints WHERE X>? AND X<? AND Y>? AND Y<?'
+        self.c.execute(sql, (x - width/2, x + width/2,
+                             y - height/2, y + height/2))
         return self.c.fetchall()
 
     def set_task(self, task, id=0):
@@ -136,19 +143,11 @@ class Freedb:
 
     def get_task(self, id=0):
         """Get turnpoints for specified task"""
-        sql = 'SELECT * FROM Turnpoints WHERE Task_Id = ? ORDER BY Task_Index'
+        sql = '''SELECT * FROM Turnpoints INNER JOIN Waypoints
+              ON Turnpoints.Waypoint_Id=Waypoints.Id
+              WHERE Turnpoints.Task_Id = ? ORDER BY Turnpoints.Task_Index'''
         self.c.execute(sql, (id,))
-
-        task = []
-        for tp in self.c:
-            task.append({'wp_id': tp['Waypoint_Id'],
-                         'rad1':  tp['Radius1'],
-                         'ang1':  tp['Angle1'],
-                         'rad2':  tp['Radius2'],
-                         'ang2':  tp['Angle2'],
-                         'dirn':  tp['Direction'],
-                         'ang12': tp['Angle12']})
-        return task
+        return self.c.fetchall()
 
     def get_active_task_id(self):
         """Get the current task id"""
