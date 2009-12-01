@@ -20,6 +20,15 @@ class Projection:
 
         return EARTH_RADIUS * d
 
+    def course(self, x1, y1, x2, y2):
+        """Calculate (initial) course between two projected point"""
+        lat1, lon1 = self.reverse(x1, y1)
+        lat2, lon2 = self.reverse(x2, y2)
+        tc1 = atan2(sin(lon2 - lon1) * cos(lat2),
+                    (cos(lat1) * sin(lat2) -
+                     sin(lat1) * cos(lat2) * cos(lon2 - lon1)))
+        return tc1 % (2 * pi)
+
 class Lambert(Projection):
     def __init__(self, parallel1, parallel2, lat, lon):
         self.ref_lon = lon

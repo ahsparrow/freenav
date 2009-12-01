@@ -155,11 +155,10 @@ class Freedb:
               Radius1, Angle1, Radius2, Angle2, Direction, Angle12)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'''
         for tp_num, tp in enumerate(task):
-            self.c.execute(sql, (id, tp_num, tp['wp_id'],
-                                 tp['rad1'], tp['ang1'],
-                                 tp['rad2'], tp['ang2'],
-                                 tp['dirn'], tp['ang12']))
-        self.commit()
+            self.c.execute(sql, (id, tp_num, tp['waypoint_id'],
+                                 tp['radius1'], tp['angle1'],
+                                 tp['radius2'], tp['angle2'],
+                                 tp['direction'], tp['angle12']))
 
     def get_task(self, id=0):
         """Get turnpoints for specified task"""
@@ -179,7 +178,6 @@ class Freedb:
         """Set the current task id"""
         sql = 'UPDATE Config SET Task_Id = ?'
         self.c.execute(sql, (task_id,))
-        self.commit()
 
     def delete_airspace(self):
         """Delete all airspace data"""
