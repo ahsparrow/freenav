@@ -81,7 +81,7 @@ class FreeControl:
     def position_changed(self,
                          field_set, timestamp, latitude, longitude, altitude):
         """Callback from D-Bus on new GPS position"""
-        utc = time.gmtime(timestamp)
+        secs = timestamp
         latitude = math.radians(latitude)
         longitude = math.radians(longitude)
         altitude = int(altitude)
@@ -92,7 +92,7 @@ class FreeControl:
         track = math.radians(track)
 
         # Update model with new position
-        self.flight.update_position(utc, latitude, longitude, altitude,
+        self.flight.update_position(secs, latitude, longitude, altitude,
                                     speed, track)
 
     def flight_update(self, flight):

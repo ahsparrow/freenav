@@ -60,19 +60,6 @@ class FlightFSM_Default(FlightState):
             fsm.setState(FlightFSM.StartReady)
             fsm.getState().Entry(fsm)
 
-    def force_start(self, fsm):
-        ctxt = fsm.getOwner()
-        if fsm.getDebugFlag() == True:
-            fsm.getDebugStream().write("TRANSITION   : FlightFSM.Default.force_start()\n")
-
-        fsm.getState().Exit(fsm)
-        fsm.clearState()
-        try:
-            ctxt.do_force_start()
-        finally:
-            fsm.setState(FlightFSM.StartSector)
-            fsm.getState().Entry(fsm)
-
     def Default(self, fsm):
         if fsm.getDebugFlag() == True:
             fsm.getDebugStream().write("TRANSITION   : FlightFSM.Default.Default()\n")
@@ -133,6 +120,14 @@ class FlightFSM_Launched(FlightFSM_Default):
         fsm.getState().Entry(fsm)
 
 class FlightFSM_StartReady(FlightFSM_Default):
+
+    def force_start(self, fsm):
+        if fsm.getDebugFlag() == True:
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.StartReady.force_start()\n")
+
+        fsm.getState().Exit(fsm)
+        fsm.setState(FlightFSM.StartSector)
+        fsm.getState().Entry(fsm)
 
     def new_position(self, fsm):
         ctxt = fsm.getOwner()

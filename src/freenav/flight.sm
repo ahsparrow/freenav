@@ -52,6 +52,11 @@ StartReady
         StartSector
         {
         }
+
+    force_start
+        StartSector
+        {
+        }
 }
 
 // Ready for start - inside start sector
@@ -106,12 +111,6 @@ Default
         StartReady
         {
             do_arm_restart();
-        }
-
-    force_start
-        StartSector
-        {
-            do_force_start();
         }
 
     Default

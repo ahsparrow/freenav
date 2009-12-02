@@ -8,8 +8,8 @@ M_TO_FT = 1 / 0.3048
 MPS_TO_KTS = 3600 / 1852.0
 
 # Map scale limits (metres per pixel)
-SCALE = [25, 35, 50, 71, 100, 141, 200]
-DEFAULT_SCALE = SCALE[4]
+SCALE = [6, 9, 12, 17, 25, 35, 50, 71, 100, 141, 200, 282, 400]
+DEFAULT_SCALE = SCALE[8]
 
 WP_SIZE = 10
 WP_ARC_LEN = 360 * 64
@@ -47,6 +47,10 @@ class FreeView:
         else:
             self.tz_offset = time.timezone / 3600
 
+        # Font size juju
+        self.font_size = int(100000.0 * gtk.gdk.screen_height_mm() /
+                             gtk.gdk.screen_height())
+
         # Create top level window
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.window.add_events(gtk.gdk.KEY_PRESS_MASK)
@@ -67,6 +71,7 @@ class FreeView:
         self.bg_color = cmap.alloc_color("white")
         self.fg_color = cmap.alloc_color("black")
 
+        # Divider between map and info boxes
         add_div(hbox)
 
         # Vertical box for info boxes
@@ -101,6 +106,7 @@ class FreeView:
             self.window.set_size_request(800, 480)
         self.window.show_all()
 
+        # Initialise waypoint/airspace cache
         self.update_cache()
 
     def view_to_win(self, x, y):
@@ -111,7 +117,7 @@ class FreeView:
 
         x1 = ((x - self.viewx) * win_width / view_width) + (win_width / 2)
         y1 = (win_height / 2) - ((y - self.viewy) * win_height / view_height)
-        return x1, y1
+        return int(x1), int(y1)
 
     def win_to_view(self, x1, y1):
         """Convert window coordinates to real world coordinates"""
@@ -130,98 +136,125 @@ class FreeView:
         height = win_height * self.view_scale
         return width, height
 
-
     def draw_waypoints(self, win, gc, layout):
         """Draw waypoints"""
+        tps = [tp['waypoint_id'] for tp in self.flight.task]
         for wp in self.view_wps:
-            x, y = self.view_to_win(wp['x'], wp['y'])
-            delta = WP_SIZE / 2
-            win.draw_arc(gc, wp['landable_flag'],
-                         x - delta, y - delta,
-                         WP_SIZE, WP_SIZE, 0, WP_ARC_LEN)
+            if self.view_scale<=100 or wp['landable_flag'] or wp['id'] in tps:
+                x, y = self.view_to_win(wp['x'], wp['y'])
+                delta = WP_SIZE / 2
+                win.draw_arc(gc, wp['landable_flag'],
+                             x - delta, y - delta,
+                             WP_SIZE, WP_SIZE, 0, WP_ARC_LEN)
 
-            layout.set_markup(wp['id'])
-            win.draw_layout(gc, x + delta, y + delta, layout)
+                layout.set_markup(wp['id'])
+                win.draw_layout(gc, x + delta, y + delta, layout)
 
     def draw_airspace(self, gc, win):
         """Draw airspace boundary lines and arcs"""
-        for bdry in self.airspace:
-            # Draw airspace lines
-            for line in self.airspace_lines[bdry['id']]:
-                x1, y1 = self.view_to_win(line['x1'], line['y1'])
-                x2, y2 = self.view_to_win(line['x2'], line['y2'])
-                win.draw_line(gc, x1, y1, x2, y2)
+        # Draw airspace lines
+        for line in self.airspace_lines:
+            x1, y1 = self.view_to_win(line['x1'], line['y1'])
+            x2, y2 = self.view_to_win(line['x2'], line['y2'])
+            win.draw_line(gc, x1, y1, x2, y2)
 
-            # Draw airspace arcs & circles
-            for arc in self.airspace_arcs[bdry['id']]:
-                radius = arc['radius']
-                x, y = self.view_to_win(arc['x'] - radius, arc['y'] + radius)
-                width = 2 * arc['radius'] / self.view_scale
-                win.draw_arc(gc, False, x, y, width, width, arc['start'],
-                             arc['length'])
+        # Draw airspace arcs & circles
+        for arc in self.airspace_arcs:
+            radius = arc['radius']
+            x, y = self.view_to_win(arc['x'] - radius, arc['y'] + radius)
+            width = 2 * arc['radius'] / self.view_scale
+            win.draw_arc(gc, False, x, y, width, width, arc['start'],
+                         arc['length'])
 
     def draw_task(self, gc, win):
-        # XXX Task
-        points = [self.view_to_win(tp['x'], tp['y']) for tp in self.task]
+        """Draw task and turnpoint sectors"""
+        # Draw lines
+        points = [self.view_to_win(tp['x'], tp['y']) for tp in self.flight.task]
         win.draw_lines(gc, points)
 
-        # Start line
-        if len(self.task) > 1:
-            tps = self.task[0]
-            tp1 = self.task[1]
+        # Draw sectors
+        if len(self.flight.task) > 1:
+            for tp in self.flight.task[:-1]:
+                self.draw_tp_sector(gc, win, tp)
 
-            bearing = (math.atan2(tp1['x'] - tps['x'], tp1['y'] - tps['y']) +
-                       math.pi/2)
-            dx = int(3000 * math.sin(bearing))
-            dy = int(3000 * math.cos(bearing))
-            p1 = self.view_to_win(tps['x'] - dx, tps['y'] - dy)
-            p2 = self.view_to_win(tps['x'] + dx, tps['y'] + dy)
-            win.draw_lines(gc, [p1, p2])
+            # Draw finish line
+            self.draw_tp_line(gc, win, self.flight.task[-1])
+
+    def draw_tp_line(self, gc, win, tp):
+        # Draw turnpoint (finish) line
+        x, y = tp['x'], tp['y']
+        radius = tp['radius1']
+        angle = math.radians(tp['angle12'])
+        dx = -radius * math.cos(angle)
+        dy = radius * math.sin(angle)
+        x1, y1 = self.view_to_win(x + dx, y + dy)
+        x2, y2 = self.view_to_win(x - dx, y - dy)
+        win.draw_line(gc, x1, y1, x2, y2)
+
+    def draw_tp_sector(self, gc, win, tp):
+        # Draw turnpoint sector
+        oz_x, oz_y = tp['x'], tp['y']
+        oz_radius1 = tp['radius1']
+        oz_radius2 = tp['radius2']
+        oz_angle1 = tp['angle1']
+        oz_angle2 = tp['angle2']
+        oz_angle = tp['angle12']
+
+        # Outer arc
+        x, y = self.view_to_win(oz_x - oz_radius1, oz_y + oz_radius1)
+        width = height = int(2 * oz_radius1 / self.view_scale)
+        ang1 = int(((90 - (180 + oz_angle + (oz_angle1 / 2.0))) % 360) * 64)
+        ang2 = int(oz_angle1 * 64)
+        win.draw_arc(gc, False, x, y, width, height, ang1, ang2)
+
+        if abs(oz_angle1 - 360) < 0.1:
+            return
+
+        # Outer radials
+        ang = 180 + oz_angle + (oz_angle1 / 2.0)
+        self.draw_radial(gc, win, oz_x, oz_y, ang, oz_radius1, oz_radius2)
+        ang = 180 + oz_angle - (oz_angle1 / 2.0)
+        self.draw_radial(gc, win, oz_x, oz_y, ang, oz_radius1, oz_radius2)
+
+        if oz_radius2 == 0:
+            return
+
+        # Inner arc
+        x, y = self.view_to_win(oz_x - oz_radius2, oz_y + oz_radius2)
+        width = height = int(2 * oz_radius2 / self.view_scale)
+        arc_len = int((oz_angle1 - oz_angle2) * 32)
+
+        win.draw_arc(gc, False, x, y, width, height, ang1, arc_len)
+        ang = (ang1 + ang2) % 23040
+        win.draw_arc(gc, False, x, y, width, height, ang, -arc_len)
+
+        if (oz_angle2 == 0) or (abs(oz_angle2 - 360) < 0.1):
+            return
+
+        # Inner radials
+        ang = 180 + oz_angle + (oz_angle2 / 2.0)
+        self.draw_radial(gc, win, oz_x, oz_y, ang, oz_radius2, 0)
+        ang = 180 + oz_angle - (oz_angle2 / 2.0)
+        self.draw_radial(gc, win, oz_x, oz_y, ang, oz_radius2, 0)
+
+    def draw_radial(self, gc, win, x, y, angle, radius1, radius2):
+        # Draw a radial line
+        a = math.radians(angle)
+        ca = math.cos(a)
+        sa = math.sin(a)
+        x1, y1 = self.view_to_win(x + radius1 * sa, y + radius1 * ca)
+        x2, y2 = self.view_to_win(x + radius2 * sa, y + radius2 * ca)
+        win.draw_line(gc, x1, y1, x2, y2)
 
     def draw_annotation(self, gc, pl, win, win_height, win_width):
-        bg = self.bg_color
-        pl.set_markup('<big>ALT:<b>%d</b></big>' % (self.nav.altitude*M_TO_FT))
-        x, y = pl.get_pixel_size()
-        win.draw_layout(gc, 2, win_height-y, pl, background=bg)
-
-        pl.set_markup('<big>GS:<b>%d/%d</b></big>' %
-            (self.nav.ground_speed*MPS_TO_KTS,
-             (self.nav.air_speed - self.nav.ground_speed)*MPS_TO_KTS))
-        x, y = pl.get_pixel_size()
-        win.draw_layout(gc, win_width/2-27, win_height-y, pl, background=bg)
-
-        if self.nav.utc:
-            hour = (self.nav.utc.tm_hour - self.tz_offset) % 24
-            mins = self.nav.utc.tm_min
-            pl.set_markup('<big><b>%d:%02d</b></big>' % (hour, mins))
-            x, y = pl.get_pixel_size()
-            win.draw_layout(gc, win_width-x-3, win_height-y, pl, background=bg)
-
-        row_height = y
-        bearing = math.degrees(self.nav.bearing)
+        nav = self.flight.get_nav()
+        bearing = math.degrees(nav['bearing'])
         if bearing < 0:
             bearing += 360
-        if self.wp_select_flag:
-            markup = '<big><b><u>%s %.1f/%.0f</u></b></big>'
-        else:
-            markup = '<big><b>%s %.1f/%.0f</b></big>'
-        pl.set_markup(markup % (self.nav.tp_name, self.nav.dist/1000, bearing))
+        markup = '<big><b>%s %.1f/%.0f</b></big>'
+        pl.set_markup(markup % (nav['id'], nav['distance'] / 1000, bearing))
         x, y = pl.get_pixel_size()
-        win.draw_layout(gc, 2, win_height - row_height - y, pl, background=bg)
-
-        # XXX pl.set_markup('<big><b>%d</b></big>' % self.gps.satellites_used)
-        # XXX x, y = pl.get_pixel_size()
-        # XXX win.draw_layout(gc, 2, win_height-2*row_height-y, pl, background=bg)
-
-        if self.nav.ete == nav.INVALID_ETE:
-            timestr = '-:--'
-        else:
-            tim = time.gmtime(self.nav.ete)
-            timestr = '%d:%02d' % (tim.tm_hour, tim.tm_min)
-        pl.set_markup('<big><b>%s</b></big>' % timestr)
-        x, y = pl.get_pixel_size()
-        win.draw_layout(gc, win_width-x-3, win_height-row_height-y, pl,
-                        background=bg)
+        win.draw_layout(gc, 2, win_height - y, pl, background=self.bg_color)
 
     def draw_glide(self, gc, pl, win, win_height, win_width):
         # Draw chevrons
@@ -308,6 +341,11 @@ class FreeView:
         x, y = pl.get_pixel_size()
         win.draw_layout(gc, xc+a+5, yc-y/2, pl, background=None)
 
+    def draw_info(self):
+        time_str = time.strftime("%H:%M",
+                                 time.localtime(self.flight.get_secs()))
+        self.info_label[3].set_markup('<span size="%d" weight="bold">%s</span>' % (self.font_size, time_str))
+
     def area_expose(self, area, event):
         win = area.window
         win_width, win_height = win.get_size()
@@ -326,10 +364,12 @@ class FreeView:
         self.draw_airspace(gc, win)
 
         gc.foreground = self.fg_color
+        gc.line_width = 2
+        self.draw_task(gc, win)
+
         gc.line_width = 1
-        # XXX self.draw_task(gc, win)
         self.draw_waypoints(win, gc, pl)
-        # XXX self.draw_annotation(gc, pl, win, win_height, win_width)
+        self.draw_annotation(gc, pl, win, win_height, win_width)
 
         gc.line_width = 2
         # XXX self.draw_glide(gc, pl, win, win_height, win_width)
@@ -339,6 +379,8 @@ class FreeView:
         # self.draw_course_indicator(gc, win, win_width)
         # XXX self.draw_wind(gc, win, pl)
 
+        self.draw_info()
+
         return True
 
     def update_cache(self):
@@ -347,14 +389,12 @@ class FreeView:
         self.view_wps = self.flight.get_area_waypoint_list(
                                     self.viewx, self.viewy, width, height)
 
-        self.airspace = self.flight.get_area_airspace(
-                                    self.viewx, self.viewy, width, height)
-        self.airspace_lines = {}
-        self.airspace_arcs = {}
-        for a in self.airspace:
-            id = a['id']
-            self.airspace_lines[id] = self.flight.get_airspace_lines(id)
-            self.airspace_arcs[id] = self.flight.get_airspace_arcs(id)
+        airspace = self.flight.get_area_airspace(self.viewx, self.viewy,
+                                                 width, height)
+        self.airspace_lines = [x for a in airspace
+                for x in self.flight.get_airspace_lines(a['id'])]
+        self.airspace_arcs = [x for a in airspace
+                for x in self.flight.get_airspace_arcs(a['id'])]
 
     # External methods - for use by controller
     def redraw(self):

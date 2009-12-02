@@ -1,3 +1,5 @@
+import math
+
 import flight_sm
 import freedb
 import projection
@@ -19,6 +21,10 @@ class Flight:
         self.task = self.db.get_task()
         self.reset_tp_list()
 
+        self.x = 0
+        self.y = 0
+        self.secs = 0
+
         self._fsm.enterStartState()
 
     def subscribe(self, subscriber):
@@ -27,6 +33,9 @@ class Flight:
     def update_subscribers(self):
         for s in self.subscriber_list:
             s.flight_update(self)
+
+    def get_secs(self):
+        return self.secs
 
     def get_position(self):
         return (self.x, self.y)
@@ -41,9 +50,9 @@ class Flight:
                 'distance': distance,
                 'bearing': bearing}
 
-    def update_position(self, utc, latitude, longitude, altitude,
+    def update_position(self, secs, latitude, longitude, altitude,
                         ground_speed, track):
-        self.utc = utc
+        self.secs = secs
         x, y = self.projection.forward(latitude, longitude)
         self.x = int(x)
         self.y = int(y)
@@ -102,10 +111,6 @@ class Flight:
         self.update_subscribers()
 
     def do_arm_restart(self):
-        self.reset_tp_list()
-        self.update_subscribers()
-
-    def do_force_start(self):
         self.reset_tp_list()
         self.update_subscribers()
 

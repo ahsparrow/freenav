@@ -160,8 +160,12 @@ class Freedb:
                                  tp['radius2'], tp['angle2'],
                                  tp['direction'], tp['angle12']))
 
-    def get_task(self, id=0):
+    def get_task(self, id=-1):
         """Get turnpoints for specified task"""
+        if id == -1:
+            # Default is to get active task
+            id = self.get_active_task_id()
+
         sql = '''SELECT * FROM Turnpoints INNER JOIN Waypoints
               ON Turnpoints.Waypoint_Id=Waypoints.Id
               WHERE Turnpoints.Task_Id = ? ORDER BY Turnpoints.Task_Index'''
