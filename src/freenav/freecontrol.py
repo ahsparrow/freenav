@@ -46,7 +46,7 @@ class FreeControl:
         device.Start()
 
         # Handle user interface events
-        view.draw_area.connect('button_press_event', self.button_press)
+        view.drawing_area.connect('button_press_event', self.button_press)
         view.window.connect('key_press_event', self.key_press)
         view.window.connect('destroy', gtk.main_quit)
         for i, ibox in enumerate(view.info_box):

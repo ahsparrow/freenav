@@ -24,6 +24,8 @@ class Flight:
         self.x = 0
         self.y = 0
         self.secs = 0
+        self.ground_speed = 0
+        self.track = 0
 
         self._fsm.enterStartState()
 
@@ -45,10 +47,24 @@ class Flight:
         dy = self.tp_list[0]['y'] - self.y
         distance = math.sqrt(dx * dx + dy * dy)
         bearing = math.atan2(dx, dy)
+        relative_bearing = (bearing - self.track) % (2 * math.pi)
 
         return {'id': self.tp_list[0]['id'],
                 'distance': distance,
-                'bearing': bearing}
+                'bearing': bearing,
+                'relative_bearing': relative_bearing}
+
+    def get_glide(self):
+        return {'margin': 1,
+                'height': 100,
+                'ete': 305,
+                'maccready': 1}
+
+    def get_velocity(self):
+        return {'speed': self.ground_speed, 'track': self.track}
+
+    def get_wind(self):
+        return {'speed': 5, 'direction': math.pi * 1.5}
 
     def update_position(self, secs, latitude, longitude, altitude,
                         ground_speed, track):
