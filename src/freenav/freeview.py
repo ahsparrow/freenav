@@ -45,10 +45,6 @@ class FreeView:
         self.viewy = 0
         self.view_scale = DEFAULT_SCALE
 
-        # Font size juju
-        self.font_size = int(100000.0 * gtk.gdk.screen_height_mm() /
-                             gtk.gdk.screen_height())
-
         # Create top level window
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.window.add_events(gtk.gdk.KEY_PRESS_MASK)
@@ -69,19 +65,18 @@ class FreeView:
         self.bg_color = cmap.alloc_color("white")
         self.fg_color = cmap.alloc_color("black")
 
-        # Divider between map and info boxes
-        add_div(hbox)
-
         # Vertical box for info boxes
+        add_div(hbox)
         vbox = gtk.VBox(homogeneous=False)
         vbox.set_size_request(INFO_BOX_SIZE, -1)
         hbox.pack_end(vbox, expand=False)
 
         # Array of info boxes
+        self.info_str = ['', '', '', '']
         self.info_box = []
         self.info_label = []
         for i in range(NUM_INFO_BOXES):
-            label = gtk.Label("xxx")
+            label = gtk.Label()
             align = gtk.Alignment(xalign=0.5, yalign=0.5)
             align.add(label)
             ebox = gtk.EventBox()
@@ -96,6 +91,34 @@ class FreeView:
         for ibox in self.info_box[1:]:
             add_div(vbox)
             vbox.pack_start(ibox)
+
+        # Font size juju
+        font_size = int(1000.0 * gtk.gdk.screen_height_mm() /
+                        gtk.gdk.screen_height())
+
+        # Pango layouts
+        attr_list = pango.AttrList()
+        attr_list.insert(pango.AttrSize(font_size * 60, 0, 999))
+        self.wp_layout = pango.Layout(self.drawing_area.create_pango_context())
+        self.wp_layout.set_attributes(attr_list)
+
+        attr_list = pango.AttrList()
+        attr_list.insert(pango.AttrSize(font_size * 75, 0, 999))
+        attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
+        self.tp_layout = pango.Layout(self.drawing_area.create_pango_context())
+        self.tp_layout.set_attributes(attr_list)
+
+        attr_list = pango.AttrList()
+        attr_list.insert(pango.AttrSize(font_size * 66, 0, 999))
+        attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
+        self.fg_layout = pango.Layout(self.drawing_area.create_pango_context())
+        self.fg_layout.set_attributes(attr_list)
+
+        attr_list = pango.AttrList()
+        attr_list.insert(pango.AttrSize(font_size * 75, 0, 999))
+        attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
+        self.wind_layout = pango.Layout(self.drawing_area.create_pango_context())
+        self.wind_layout.set_attributes(attr_list)
 
         # Show the window
         if fullscreen:
@@ -139,10 +162,6 @@ class FreeView:
         win = area.window
         win_width, win_height = win.get_size()
 
-        pl = pango.Layout(area.create_pango_context())
-        font_description = pango.FontDescription('sans normal 14')
-        pl.set_font_description(font_description)
-
         # Start with a blank sheet...
         gc = win.new_gc()
         gc.foreground = self.bg_color
@@ -160,32 +179,29 @@ class FreeView:
 
         # Waypoints
         gc.line_width = 1
-        self.draw_waypoints(win, gc, pl)
+        self.draw_waypoints(win, gc)
 
-        # Turnpoint annotation
-        self.draw_annotation(gc, pl, win, win_height)
+        # Next turnpoint annotation and course
+        self.draw_turnpoint(gc, win, win_height)
 
         # Final glide indicator
         gc.line_width = 3
-        self.draw_glide(gc, pl, win, win_height)
+        self.draw_glide(gc, win, win_height)
 
-        # Draw heading symbol
+        # Heading symbol
         gc.line_width = 2
         self.draw_heading(gc, win, win_height, win_width)
 
-        # Draw course arrow
-        gc.line_width = 1
-        self.draw_course_indicator(gc, win)
-
-        # Draw wind arrow
+        # Wind arrow
         gc.line_width = 2
-        self.draw_wind(gc, pl, win, win_width)
+        self.draw_wind(gc, win, win_width)
 
+        # Info boxes
         self.draw_info()
 
         return True
 
-    def draw_waypoints(self, win, gc, layout):
+    def draw_waypoints(self, win, gc):
         """Draw waypoints"""
         tps = [tp['waypoint_id'] for tp in self.flight.task]
         for wp in self.view_wps:
@@ -196,8 +212,8 @@ class FreeView:
                              x - delta, y - delta,
                              WP_SIZE, WP_SIZE, 0, CIRCLE_LEN)
 
-                layout.set_markup(wp['id'])
-                win.draw_layout(gc, x + delta, y + delta, layout)
+                self.wp_layout.set_text(wp['id'])
+                win.draw_layout(gc, x + delta, y + delta, self.wp_layout)
 
     def draw_airspace(self, gc, win):
         """Draw airspace boundary lines and arcs"""
@@ -296,85 +312,20 @@ class FreeView:
         x2, y2 = self.view_to_win(x + radius2 * sa, y + radius2 * ca)
         win.draw_line(gc, x1, y1, x2, y2)
 
-    def draw_annotation(self, gc, pl, win, win_height):
+    def draw_turnpoint(self, gc, win, win_height):
         """Draw turnpoint annotation"""
         nav = self.flight.get_nav()
-        bearing = math.degrees(nav['bearing'])
-        if bearing < 0:
-            bearing += 360
+        bearing = math.degrees(nav['bearing']) % 360
 
-        markup = '<big><b>%s %.1f/%.0f</b></big>'
-        pl.set_markup(markup % (nav['id'], nav['distance'] / 1000, bearing))
-        x, y = pl.get_pixel_size()
+        dist_km = nav['distance'] / 1000
+        self.tp_layout.set_text('%s %.1f/%.0f' % (nav['id'], dist_km, bearing))
+        x, y = self.tp_layout.get_pixel_size()
 
-        win.draw_layout(gc, 2, win_height - y, pl, background=self.bg_color)
+        win.draw_layout(gc, 2, win_height - y, self.tp_layout,
+                        background=self.bg_color)
 
-    def draw_glide(self, gc, pl, win, win_height):
-        """Draw final glide information"""
-        glide = self.flight.get_glide()
-
-        # Draw origin
-        y = win_height / 2
-        win.draw_line(gc, 1, y, FG_WIDTH + 1, y)
-
-        # Draw chevrons
-        num_arrows = int(glide['margin'] * 20)
-        if num_arrows > 0:
-            y = y + (FG_INC / 2)
-            yinc = -FG_INC
-        else:
-            y = y - (FG_INC / 2)
-            yinc =  FG_INC
-        num_arrows = abs(num_arrows)
-
-        for i in range(min(num_arrows, 5)):
-            y =  y + yinc
-            win.draw_lines(gc, [(1, y), ((FG_WIDTH / 2) + 1, y + yinc),
-                                (FG_WIDTH + 1, y)])
-
-        # Draw limit bar
-        if num_arrows > 5:
-            y = y + yinc
-            if yinc > 0:
-                y = y + gc.line_width
-            else:
-                y = y - gc.line_width
-            win.draw_line(gc, 1, y, FG_WIDTH + 1, y)
-
-        # Arrival height, MacCready and ETE
-        ete_mins = glide['ete'] / 60
-        if ete_mins >= 600:
-            ete_str = '-:--'
-        else:
-            ete_str = "%d:%02d" % (ete_mins / 60, ete_mins % 60)
-
-        pl.set_markup('<big><b>%d\n%s\n%.1f</b></big>' %
-                      (glide['height'] * M_TO_FT, ete_str,
-                       glide['maccready'] * MPS_TO_KTS))
-        x, y = pl.get_pixel_size()
-        win.draw_layout(gc, FG_WIDTH + 5, (win_height / 2) - (2 * y / 3), pl,
-                        background=None)
-
-    def draw_heading(self, gc, win, win_height, win_width):
-        """Draw heading glider symbol"""
-        xc = win_width / 2
-        yc = win_height / 2
-
-        vel = self.flight.get_velocity()
-        x = math.sin(vel['track'])
-        y = -math.cos(vel['track'])
-        a, b, c, d = 15, 30, 45, 15
-        cf = [x*a, y*a, -x*b, -y*b]
-        cw = [y*c, -x*c, -y*c, x*c]
-        ct = [-x*b+y*d, -y*b-x*d, -x*b-y*d, -y*b+x*d]
-
-        for x1, y1, x2, y2 in cf, cw, ct:
-            win.draw_line(gc, int(xc + x1 + 0.5), int(yc + y1 + 0.5),
-                              int(xc + x2 + 0.5), int(yc + y2 + 0.5))
-
-    def draw_course_indicator(self, gc, win):
-        """Draw arrow for relative bearing to TP"""
-        rb = self.flight.get_nav()['relative_bearing']
+        # Draw arrow for relative bearing to TP
+        rb = nav['relative_bearing']
         x, y = math.sin(rb), -math.cos(rb)
 
         xc = 40
@@ -388,8 +339,67 @@ class FreeView:
 
         win.draw_polygon(gc, True, poly)
 
-    def draw_wind(self, gc, pl, win, win_width):
-        # Draw wind speed/direction
+    def draw_glide(self, gc, win, win_height):
+        """Draw final glide information"""
+        glide = self.flight.get_glide()
+
+        # Draw origin
+        y = win_height / 2
+        win.draw_line(gc, 1, y, FG_WIDTH + 1, y)
+
+        # Draw chevrons
+        num_arrows = abs(int(glide['margin'] * 20))
+        if glide['margin'] > 0:
+            yinc = -FG_INC
+        else:
+            yinc =  FG_INC
+        y = y - yinc / 2
+
+        for i in range(min(num_arrows, 5)):
+            y =  y + yinc
+            win.draw_lines(gc, [(1, y), ((FG_WIDTH / 2) + 1, y + yinc),
+                                (FG_WIDTH + 1, y)])
+        # Draw limit bar
+        if num_arrows > 5:
+            if yinc > 0:
+                y = y + yinc + gc.line_width
+            else:
+                y = y + yinc - gc.line_width
+            win.draw_line(gc, 1, y, FG_WIDTH + 1, y)
+
+        # Arrival height, MacCready and ETE
+        ete_mins = glide['ete'] / 60
+        if ete_mins >= 600:
+            ete_str = '-:--'
+        else:
+            ete_str = "%d:%02d" % (ete_mins / 60, ete_mins % 60)
+
+        self.fg_layout.set_text('%d\n%s\n%.1f' %
+                      (glide['height'] * M_TO_FT, ete_str,
+                       glide['maccready'] * MPS_TO_KTS))
+        x, y = self.fg_layout.get_pixel_size()
+        win.draw_layout(gc, FG_WIDTH + 5, (win_height / 2) - (2 * y / 3),
+                        self.fg_layout, background=None)
+
+    def draw_heading(self, gc, win, win_height, win_width):
+        """Draw heading glider symbol"""
+        xc = win_width / 2
+        yc = win_height / 2
+
+        vel = self.flight.get_velocity()
+        x = math.sin(vel['track'])
+        y = -math.cos(vel['track'])
+        a, b, c, d = 15, 30, 45, 15
+        cf = [x * a, y * a, -x * b, -y * b]
+        cw = [y * c, -x * c, -y * c, x * c]
+        ct = [-x * b + y * d, -y * b - x * d, -x * b - y * d, -y * b + x * d]
+
+        for x1, y1, x2, y2 in (cf, cw, ct):
+            win.draw_line(gc, int(xc + x1 + 0.5), int(yc + y1 + 0.5),
+                              int(xc + x2 + 0.5), int(yc + y2 + 0.5))
+
+    def draw_wind(self, gc, win, win_width):
+        """Draw wind speed/direction"""
         wind = self.flight.get_wind()
         x = math.sin(wind['direction'])
         y = -math.cos(wind['direction'])
@@ -405,15 +415,16 @@ class FreeView:
         win.draw_polygon(gc, False, poly)
 
         speed = wind['speed'] * MPS_TO_KTS
-        pl.set_markup('<big><b>%d</b></big>' % speed)
-        x, y = pl.get_pixel_size()
+        self.wind_layout.set_text(str(int(speed)))
+        x, y = self.wind_layout.get_pixel_size()
 
-        win.draw_layout(gc, xc - x - 35, yc - y / 2, pl, background=None)
+        win.draw_layout(gc, xc - x - 35, yc - y / 2, self.wind_layout,
+                        background=None)
 
     def draw_info(self):
-        time_str = time.strftime("%H:%M",
-                                 time.localtime(self.flight.get_secs()))
-        self.info_label[3].set_markup('<span size="%d" weight="bold">%s</span>' % (self.font_size, time_str))
+        """Draw the info label array"""
+        for str, label in zip(self.info_str, self.info_label):
+            label.set_text(str)
 
     def update_cache(self):
         """Update cached waypoints and airspace"""
