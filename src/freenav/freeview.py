@@ -40,6 +40,10 @@ class FreeView:
     def __init__(self, flight, fullscreen):
         self.flight = flight
 
+        # Font size juju
+        font_size = int(1000.0 * gtk.gdk.screen_height_mm() /
+                        gtk.gdk.screen_height())
+
         # viewx/viewy is geographic position at center of window
         self.viewx = 0
         self.viewy = 0
@@ -72,11 +76,15 @@ class FreeView:
         hbox.pack_end(vbox, expand=False)
 
         # Array of info boxes
-        self.info_str = ['', '', '', '']
         self.info_box = []
         self.info_label = []
         for i in range(NUM_INFO_BOXES):
             label = gtk.Label()
+            attr_list = pango.AttrList()
+            attr_list.insert(pango.AttrSize(font_size * 100, 0, 999))
+            attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
+            label.set_attributes(attr_list)
+
             align = gtk.Alignment(xalign=0.5, yalign=0.5)
             align.add(label)
             ebox = gtk.EventBox()
@@ -91,10 +99,6 @@ class FreeView:
         for ibox in self.info_box[1:]:
             add_div(vbox)
             vbox.pack_start(ibox)
-
-        # Font size juju
-        font_size = int(1000.0 * gtk.gdk.screen_height_mm() /
-                        gtk.gdk.screen_height())
 
         # Pango layouts
         attr_list = pango.AttrList()
@@ -195,9 +199,6 @@ class FreeView:
         # Wind arrow
         gc.line_width = 2
         self.draw_wind(gc, win, win_width)
-
-        # Info boxes
-        self.draw_info()
 
         return True
 
@@ -420,11 +421,6 @@ class FreeView:
 
         win.draw_layout(gc, xc - x - 35, yc - y / 2, self.wind_layout,
                         background=None)
-
-    def draw_info(self):
-        """Draw the info label array"""
-        for str, label in zip(self.info_str, self.info_label):
-            label.set_text(str)
 
     def update_cache(self):
         """Update cached waypoints and airspace"""

@@ -1,4 +1,5 @@
 import ConfigParser
+import collections
 import math
 import os.path
 import time
@@ -14,9 +15,12 @@ DEVICE_INTERFACE = "org.freedesktop.Gypsy.Device"
 COURSE_INTERFACE = "org.freedesktop.Gypsy.Course"
 
 KTS_TO_MPS = 1852 / 3600.0
+FT_TO_M = 0.3048
 
 POSITION_ALL_VALID = 0x7
 COURSE_SPEED_TRACK_VALID = 0x3
+
+INFO_LEVEL = 0
 
 class FreeControl:
     def __init__(self, flight, view):
@@ -24,9 +28,10 @@ class FreeControl:
         self.flight = flight
         self.flight.subscribe(self)
 
+        self.level_display_type = 'flight_level'
+
         config = ConfigParser.ConfigParser()
-        config.read(os.path.join(os.path.expanduser('~'),
-                                 '.freeflight',
+        config.read(os.path.join(os.path.expanduser('~'), '.freeflight',
                                  'freenav.ini'))
 
         # Set-up all the D-Bus stuff
@@ -39,6 +44,7 @@ class FreeControl:
         path = control.Create(gps_dev, dbus_interface=CONTROL_INTERFACE)
         gps = bus.get_object(DBUS_SERVICE, path)
         gps.connect_to_signal("PositionChanged", self.position_changed)
+        gps.connect_to_signal("PressureLevelChanged", self.level_changed)
 
         self.course = dbus.Interface(gps, dbus_interface=COURSE_INTERFACE)
 
@@ -55,6 +61,8 @@ class FreeControl:
     def info_button_press(self, widget, event, *args):
         """Handle button press in info box"""
         print "Info button press", args[0]
+        if args[0] == INFO_LEVEL:
+            self.level_button_press()
         return True
 
     def button_press(self, widget, event, *args):
@@ -95,9 +103,47 @@ class FreeControl:
         self.flight.update_position(secs, latitude, longitude, altitude,
                                     speed, track)
 
+    def level_changed(self, level):
+        """Callback from D-Bus on new pressure altitude"""
+        self.flight.update_level(level * FT_TO_M)
+
     def flight_update(self, flight):
         """Callback on flight model change"""
+        self.display_level()
         self.view.update_position(*flight.get_position())
+
+    #------------------------------------------------------------------
+
+    def level_button_press(self):
+        if self.level_display_type == 'flight_level':
+            self.level_display_type = 'altitude'
+        elif self.level_display_type == 'altitude':
+            self.level_display_type = 'height'
+        else:
+            self.level_display_type = 'flight_level'
+        self.display_level()
+
+    def display_level(self):
+        if self.level_display_type == 'height':
+            height = self.flight.get_pressure_height()
+            if height is None:
+                s = "****F"
+            else:
+                s = str(int(height / FT_TO_M)) + 'F'
+        elif self.level_display_type == 'altitude':
+            altitude = self.flight.get_pressure_altitude()
+            if altitude is None:
+                s = "****"
+            else:
+                s = str(int(altitude / FT_TO_M))
+        else:
+            fl = self.flight.get_flight_level()
+            if fl is None:
+                s = "FL**"
+            else:
+                s = "FL%02d" % round((fl / FT_TO_M) / 100)
+        self.view.info_label[INFO_LEVEL].set_text(s)
+        self.view.redraw()
 
     def main(self):
         gtk.main()

@@ -38,6 +38,9 @@ class FlightState(statemap.State):
     def new_position(self, fsm):
         self.Default(fsm)
 
+    def new_pressure_level(self, fsm, level):
+        self.Default(fsm)
+
     def Default(self, fsm):
         if fsm.getDebugFlag() == True:
             fsm.getDebugStream().write('TRANSITION   : Default\n')
@@ -86,14 +89,20 @@ class FlightFSM_Init(FlightFSM_Default):
             fsm.getState().Entry(fsm)
         elif ctxt.ground_speed < 2 :
             fsm.getState().Exit(fsm)
-            # No actions.
-            pass
-            fsm.setState(FlightFSM.Ground)
-            fsm.getState().Entry(fsm)
+            fsm.clearState()
+            try:
+                ctxt.do_ground_init()
+            finally:
+                fsm.setState(FlightFSM.Ground)
+                fsm.getState().Entry(fsm)
         else:
             FlightFSM_Default.new_position(self, fsm)
         
 class FlightFSM_Ground(FlightFSM_Default):
+
+    def Exit(self, fsm):
+        ctxt = fsm.getOwner()
+        ctxt.do_takeoff()
 
     def new_position(self, fsm):
         ctxt = fsm.getOwner()
@@ -109,6 +118,18 @@ class FlightFSM_Ground(FlightFSM_Default):
         else:
             FlightFSM_Default.new_position(self, fsm)
         
+    def new_pressure_level(self, fsm, level):
+        ctxt = fsm.getOwner()
+        if fsm.getDebugFlag() == True:
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.Ground.new_pressure_level(level)\n")
+
+        endState = fsm.getState()
+        fsm.clearState()
+        try:
+            ctxt.do_set_pressure_level_datum(level)
+        finally:
+            fsm.setState(endState)
+
 class FlightFSM_Launched(FlightFSM_Default):
 
     def arm_start(self, fsm):

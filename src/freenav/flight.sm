@@ -22,16 +22,23 @@ Init
     new_position [ctxt.ground_speed < 2]
         Ground
         {
+            do_ground_init();
         }
 }
 
 // On the ground, waiting for takeoff
 Ground
+Exit {do_takeoff();}
 {
-    // Takeoff!!!
     new_position [ctxt.ground_speed > 10]
         Launched
         {
+        }
+
+    new_pressure_level (level)
+        nil
+        {
+            do_set_pressure_level_datum(level);
         }
 }
 

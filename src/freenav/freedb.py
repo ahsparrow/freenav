@@ -4,6 +4,7 @@
 #
 
 import os
+import time
 
 import sqlite3
 
@@ -39,7 +40,12 @@ SCHEMA = {
         ('Radius2', 'INTEGER'), ('Angle2', 'REAL'),
         ('Direction', 'TEXT'), ('Angle12', 'REAL')],
 
-    'Config': [('Task_Id', 'INTEGER')]}
+    'Config': [('Task_Id', 'INTEGER'),
+               ('QNE', 'REAL'),
+               ('QNE_Timestamp', 'INTEGER'),
+               ('Pressure_Level_Datum', 'REAL'),
+               ('Pressure_Level_Datum_Timestamp', 'INTEGER'),
+               ('Start_Time', 'INTEGER')]}
 
 class Freedb:
     def __init__(self, file=''):
@@ -71,7 +77,10 @@ class Freedb:
               VALUES (?, ?, ?, ?)'''
         self.c.execute(sql, (parallel1, parallel2, latitude, longitude))
 
-        sql = 'INSERT INTO Config (Task_Id) VALUES (0)'
+        sql = '''INSERT INTO Config
+              (Task_Id, QNE, QNE_Timestamp, Pressure_Level_Datum,
+               Pressure_Level_Datum_Timestamp, Start_Time)
+              VALUES (0, 0, 0, 0, 0, 0)'''
         self.c.execute(sql)
 
         self.c.execute('CREATE INDEX X_Index ON Waypoints (X)')
@@ -214,3 +223,41 @@ class Freedb:
     def insert_airspace_circle(self, id, x, y, radius):
         """Convenience function to add a 360 degree arc"""
         self.insert_airspace_arc(id, x, y, radius, 0, 360)
+
+    def set_qne(self, qne):
+        """Set QNE value and date"""
+        time_stamp = int(time.time())
+        sql = 'UPDATE Config SET QNE = ?, QNE_Timestamp = ?'
+        self.c.execute(sql, (qne, time_stamp))
+
+    def get_config(self):
+        """Returns configuration values"""
+        self.c.execute('SELECT * FROM Config')
+        return self.c.fetchone()
+
+    def set_pressure_level_datum(self, level, tim):
+        """Set takeoff level and time"""
+        sql = '''UPDATE Config Set Pressure_Level_Datum = ?,
+              Pressure_Level_Datum_Timestamp = ?'''
+        self.c.execute(sql, (level, tim))
+
+    def get_nearest_landable(self, xpos, ypos):
+        """Get list of landable waypoints sorted by distance"""
+        sql = 'SELECT * FROM Waypoints WHERE Landable_Flag != 0'
+        self.c.execute(sql)
+        wps = self.c.fetchall()
+
+        def dist_cmp(a, b):
+            z = (((a['x'] - xpos)**2 + (a['y'] - ypos)**2) -
+                 ((b['x'] - xpos)**2 + (b['y'] - ypos)**2))
+            if z > 0:
+                return 1
+            elif z < 0:
+                return -1
+            else:
+                return 0
+
+        wps.sort(dist_cmp)
+        return wps
+
+

@@ -41,6 +41,7 @@ class NmeaGen:
         self.x = wp['X']
         self.y = wp['Y']
         self.time = time.time()
+        self.alt = 0
 
     def set_values(self, altitude, air_speed, ground_speed, course, maccready,
                    ballast, bugs):
@@ -108,6 +109,10 @@ class NmeaGen:
         data = '$PBB50,%d,.0,%03.1f,0,%d,%03.1f,1,23' % \
                 (int(self.air_speed*MPS_TO_KTS),
                  self.maccready, self.bugs, self.ballast)
+        data = self.add_checksum(data)
+        stream.write(data)
+
+        data = '$PGRMZ,%d,F,2' % self.alt
         data = self.add_checksum(data)
         stream.write(data)
 
