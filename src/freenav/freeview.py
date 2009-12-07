@@ -48,6 +48,8 @@ class FreeView:
         self.viewx = 0
         self.viewy = 0
         self.view_scale = DEFAULT_SCALE
+        self.cachex = 0
+        self.cachey = 0
 
         # Create top level window
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -444,7 +446,15 @@ class FreeView:
         """Update position of view and redraw"""
         self.viewx = x
         self.viewy = y
-        self.update_cache()
+
+        width, height = self.get_view_size()
+        if ((abs(x - self.cachex) > (width / 20)) or
+                (abs(y - self.cachey) > (height / 20))):
+            # Update airspace/waypoint cache if view has significantly changed
+            self.cachex = x
+            self.cachey = y
+            self.update_cache()
+
         self.redraw()
 
     def zoom_out(self):
