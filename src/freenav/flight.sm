@@ -1,112 +1,126 @@
 %class Flight
 
-%start FlightFSM::Init
+%start FlightFSM::Initialising
 %map FlightFSM
 %%
 // Waiting for first GPS fix
-Init
+Initialising
 {
     // Restart in air after task start
     new_position [(ctxt.ground_speed > 10) and ctxt.is_previous_start()]
-        Task
+        OnTask
         {
         }
 
     // Restart after launch, but before start
     new_position [ctxt.ground_speed > 10]
-        Launched
+        WaitingForStart
         {
         }
 
     // Start on grid
     new_position [ctxt.ground_speed < 2]
-        Ground
+        OnGround
         {
-            do_ground_init();
+            init_ground();
         }
 }
 
 // On the ground, waiting for takeoff
-Ground
+OnGround
 Exit {do_takeoff();}
 {
     new_position [ctxt.ground_speed > 10]
-        Launched
+        WaitingForStart
         {
         }
 
     new_pressure_level (level)
         nil
         {
-            do_set_pressure_level_datum(level);
+            do_update_pressure_level(level);
         }
 }
 
 // Launched, but not ready for start yet
-Launched
+WaitingForStart
 {
     // Time to go
-    arm_start
-        StartReady
+    start_trigger
+        OutsideStartSector
         {
         }
 }
 
 // Ready for start - outsite start sector
-StartReady
+OutsideStartSector
+Entry {set_task("start");}
 {
     new_position [ctxt.in_start_sector()]
-        StartSector
+        InsideStartSector
         {
         }
 
-    force_start
-        StartSector
+    start_trigger
+        InsideStartSector
         {
         }
 }
 
 // Ready for start - inside start sector
-StartSector
+InsideStartSector
+Entry {set_task("sector");}
 {
-    // And we're off...
     new_position [not ctxt.in_start_sector()]
-        Task
+        OnTask
         {
-            do_start();
+            make_start();
+        }
+
+    start_trigger
+        OnTask
+        {
+            make_start();
         }
 }
 
 // On task
-Task
+OnTask
+Entry {set_task("task");}
 {
     // Suspend task and go somewhere else
     divert(waypoint_id)
-        Divert
+        Diverted
         {
             do_divert(waypoint_id);
         }
 
-    incr_turnpoint [len(ctxt.tp_list) > 1]
+    increment_turnpoint [len(ctxt.tp_list) > 1]
         nil
         {
-            do_incr_turnpoint();
+            do_increment_turnpoint();
         }
 
-    decr_turnpoint [len(ctxt.task) > (len(ctxt.tp_list) + 1)]
+    decrement_turnpoint [len(ctxt.task) > (len(ctxt.tp_list) + 1)]
         nil
         {
-            do_decr_turnpoint();
+            do_decrement_turnpoint();
+        }
+
+    start_trigger
+        OutsideStartSector
+        {
         }
 }
 
 // Diverting to (non-task) waypoint
-Divert
+Diverted
+Entry {set_task("divert");}
 Exit {do_cancel_divert();}
 {
     // Finished faffing... back to task
     cancel_divert
-        Task
+        OnTask
         {
         }
 }
@@ -114,12 +128,6 @@ Exit {do_cancel_divert();}
 // Default stuff
 Default
 {
-    arm_restart
-        StartReady
-        {
-            do_arm_restart();
-        }
-
     Default
         nil
         {

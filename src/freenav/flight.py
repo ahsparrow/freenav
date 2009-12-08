@@ -11,7 +11,7 @@ KTS_TO_MPS = 1852.0 / 3600
 class Flight:
     def __init__(self):
         self._fsm = flight_sm.Flight_sm(self)
-        #self._fsm.setDebugFlag(True)
+        self._fsm.setDebugFlag(True)
 
         self.subscriber_list = set()
 
@@ -23,6 +23,8 @@ class Flight:
         # Initialise task and turnpoint list
         self.task = self.db.get_task()
         self.reset_tp_list()
+
+        self.task_state = ''
 
         self.x = 0
         self.y = 0
@@ -50,6 +52,45 @@ class Flight:
     def subscribe(self, subscriber):
         """Add a subscriber"""
         self.subscriber_list.add(subscriber)
+
+    def update_position(self, secs, latitude, longitude, altitude,
+                        ground_speed, track):
+        self.secs = secs
+        x, y = self.projection.forward(latitude, longitude)
+        self.x = int(x)
+        self.y = int(y)
+        self.altitude = altitude
+        self.track = track
+        self.ground_speed = ground_speed
+
+        self._fsm.new_position()
+        self.notify_subscribers()
+
+    def update_vario(self, maccready, bugs, ballast):
+        self.maccready = maccready
+        self.bugs = bugs
+        self.ballast = ballast
+
+    def update_pressure_level(self, level):
+        self.pressure_level = level
+        self._fsm.new_pressure_level(level)
+
+    def divert(self, waypoint_id):
+        self._fsm.divert(waypoint_id)
+
+    def cancel_divert(self):
+        self._fsm.cancel_diversion()
+
+    def trigger_start(self):
+        self._fsm.start_trigger()
+
+    def increment_turnpoint(self):
+        self._fsm.increment_turnpoint()
+
+    def decrement_turnpoint(self):
+        self._fsm.decrement_turnpoint()
+
+    #------------------------------------------------------------------------
 
     def get_secs(self):
         """Return GPS time, in seconds"""
@@ -109,97 +150,57 @@ class Flight:
     def get_wind(self):
         return {'speed': 5, 'direction': math.pi * 1.5}
 
-    def update_position(self, secs, latitude, longitude, altitude,
-                        ground_speed, track):
-        self.secs = secs
-        x, y = self.projection.forward(latitude, longitude)
-        self.x = int(x)
-        self.y = int(y)
-        self.altitude = altitude
-        self.track = track
-        self.ground_speed = ground_speed
-
-        self._fsm.new_position()
-        self.update_subscribers()
-
-    def update_level(self, level):
-        self.pressure_level = level
-
-    def update_vario(self, maccready, bugs, ballast):
-        self.maccready = maccready
-        self.bugs = bugs
-        self.ballast = ballast
-
-    def update_level(self, level):
-        self.pressure_level = level
-        self._fsm.new_pressure_level(level)
-
-    def divert(self, waypoint_id):
-        self._fsm.divert(waypoint_id)
-
-    def cancel_divert(self):
-        self._fsm.cancel_divert()
-
-    def start(self):
-        self._fsm.start()
-
-    def force_start(self):
-        self._fsm.force_start()
-
-    def incr_turnpoint(self):
-        self._fsm.incr_turnpoint()
-
-    def decr_turnpoint(self):
-        self._fsm.decr_turnpoint()
+    def get_task_state(self):
+        return self.task_state
 
     #------------------------------------------------------------------------
     # State machine methods
 
-    def do_ground_init(self):
+    def init_ground(self):
         """Get and store airfield altitude"""
         wps = self.db.get_nearest_landable(self.x, self.y)
         self.airfield_altitude = wps[0]['altitude']
         print wps[0]['id']
 
-    def do_set_pressure_level_datum(self, level):
+    def do_update_pressure_level(self, level):
         """Record pressure level datum"""
         self.pressure_level_deque.append(level)
 
         # Calculate average over 60 samples
         if len(self.pressure_level_deque) > 60:
-            self.update_pressure_level_datum()
+            self.set_pressure_level_datum()
 
     def do_takeoff(self):
         """Leaving the ground"""
         if self.pressure_level_datum is None and self.pressure_level_deque:
             # In case we haven't had time to accumulate a full sample
-            self.update_pressure_level_datum()
+            self.set_pressure_level_datum()
 
-    def do_start(self):
+    def set_task(self, task_state):
+        self.task_state = task_state
+        print "TS", task_state
+
+    def make_start(self):
         self.tp_list.pop(0)
-        self.update_subscribers()
+        self.notify_subscribers()
 
     def do_divert(self, waypoint_id):
         self.divert_tp_list = self.tp_list
         self.tp_list = [db.get_waypoint(waypoint_id)]
-        self.update_subscribers()
+        self.notify_subscribers()
 
     def do_cancel_divert(self):
         self.tp_list = self.divert_tp_list
-        self.update_subscribers()
+        self.notify_subscribers()
 
-    def do_incr_turnpoint(self):
+    def do_increment_turnpoint(self):
         self.tp_list.pop(0)
-        self.update_subscribers()
+        self.notify_subscribers()
 
-    def do_decr_turnpoint(self):
+    def do_decrement_turnpoint(self):
         prev_tp = self.task[-(len(self.tp_list) + 1)]
         self.tp_list.insert(0, prev_tp)
-        self.update_subscribers()
-
-    def do_arm_restart(self):
-        self.reset_tp_list()
-        self.update_subscribers()
+        self.notify_subscribers()
 
     def is_previous_start(self):
         return False
@@ -210,12 +211,12 @@ class Flight:
     #------------------------------------------------------------------------
     # Internal stuff
 
-    def update_subscribers(self):
+    def notify_subscribers(self):
         """Send an update to all the subscribers"""
         for s in self.subscriber_list:
             s.flight_update(self)
 
-    def update_pressure_level_datum(self):
+    def set_pressure_level_datum(self):
         """Update datum and store to database"""
         self.pressure_level_datum = (sum(self.pressure_level_deque) /
                                      len(self.pressure_level_deque))

@@ -14,31 +14,25 @@ class FlightState(statemap.State):
     def Exit(self, fsm):
         pass
 
-    def arm_restart(self, fsm):
-        self.Default(fsm)
-
-    def arm_start(self, fsm):
-        self.Default(fsm)
-
     def cancel_divert(self, fsm):
         self.Default(fsm)
 
-    def decr_turnpoint(self, fsm):
+    def decrement_turnpoint(self, fsm):
         self.Default(fsm)
 
     def divert(self, fsm, waypoint_id):
         self.Default(fsm)
 
-    def force_start(self, fsm):
-        self.Default(fsm)
-
-    def incr_turnpoint(self, fsm):
+    def increment_turnpoint(self, fsm):
         self.Default(fsm)
 
     def new_position(self, fsm):
         self.Default(fsm)
 
     def new_pressure_level(self, fsm, level):
+        self.Default(fsm)
+
+    def start_trigger(self, fsm):
         self.Default(fsm)
 
     def Default(self, fsm):
@@ -50,55 +44,42 @@ class FlightState(statemap.State):
 
 class FlightFSM_Default(FlightState):
 
-    def arm_restart(self, fsm):
-        ctxt = fsm.getOwner()
-        if fsm.getDebugFlag() == True:
-            fsm.getDebugStream().write("TRANSITION   : FlightFSM.Default.arm_restart()\n")
-
-        fsm.getState().Exit(fsm)
-        fsm.clearState()
-        try:
-            ctxt.do_arm_restart()
-        finally:
-            fsm.setState(FlightFSM.StartReady)
-            fsm.getState().Entry(fsm)
-
     def Default(self, fsm):
         if fsm.getDebugFlag() == True:
             fsm.getDebugStream().write("TRANSITION   : FlightFSM.Default.Default()\n")
 
 
-class FlightFSM_Init(FlightFSM_Default):
+class FlightFSM_Initialising(FlightFSM_Default):
 
     def new_position(self, fsm):
         ctxt = fsm.getOwner()
         if fsm.getDebugFlag() == True:
-            fsm.getDebugStream().write("TRANSITION   : FlightFSM.Init.new_position()\n")
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.Initialising.new_position()\n")
 
         if (ctxt.ground_speed > 10) and ctxt.is_previous_start() :
             fsm.getState().Exit(fsm)
             # No actions.
             pass
-            fsm.setState(FlightFSM.Task)
+            fsm.setState(FlightFSM.OnTask)
             fsm.getState().Entry(fsm)
         elif ctxt.ground_speed > 10 :
             fsm.getState().Exit(fsm)
             # No actions.
             pass
-            fsm.setState(FlightFSM.Launched)
+            fsm.setState(FlightFSM.WaitingForStart)
             fsm.getState().Entry(fsm)
         elif ctxt.ground_speed < 2 :
             fsm.getState().Exit(fsm)
             fsm.clearState()
             try:
-                ctxt.do_ground_init()
+                ctxt.init_ground()
             finally:
-                fsm.setState(FlightFSM.Ground)
+                fsm.setState(FlightFSM.OnGround)
                 fsm.getState().Entry(fsm)
         else:
             FlightFSM_Default.new_position(self, fsm)
         
-class FlightFSM_Ground(FlightFSM_Default):
+class FlightFSM_OnGround(FlightFSM_Default):
 
     def Exit(self, fsm):
         ctxt = fsm.getOwner()
@@ -107,13 +88,13 @@ class FlightFSM_Ground(FlightFSM_Default):
     def new_position(self, fsm):
         ctxt = fsm.getOwner()
         if fsm.getDebugFlag() == True:
-            fsm.getDebugStream().write("TRANSITION   : FlightFSM.Ground.new_position()\n")
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.OnGround.new_position()\n")
 
         if ctxt.ground_speed > 10 :
             fsm.getState().Exit(fsm)
             # No actions.
             pass
-            fsm.setState(FlightFSM.Launched)
+            fsm.setState(FlightFSM.WaitingForStart)
             fsm.getState().Entry(fsm)
         else:
             FlightFSM_Default.new_position(self, fsm)
@@ -121,113 +102,150 @@ class FlightFSM_Ground(FlightFSM_Default):
     def new_pressure_level(self, fsm, level):
         ctxt = fsm.getOwner()
         if fsm.getDebugFlag() == True:
-            fsm.getDebugStream().write("TRANSITION   : FlightFSM.Ground.new_pressure_level(level)\n")
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.OnGround.new_pressure_level(level)\n")
 
         endState = fsm.getState()
         fsm.clearState()
         try:
-            ctxt.do_set_pressure_level_datum(level)
+            ctxt.do_update_pressure_level(level)
         finally:
             fsm.setState(endState)
 
-class FlightFSM_Launched(FlightFSM_Default):
+class FlightFSM_WaitingForStart(FlightFSM_Default):
 
-    def arm_start(self, fsm):
+    def start_trigger(self, fsm):
         if fsm.getDebugFlag() == True:
-            fsm.getDebugStream().write("TRANSITION   : FlightFSM.Launched.arm_start()\n")
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.WaitingForStart.start_trigger()\n")
 
         fsm.getState().Exit(fsm)
-        fsm.setState(FlightFSM.StartReady)
+        fsm.setState(FlightFSM.OutsideStartSector)
         fsm.getState().Entry(fsm)
 
-class FlightFSM_StartReady(FlightFSM_Default):
+class FlightFSM_OutsideStartSector(FlightFSM_Default):
 
-    def force_start(self, fsm):
-        if fsm.getDebugFlag() == True:
-            fsm.getDebugStream().write("TRANSITION   : FlightFSM.StartReady.force_start()\n")
-
-        fsm.getState().Exit(fsm)
-        fsm.setState(FlightFSM.StartSector)
-        fsm.getState().Entry(fsm)
+    def Entry(self, fsm):
+        ctxt = fsm.getOwner()
+        ctxt.set_task("start")
 
     def new_position(self, fsm):
         ctxt = fsm.getOwner()
         if fsm.getDebugFlag() == True:
-            fsm.getDebugStream().write("TRANSITION   : FlightFSM.StartReady.new_position()\n")
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.OutsideStartSector.new_position()\n")
 
         if ctxt.in_start_sector() :
             fsm.getState().Exit(fsm)
             # No actions.
             pass
-            fsm.setState(FlightFSM.StartSector)
+            fsm.setState(FlightFSM.InsideStartSector)
             fsm.getState().Entry(fsm)
         else:
             FlightFSM_Default.new_position(self, fsm)
         
-class FlightFSM_StartSector(FlightFSM_Default):
+    def start_trigger(self, fsm):
+        if fsm.getDebugFlag() == True:
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.OutsideStartSector.start_trigger()\n")
+
+        fsm.getState().Exit(fsm)
+        fsm.setState(FlightFSM.InsideStartSector)
+        fsm.getState().Entry(fsm)
+
+class FlightFSM_InsideStartSector(FlightFSM_Default):
+
+    def Entry(self, fsm):
+        ctxt = fsm.getOwner()
+        ctxt.set_task("sector")
 
     def new_position(self, fsm):
         ctxt = fsm.getOwner()
         if fsm.getDebugFlag() == True:
-            fsm.getDebugStream().write("TRANSITION   : FlightFSM.StartSector.new_position()\n")
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.InsideStartSector.new_position()\n")
 
         if not ctxt.in_start_sector() :
             fsm.getState().Exit(fsm)
             fsm.clearState()
             try:
-                ctxt.do_start()
+                ctxt.make_start()
             finally:
-                fsm.setState(FlightFSM.Task)
+                fsm.setState(FlightFSM.OnTask)
                 fsm.getState().Entry(fsm)
         else:
             FlightFSM_Default.new_position(self, fsm)
         
-class FlightFSM_Task(FlightFSM_Default):
-
-    def decr_turnpoint(self, fsm):
+    def start_trigger(self, fsm):
         ctxt = fsm.getOwner()
         if fsm.getDebugFlag() == True:
-            fsm.getDebugStream().write("TRANSITION   : FlightFSM.Task.decr_turnpoint()\n")
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.InsideStartSector.start_trigger()\n")
+
+        fsm.getState().Exit(fsm)
+        fsm.clearState()
+        try:
+            ctxt.make_start()
+        finally:
+            fsm.setState(FlightFSM.OnTask)
+            fsm.getState().Entry(fsm)
+
+class FlightFSM_OnTask(FlightFSM_Default):
+
+    def Entry(self, fsm):
+        ctxt = fsm.getOwner()
+        ctxt.set_task("task")
+
+    def decrement_turnpoint(self, fsm):
+        ctxt = fsm.getOwner()
+        if fsm.getDebugFlag() == True:
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.OnTask.decrement_turnpoint()\n")
 
         if len(ctxt.task) > (len(ctxt.tp_list) + 1) :
             endState = fsm.getState()
             fsm.clearState()
             try:
-                ctxt.do_decr_turnpoint()
+                ctxt.do_decrement_turnpoint()
             finally:
                 fsm.setState(endState)
         else:
-            FlightFSM_Default.decr_turnpoint(self, fsm)
+            FlightFSM_Default.decrement_turnpoint(self, fsm)
         
     def divert(self, fsm, waypoint_id):
         ctxt = fsm.getOwner()
         if fsm.getDebugFlag() == True:
-            fsm.getDebugStream().write("TRANSITION   : FlightFSM.Task.divert(waypoint_id)\n")
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.OnTask.divert(waypoint_id)\n")
 
         fsm.getState().Exit(fsm)
         fsm.clearState()
         try:
             ctxt.do_divert(waypoint_id)
         finally:
-            fsm.setState(FlightFSM.Divert)
+            fsm.setState(FlightFSM.Diverted)
             fsm.getState().Entry(fsm)
 
-    def incr_turnpoint(self, fsm):
+    def increment_turnpoint(self, fsm):
         ctxt = fsm.getOwner()
         if fsm.getDebugFlag() == True:
-            fsm.getDebugStream().write("TRANSITION   : FlightFSM.Task.incr_turnpoint()\n")
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.OnTask.increment_turnpoint()\n")
 
         if len(ctxt.tp_list) > 1 :
             endState = fsm.getState()
             fsm.clearState()
             try:
-                ctxt.do_incr_turnpoint()
+                ctxt.do_increment_turnpoint()
             finally:
                 fsm.setState(endState)
         else:
-            FlightFSM_Default.incr_turnpoint(self, fsm)
+            FlightFSM_Default.increment_turnpoint(self, fsm)
         
-class FlightFSM_Divert(FlightFSM_Default):
+    def start_trigger(self, fsm):
+        if fsm.getDebugFlag() == True:
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.OnTask.start_trigger()\n")
+
+        fsm.getState().Exit(fsm)
+        fsm.setState(FlightFSM.OutsideStartSector)
+        fsm.getState().Entry(fsm)
+
+class FlightFSM_Diverted(FlightFSM_Default):
+
+    def Entry(self, fsm):
+        ctxt = fsm.getOwner()
+        ctxt.set_task("divert")
 
     def Exit(self, fsm):
         ctxt = fsm.getOwner()
@@ -235,27 +253,27 @@ class FlightFSM_Divert(FlightFSM_Default):
 
     def cancel_divert(self, fsm):
         if fsm.getDebugFlag() == True:
-            fsm.getDebugStream().write("TRANSITION   : FlightFSM.Divert.cancel_divert()\n")
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.Diverted.cancel_divert()\n")
 
         fsm.getState().Exit(fsm)
-        fsm.setState(FlightFSM.Task)
+        fsm.setState(FlightFSM.OnTask)
         fsm.getState().Entry(fsm)
 
 class FlightFSM(object):
 
-    Init = FlightFSM_Init('FlightFSM.Init', 0)
-    Ground = FlightFSM_Ground('FlightFSM.Ground', 1)
-    Launched = FlightFSM_Launched('FlightFSM.Launched', 2)
-    StartReady = FlightFSM_StartReady('FlightFSM.StartReady', 3)
-    StartSector = FlightFSM_StartSector('FlightFSM.StartSector', 4)
-    Task = FlightFSM_Task('FlightFSM.Task', 5)
-    Divert = FlightFSM_Divert('FlightFSM.Divert', 6)
+    Initialising = FlightFSM_Initialising('FlightFSM.Initialising', 0)
+    OnGround = FlightFSM_OnGround('FlightFSM.OnGround', 1)
+    WaitingForStart = FlightFSM_WaitingForStart('FlightFSM.WaitingForStart', 2)
+    OutsideStartSector = FlightFSM_OutsideStartSector('FlightFSM.OutsideStartSector', 3)
+    InsideStartSector = FlightFSM_InsideStartSector('FlightFSM.InsideStartSector', 4)
+    OnTask = FlightFSM_OnTask('FlightFSM.OnTask', 5)
+    Diverted = FlightFSM_Diverted('FlightFSM.Diverted', 6)
     Default = FlightFSM_Default('FlightFSM.Default', -1)
 
 class Flight_sm(statemap.FSMContext):
 
     def __init__(self, owner):
-        statemap.FSMContext.__init__(self, FlightFSM.Init)
+        statemap.FSMContext.__init__(self, FlightFSM.Initialising)
         self._owner = owner
 
     def __getattr__(self, attrib):

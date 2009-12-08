@@ -21,6 +21,8 @@ POSITION_ALL_VALID = 0x7
 COURSE_SPEED_TRACK_VALID = 0x3
 
 INFO_LEVEL = 0
+INFO_TASK = 2
+INFO_TIME = 3
 
 class FreeControl:
     def __init__(self, flight, view):
@@ -44,7 +46,8 @@ class FreeControl:
         path = control.Create(gps_dev, dbus_interface=CONTROL_INTERFACE)
         gps = bus.get_object(DBUS_SERVICE, path)
         gps.connect_to_signal("PositionChanged", self.position_changed)
-        gps.connect_to_signal("PressureLevelChanged", self.level_changed)
+        gps.connect_to_signal("PressureLevelChanged",
+                              self.pressure_level_changed)
 
         self.course = dbus.Interface(gps, dbus_interface=COURSE_INTERFACE)
 
@@ -63,6 +66,8 @@ class FreeControl:
         print "Info button press", args[0]
         if args[0] == INFO_LEVEL:
             self.level_button_press()
+        elif args[0] == INFO_TIME:
+            self.time_button_press()
         return True
 
     def button_press(self, widget, event, *args):
@@ -103,13 +108,15 @@ class FreeControl:
         self.flight.update_position(secs, latitude, longitude, altitude,
                                     speed, track)
 
-    def level_changed(self, level):
+    def pressure_level_changed(self, level):
         """Callback from D-Bus on new pressure altitude"""
-        self.flight.update_level(level * FT_TO_M)
+        self.flight.update_pressure_level(level * FT_TO_M)
 
     def flight_update(self, flight):
         """Callback on flight model change"""
         self.display_level()
+        self.display_task_info()
+        self.display_time(flight.get_secs())
         self.view.update_position(*flight.get_position())
 
     #------------------------------------------------------------------
@@ -143,7 +150,28 @@ class FreeControl:
             else:
                 s = "FL%02d" % round((fl / FT_TO_M) / 100)
         self.view.info_label[INFO_LEVEL].set_text(s)
-        self.view.redraw()
+
+    def display_time(self, secs):
+        s = time.strftime("%H:%M", time.localtime(secs))
+        self.view.info_label[INFO_TIME].set_text(s)
+
+    def time_button_press(self):
+        dialog = gtk.MessageDialog(buttons=gtk.BUTTONS_YES_NO,
+                                   message_format='Start task?',
+                                   type=gtk.MESSAGE_QUESTION)
+        ret = dialog.run()
+        dialog.destroy()
+        if ret == gtk.RESPONSE_YES:
+            print "XXX"
+            self.flight.trigger_start()
+
+    def display_task_info(self):
+        task_state = self.flight.get_task_state()
+        if task_state == 'task':
+            info_str = 'Task'
+        else:
+            info_str = task_state.title()
+        self.view.info_label[INFO_TASK].set_text(info_str)
 
     def main(self):
         gtk.main()
