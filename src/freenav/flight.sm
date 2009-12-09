@@ -44,6 +44,7 @@ Exit {do_takeoff();}
 
 // Launched, but not ready for start yet
 WaitingForStart
+Entry {set_task("Launch");}
 {
     start_trigger
         OutsideStartSector
@@ -53,7 +54,7 @@ WaitingForStart
 
 // Ready for start - outsite start sector
 OutsideStartSector
-Entry {set_task("start");}
+Entry {set_task("start"); reset_tp_list();}
 {
     new_position [ctxt.in_start_sector()]
         InsideStartSector
@@ -61,8 +62,10 @@ Entry {set_task("start");}
         }
 
     start_trigger
-        InsideStartSector
+        OnTask
         {
+            set_task("task");
+            make_start();
         }
 }
 
@@ -73,24 +76,26 @@ Entry {set_task("sector");}
     new_position [not ctxt.in_start_sector()]
         OnTask
         {
+            set_task("task");
             make_start();
         }
 
     start_trigger
         OnTask
         {
+            set_task("task");
             make_start();
         }
 }
 
 // On task
 OnTask
-Entry {set_task("task");}
 {
     // Suspend task and go somewhere else
     divert(waypoint_id)
         Diverted
         {
+            set_task("divert");
             do_divert(waypoint_id);
         }
 
@@ -108,13 +113,13 @@ Entry {set_task("task");}
 
 // Diverting to (non-task) waypoint
 Diverted
-Entry {set_task("divert");}
-Exit {do_cancel_divert();}
 {
     // Finished faffing... back to task
     cancel_divert
         OnTask
         {
+            set_task("task");
+            do_cancel_divert();
         }
 }
 

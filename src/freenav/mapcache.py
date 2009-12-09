@@ -16,16 +16,14 @@ class MapCache():
         self.airspace_arcs = []
 
     def update(self, x, y, width, height):
-        if width != self.width or height != self.height:
-            self.do_update(x, y, width, height)
-        else:
-            dx = abs(x - self.x)
-            dy = abs(y - self.y)
-            if (dx > (width / 20)) or (dy > (height / 20)):
-                self.do_update(x, y, width, height)
+        """Reload cache if there has been significant movement"""
+        dx = abs(x - self.x)
+        dy = abs(y - self.y)
+        if (dx > (width / 20)) or (dy > (height / 20)):
+            self.reload(x, y, width, height)
 
-    def do_update(self, x, y, width, height):
-        """Update cached waypoints and airspace"""
+    def reload(self, x, y, width, height):
+        """Reload waypoint and airspace caches"""
         self.x = x
         self.y = y
         self.width = width
@@ -48,7 +46,6 @@ class MapCache():
 
            Works by counting the number of times a line to the left of the
            position cross the boundary. If it's odd then point is inside."""
-
         airspace_info = []
         for airspace in self.airspace:
             odd_node = False
@@ -71,14 +68,14 @@ class MapCache():
                     ang2 = 180 * 64 - ang1
 
                     for ang in (ang1, ang2):
-                        if (len > 0 and ((ang - start) % (360 * 64)) < len) or \
-                           (len < 0 and ((start - ang) % (360 * 64)) < -len):
+                        if ((len > 0 and ((ang - start) % (360 * 64)) < len) or
+                            (len < 0 and ((start - ang) % (360 * 64)) < -len)):
                             xp = xc + radius * math.cos(math.radians(ang/64.0)) 
                             if xp < x:
                                 odd_node = not odd_node
 
             if odd_node:
-                airspace_info.append(
-                        (airspace['name'], airspace['base'], airspace['top']))
+                airspace_info.append((airspace['name'], airspace['base'],
+                                      airspace['top']))
 
         return airspace_info

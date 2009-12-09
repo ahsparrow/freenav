@@ -28,13 +28,14 @@ WP_SIZE = 10
 FG_WIDTH = 40
 FG_INC = 20
 
-def html_escape(text):
-    text = text.replace('&', '&amp;')
-    text = text.replace('"', '&quot;')
-    text = text.replace("'", '&#39;')
-    text = text.replace(">", '&gt;')
-    text = text.replace("<", '&lt;')
-    return text
+def html_escape(html):
+    """Escape HTML specific characters from pango markup string"""
+    html = html.replace('&', '&amp;')
+    html = html.replace('"', '&quot;')
+    html = html.replace("'", '&#39;')
+    html = html.replace(">", '&gt;')
+    html = html.replace("<", '&lt;')
+    return html
 
 def add_div(box):
     """Add a dividing bar between box elements"""
@@ -51,14 +52,15 @@ class FreeView:
         self.flight = flight
 
         # Font size juju
-        font_size = int(1000.0 * gtk.gdk.screen_height_mm() /
-                        gtk.gdk.screen_height())
+        self.font_size = int(1000.0 * gtk.gdk.screen_height_mm() /
+                             gtk.gdk.screen_height())
 
         # viewx/viewy is geographic position at center of window
         self.viewx = 0
         self.viewy = 0
         self.view_scale = DEFAULT_SCALE
 
+        # Cache of displayed waypoints and airspace
         self.mapcache = mapcache.MapCache(flight)
 
         # Create top level window
@@ -87,13 +89,13 @@ class FreeView:
         vbox.set_size_request(INFO_BOX_SIZE, -1)
         hbox.pack_end(vbox, expand=False)
 
-        # Array of info boxes
+        # Array of info boxes with event boxes to capture button presses
         self.info_box = []
         self.info_label = []
         for i in range(NUM_INFO_BOXES):
             label = gtk.Label()
             attr_list = pango.AttrList()
-            attr_list.insert(pango.AttrSize(font_size * 100, 0, 999))
+            attr_list.insert(pango.AttrSize(self.font_size * 100, 0, 999))
             attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
             label.set_attributes(attr_list)
 
@@ -112,26 +114,26 @@ class FreeView:
             add_div(vbox)
             vbox.pack_start(ibox)
 
-        # Pango layouts
+        # Pango layouts for text on map display
         attr_list = pango.AttrList()
-        attr_list.insert(pango.AttrSize(font_size * 60, 0, 999))
+        attr_list.insert(pango.AttrSize(self.font_size * 60, 0, 999))
         self.wp_layout = pango.Layout(self.drawing_area.create_pango_context())
         self.wp_layout.set_attributes(attr_list)
 
         attr_list = pango.AttrList()
-        attr_list.insert(pango.AttrSize(font_size * 75, 0, 999))
+        attr_list.insert(pango.AttrSize(self.font_size * 100, 0, 999))
         attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
         self.tp_layout = pango.Layout(self.drawing_area.create_pango_context())
         self.tp_layout.set_attributes(attr_list)
 
         attr_list = pango.AttrList()
-        attr_list.insert(pango.AttrSize(font_size * 66, 0, 999))
+        attr_list.insert(pango.AttrSize(self.font_size * 80, 0, 999))
         attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
         self.fg_layout = pango.Layout(self.drawing_area.create_pango_context())
         self.fg_layout.set_attributes(attr_list)
 
         attr_list = pango.AttrList()
-        attr_list.insert(pango.AttrSize(font_size * 75, 0, 999))
+        attr_list.insert(pango.AttrSize(self.font_size * 75, 0, 999))
         attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
         self.wind_layout = pango.Layout(
                 self.drawing_area.create_pango_context())
@@ -326,7 +328,7 @@ class FreeView:
         win.draw_line(gc, x1, y1, x2, y2)
 
     def draw_turnpoint(self, gc, win, win_height):
-        """Draw turnpoint annotation"""
+        """Draw turnpoint annotation and direction pointer"""
         nav = self.flight.get_nav()
         bearing = math.degrees(nav['bearing']) % 360
 
@@ -455,8 +457,9 @@ class FreeView:
         if ind < (len(SCALE) - 1):
             self.view_scale = SCALE[ind + 1]
 
-        width, height = self.get_view_size()
-        self.mapcache.update(self.viewx, self.viewy, width, height)
+            # Big change in view, so reload the cache
+            width, height = self.get_view_size()
+            self.mapcache.reload(self.viewx, self.viewy, width, height)
 
     def zoom_in(self):
         """See some less"""
@@ -464,22 +467,27 @@ class FreeView:
         if ind > 0:
             self.view_scale = SCALE[ind - 1]
 
-        width, height = self.get_view_size()
-        self.mapcache.update(self.viewx, self.viewy, width, height)
+            # Big change in view, so reload the cache
+            width, height = self.get_view_size()
+            self.mapcache.reload(self.viewx, self.viewy, width, height)
 
     def show_airspace_info(self, airspace_info):
         """Show message dialog with aispace info message"""
         msgs = []
         for info in airspace_info:
-            msgs.append("<big><b>%s</b>\n%s, %s</big>" %
-                        tuple(map(html_escape, info)))
+            msgs.append("%s\n%s, %s" % info)
+
         if msgs:
+            msg = "\n\n".join(msgs)
             dialog = gtk.Dialog("Airspace", None,
                                 gtk.DIALOG_MODAL | gtk.DIALOG_NO_SEPARATOR,
                                 (gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
-            msg = "\n\n".join(msgs)
+
             label = gtk.Label(msg)
-            label.set_use_markup(True)
+            attr_list = pango.AttrList()
+            attr_list.insert(pango.AttrSize(self.font_size * 75, 0, 999))
+            label.set_attributes(attr_list)
+
             dialog.vbox.pack_start(label)
             label.show()
             dialog.run()

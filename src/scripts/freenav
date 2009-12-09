@@ -13,9 +13,9 @@ def main():
     parser = optparse.OptionParser()
     parser.add_option("-l", "--logdir", dest="logdir", default=LOG_DIR,
                       help="write IGC log file in DIR", metavar="DIR")
-    parser.add_option("-f", "--fullscreen",
-                      action="store_true", dest="fullscreen", default=False,
-                      help="run application in fullscreen mode")
+    parser.add_option("-w", "--window",
+                      action="store_false", dest="fullscreen", default=True,
+                      help="run application in window mode")
     (opts, args) = parser.parse_args()
 
     model = freenav.flight.Flight()

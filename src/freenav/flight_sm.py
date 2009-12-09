@@ -110,6 +110,10 @@ class FlightFSM_OnGround(FlightFSM_Default):
 
 class FlightFSM_WaitingForStart(FlightFSM_Default):
 
+    def Entry(self, fsm):
+        ctxt = fsm.getOwner()
+        ctxt.set_task("Launch")
+
     def start_trigger(self, fsm):
         if fsm.getDebugFlag() == True:
             fsm.getDebugStream().write("TRANSITION   : FlightFSM.WaitingForStart.start_trigger()\n")
@@ -123,6 +127,7 @@ class FlightFSM_OutsideStartSector(FlightFSM_Default):
     def Entry(self, fsm):
         ctxt = fsm.getOwner()
         ctxt.set_task("start")
+        ctxt.reset_tp_list()
 
     def new_position(self, fsm):
         ctxt = fsm.getOwner()
@@ -139,12 +144,18 @@ class FlightFSM_OutsideStartSector(FlightFSM_Default):
             FlightFSM_Default.new_position(self, fsm)
         
     def start_trigger(self, fsm):
+        ctxt = fsm.getOwner()
         if fsm.getDebugFlag() == True:
             fsm.getDebugStream().write("TRANSITION   : FlightFSM.OutsideStartSector.start_trigger()\n")
 
         fsm.getState().Exit(fsm)
-        fsm.setState(FlightFSM.InsideStartSector)
-        fsm.getState().Entry(fsm)
+        fsm.clearState()
+        try:
+            ctxt.set_task("task")
+            ctxt.make_start()
+        finally:
+            fsm.setState(FlightFSM.OnTask)
+            fsm.getState().Entry(fsm)
 
 class FlightFSM_InsideStartSector(FlightFSM_Default):
 
@@ -161,6 +172,7 @@ class FlightFSM_InsideStartSector(FlightFSM_Default):
             fsm.getState().Exit(fsm)
             fsm.clearState()
             try:
+                ctxt.set_task("task")
                 ctxt.make_start()
             finally:
                 fsm.setState(FlightFSM.OnTask)
@@ -176,16 +188,13 @@ class FlightFSM_InsideStartSector(FlightFSM_Default):
         fsm.getState().Exit(fsm)
         fsm.clearState()
         try:
+            ctxt.set_task("task")
             ctxt.make_start()
         finally:
             fsm.setState(FlightFSM.OnTask)
             fsm.getState().Entry(fsm)
 
 class FlightFSM_OnTask(FlightFSM_Default):
-
-    def Entry(self, fsm):
-        ctxt = fsm.getOwner()
-        ctxt.set_task("task")
 
     def divert(self, fsm, waypoint_id):
         ctxt = fsm.getOwner()
@@ -195,6 +204,7 @@ class FlightFSM_OnTask(FlightFSM_Default):
         fsm.getState().Exit(fsm)
         fsm.clearState()
         try:
+            ctxt.set_task("divert")
             ctxt.do_divert(waypoint_id)
         finally:
             fsm.setState(FlightFSM.Diverted)
@@ -222,21 +232,19 @@ class FlightFSM_OnTask(FlightFSM_Default):
 
 class FlightFSM_Diverted(FlightFSM_Default):
 
-    def Entry(self, fsm):
-        ctxt = fsm.getOwner()
-        ctxt.set_task("divert")
-
-    def Exit(self, fsm):
-        ctxt = fsm.getOwner()
-        ctxt.do_cancel_divert()
-
     def cancel_divert(self, fsm):
+        ctxt = fsm.getOwner()
         if fsm.getDebugFlag() == True:
             fsm.getDebugStream().write("TRANSITION   : FlightFSM.Diverted.cancel_divert()\n")
 
         fsm.getState().Exit(fsm)
-        fsm.setState(FlightFSM.OnTask)
-        fsm.getState().Entry(fsm)
+        fsm.clearState()
+        try:
+            ctxt.set_task("task")
+            ctxt.do_cancel_divert()
+        finally:
+            fsm.setState(FlightFSM.OnTask)
+            fsm.getState().Entry(fsm)
 
 class FlightFSM(object):
 

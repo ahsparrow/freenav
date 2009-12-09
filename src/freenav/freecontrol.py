@@ -77,10 +77,10 @@ class FreeControl:
         """Handle button press (mouse click/screen touch)"""
         win_width, win_height = widget.window.get_size()
 
-        if (event.x < 75) and (event.y > (win_height -75)):
+        if (event.x < 100) and (event.y > (win_height - 100)):
             # Next turnpoint
             self.flight.next_turnpoint()
-        elif (event.x < 75) and (event.y < 75):
+        elif (event.x < 100) and (event.y < 100):
             # Arm divert
             self.divert_flag = True
         elif self.divert_flag:
@@ -146,6 +146,7 @@ class FreeControl:
     #------------------------------------------------------------------
 
     def level_button_press(self):
+        """Button press in the level info box. Change between level displays"""
         if self.level_display_type == 'flight_level':
             self.level_display_type = 'altitude'
         elif self.level_display_type == 'altitude':
@@ -154,50 +155,57 @@ class FreeControl:
             self.level_display_type = 'flight_level'
         self.display_level()
 
+    def time_button_press(self):
+        """Button press in the time info box. Start the task"""
+        task_state = self.flight.get_task_state()
+        if task_state and task_state != "divert":
+            dialog = gtk.MessageDialog(buttons=gtk.BUTTONS_YES_NO,
+                                       message_format='Start task?',
+                                       type=gtk.MESSAGE_QUESTION)
+            ret = dialog.run()
+            dialog.destroy()
+            if ret == gtk.RESPONSE_YES:
+                self.flight.trigger_start()
+
+    def task_button_press(self):
+        """Button press in the task info box"""
+        self.flight.cancel_divert()
+
     def display_level(self):
+        """Update pressure level info label"""
         if self.level_display_type == 'height':
             height = self.flight.get_pressure_height()
             if height is None:
-                s = "****F"
+                s = '+****'
             else:
-                s = str(int(height / FT_TO_M)) + 'F'
+                s = '+' + str(int(height / FT_TO_M))
         elif self.level_display_type == 'altitude':
             altitude = self.flight.get_pressure_altitude()
             if altitude is None:
-                s = "****"
+                s = '****'
             else:
                 s = str(int(altitude / FT_TO_M))
         else:
             fl = self.flight.get_flight_level()
             if fl is None:
-                s = "FL**"
+                s = 'FL**'
             else:
-                s = "FL%02d" % round((fl / FT_TO_M) / 100)
+                s = 'FL%02d' % round((fl / FT_TO_M) / 100)
         self.view.info_label[INFO_LEVEL].set_text(s)
 
     def display_time(self, secs):
-        s = time.strftime("%H:%M", time.localtime(secs))
+        """Update time info label"""
+        s = time.strftime('%H:%M', time.localtime(secs))
         self.view.info_label[INFO_TIME].set_text(s)
 
-    def time_button_press(self):
-        dialog = gtk.MessageDialog(buttons=gtk.BUTTONS_YES_NO,
-                                   message_format='Start task?',
-                                   type=gtk.MESSAGE_QUESTION)
-        ret = dialog.run()
-        dialog.destroy()
-        if ret == gtk.RESPONSE_YES:
-            self.flight.trigger_start()
-
     def display_task_info(self):
+        """Update task info label"""
         task_state = self.flight.get_task_state()
         if task_state == 'task':
             info_str = 'Task'
         else:
             info_str = task_state.title()
         self.view.info_label[INFO_TASK].set_text(info_str)
-
-    def task_button_press(self):
-        self.flight.cancel_divert()
 
     def main(self):
         gtk.main()

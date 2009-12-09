@@ -49,12 +49,16 @@ class Flight:
 
         self._fsm.enterStartState()
 
+    #------------------------------------------------------------------------
+    # Model control methods
+
     def subscribe(self, subscriber):
         """Add a subscriber"""
         self.subscriber_list.add(subscriber)
 
     def update_position(self, secs, latitude, longitude, altitude,
                         ground_speed, track):
+        "Update model with new position data"""
         self.secs = secs
         x, y = self.projection.forward(latitude, longitude)
         self.x = int(x)
@@ -67,25 +71,34 @@ class Flight:
         self.notify_subscribers()
 
     def update_vario(self, maccready, bugs, ballast):
+        """Update model with new vario parameters"""
         self.maccready = maccready
         self.bugs = bugs
         self.ballast = ballast
 
     def update_pressure_level(self, level):
+        """Update model with new pressure level data"""
         self.pressure_level = level
         self._fsm.new_pressure_level(level)
 
     def divert(self, waypoint_id):
+        """Divert to specified waypoint"""
         self._fsm.divert(waypoint_id)
 
     def cancel_divert(self):
+        """Cancel divert (and return to task)"""
         self._fsm.cancel_divert()
 
     def trigger_start(self):
+        """Start, or re-start, the task"""
         self._fsm.start_trigger()
 
     def next_turnpoint(self):
+        """Goto next turnpoing"""
         self._fsm.next_turnpoint()
+
+    #------------------------------------------------------------------------
+    # Pass through function to database
 
     def get_waypoint_list(self):
         return self.db.get_waypoint_list()
@@ -106,6 +119,7 @@ class Flight:
         return self.db.get_nearest_landable(x, y)
 
     #------------------------------------------------------------------------
+    # Model query methods
 
     def get_secs(self):
         """Return GPS time, in seconds"""
@@ -139,9 +153,11 @@ class Flight:
         return level
 
     def get_position(self):
+        """Return X, Y position"""
         return (self.x, self.y)
 
     def get_nav(self):
+        """Return navigation (to current WP) data"""
         dx = self.tp_list[0]['x'] - self.x
         dy = self.tp_list[0]['y'] - self.y
         distance = math.sqrt(dx * dx + dy * dy)
@@ -154,18 +170,22 @@ class Flight:
                 'relative_bearing': relative_bearing}
 
     def get_glide(self):
+        """Return final glide parameters"""
         return {'margin': 1,
                 'height': 100,
                 'ete': 305,
                 'maccready': 1}
 
     def get_velocity(self):
+        """Return ground speed and track"""
         return {'speed': self.ground_speed, 'track': self.track}
 
     def get_wind(self):
+        """Return wind speed and direction"""
         return {'speed': 5, 'direction': math.pi * 1.5}
 
     def get_task_state(self):
+        """Return task state"""
         return self.task_state
 
     #------------------------------------------------------------------------
@@ -194,28 +214,35 @@ class Flight:
         self.task_state = task_state
 
     def make_start(self):
+        """Start task"""
         self.tp_list.pop(0)
         self.notify_subscribers()
 
     def do_divert(self, waypoint_id):
+        """Divert to specified waypoint"""
+        self.set_task("divert")
         self.divert_tp_list = self.tp_list
         self.tp_list = [self.db.get_waypoint(waypoint_id)]
         self.notify_subscribers()
 
     def do_cancel_divert(self):
+        """Cancel waypoint diversion and return to task"""
         self.tp_list = self.divert_tp_list
         self.notify_subscribers()
 
     def do_next_turnpoint(self):
+        """Goto next turnpoint (wrapping at end of list)"""
         self.tp_list.pop(0)
         if len(self.tp_list) == 0:
             self.tp_list = self.task[1:]
         self.notify_subscribers()
 
     def is_previous_start(self):
+        """Return true if a start has already been made"""
         return False
 
     def in_start_sector(self):
+        """Return true if in start sector (2D only)"""
         start = self.task[0]
 
         dx = self.x - start['x']
@@ -248,7 +275,9 @@ class Flight:
         self.db.set_pressure_level_datum(self.pressure_level_datum, self.secs)
 
     def reset_tp_list(self):
+        """Reset the task turnpoint list"""
         self.tp_list = self.task[:]
+        self.notify_subscribers()
 
 if __name__ == '__main__':
     f = Flight()
