@@ -4,6 +4,8 @@ import time
 import gtk, gobject, pango
 import gtk.gdk
 
+import mapcache
+
 # Constants for drawing arcs
 ARC_LEN = 64
 CIRCLE_LEN = 360 * ARC_LEN
@@ -25,6 +27,14 @@ WP_SIZE = 10
 # Size of final glide indicator
 FG_WIDTH = 40
 FG_INC = 20
+
+def html_escape(text):
+    text = text.replace('&', '&amp;')
+    text = text.replace('"', '&quot;')
+    text = text.replace("'", '&#39;')
+    text = text.replace(">", '&gt;')
+    text = text.replace("<", '&lt;')
+    return text
 
 def add_div(box):
     """Add a dividing bar between box elements"""
@@ -48,8 +58,8 @@ class FreeView:
         self.viewx = 0
         self.viewy = 0
         self.view_scale = DEFAULT_SCALE
-        self.cachex = 0
-        self.cachey = 0
+
+        self.mapcache = mapcache.MapCache(flight)
 
         # Create top level window
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -123,7 +133,8 @@ class FreeView:
         attr_list = pango.AttrList()
         attr_list.insert(pango.AttrSize(font_size * 75, 0, 999))
         attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
-        self.wind_layout = pango.Layout(self.drawing_area.create_pango_context())
+        self.wind_layout = pango.Layout(
+                self.drawing_area.create_pango_context())
         self.wind_layout.set_attributes(attr_list)
 
         # Show the window
@@ -132,9 +143,6 @@ class FreeView:
         else:
             self.window.set_size_request(800, 480)
         self.window.show_all()
-
-        # Initialise waypoint/airspace cache
-        self.update_cache()
 
     def view_to_win(self, x, y):
         """Convert real world coordinates to window coordinates"""
@@ -207,7 +215,7 @@ class FreeView:
     def draw_waypoints(self, win, gc):
         """Draw waypoints"""
         tps = [tp['waypoint_id'] for tp in self.flight.task]
-        for wp in self.view_wps:
+        for wp in self.mapcache.wps:
             if self.view_scale<=100 or wp['landable_flag'] or wp['id'] in tps:
                 x, y = self.view_to_win(wp['x'], wp['y'])
                 delta = WP_SIZE / 2
@@ -221,18 +229,20 @@ class FreeView:
     def draw_airspace(self, gc, win):
         """Draw airspace boundary lines and arcs"""
         # Airspace lines
-        for line in self.airspace_lines:
-            x1, y1 = self.view_to_win(line['x1'], line['y1'])
-            x2, y2 = self.view_to_win(line['x2'], line['y2'])
-            win.draw_line(gc, x1, y1, x2, y2)
+        for id in self.mapcache.airspace_lines:
+            for line in self.mapcache.airspace_lines[id]:
+                x1, y1 = self.view_to_win(line['x1'], line['y1'])
+                x2, y2 = self.view_to_win(line['x2'], line['y2'])
+                win.draw_line(gc, x1, y1, x2, y2)
 
         # Airspace arcs & circles
-        for arc in self.airspace_arcs:
-            radius = arc['radius']
-            x, y = self.view_to_win(arc['x'] - radius, arc['y'] + radius)
-            width = 2 * arc['radius'] / self.view_scale
-            win.draw_arc(gc, False, x, y, width, width, arc['start'],
-                         arc['length'])
+        for id in self.mapcache.airspace_arcs:
+            for arc in self.mapcache.airspace_arcs[id]:
+                radius = arc['radius']
+                x, y = self.view_to_win(arc['x'] - radius, arc['y'] + radius)
+                width = 2 * arc['radius'] / self.view_scale
+                win.draw_arc(gc, False, x, y, width, width, arc['start'],
+                             arc['length'])
 
     def draw_task(self, gc, win):
         """Draw task and turnpoint sectors"""
@@ -424,19 +434,6 @@ class FreeView:
         win.draw_layout(gc, xc - x - 35, yc - y / 2, self.wind_layout,
                         background=None)
 
-    def update_cache(self):
-        """Update cached waypoints and airspace"""
-        width, height = self.get_view_size()
-        self.view_wps = self.flight.get_area_waypoint_list(
-                                    self.viewx, self.viewy, width, height)
-
-        airspace = self.flight.get_area_airspace(self.viewx, self.viewy,
-                                                 width, height)
-        self.airspace_lines = [x for a in airspace
-                for x in self.flight.get_airspace_lines(a['id'])]
-        self.airspace_arcs = [x for a in airspace
-                for x in self.flight.get_airspace_arcs(a['id'])]
-
     # External methods - for use by controller
     def redraw(self):
         """Redraw display"""
@@ -448,12 +445,7 @@ class FreeView:
         self.viewy = y
 
         width, height = self.get_view_size()
-        if ((abs(x - self.cachex) > (width / 20)) or
-                (abs(y - self.cachey) > (height / 20))):
-            # Update airspace/waypoint cache if view has significantly changed
-            self.cachex = x
-            self.cachey = y
-            self.update_cache()
+        self.mapcache.update(x, y, width, height)
 
         self.redraw()
 
@@ -462,11 +454,34 @@ class FreeView:
         ind = SCALE.index(self.view_scale)
         if ind < (len(SCALE) - 1):
             self.view_scale = SCALE[ind + 1]
-        self.update_cache()
+
+        width, height = self.get_view_size()
+        self.mapcache.update(self.viewx, self.viewy, width, height)
 
     def zoom_in(self):
         """See some less"""
         ind = SCALE.index(self.view_scale)
         if ind > 0:
             self.view_scale = SCALE[ind - 1]
-        self.update_cache()
+
+        width, height = self.get_view_size()
+        self.mapcache.update(self.viewx, self.viewy, width, height)
+
+    def show_airspace_info(self, airspace_info):
+        """Show message dialog with aispace info message"""
+        msgs = []
+        for info in airspace_info:
+            msgs.append("<big><b>%s</b>\n%s, %s</big>" %
+                        tuple(map(html_escape, info)))
+        if msgs:
+            dialog = gtk.Dialog("Airspace", None,
+                                gtk.DIALOG_MODAL | gtk.DIALOG_NO_SEPARATOR,
+                                (gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
+            msg = "\n\n".join(msgs)
+            label = gtk.Label(msg)
+            label.set_use_markup(True)
+            dialog.vbox.pack_start(label)
+            label.show()
+            dialog.run()
+            dialog.destroy()
+

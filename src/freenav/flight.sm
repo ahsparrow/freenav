@@ -94,16 +94,10 @@ Entry {set_task("task");}
             do_divert(waypoint_id);
         }
 
-    increment_turnpoint [len(ctxt.tp_list) > 1]
+    next_turnpoint
         nil
         {
-            do_increment_turnpoint();
-        }
-
-    decrement_turnpoint [len(ctxt.task) > (len(ctxt.tp_list) + 1)]
-        nil
-        {
-            do_decrement_turnpoint();
+            do_next_turnpoint();
         }
 
     start_trigger

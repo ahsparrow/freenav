@@ -17,19 +17,16 @@ class FlightState(statemap.State):
     def cancel_divert(self, fsm):
         self.Default(fsm)
 
-    def decrement_turnpoint(self, fsm):
-        self.Default(fsm)
-
     def divert(self, fsm, waypoint_id):
-        self.Default(fsm)
-
-    def increment_turnpoint(self, fsm):
         self.Default(fsm)
 
     def new_position(self, fsm):
         self.Default(fsm)
 
     def new_pressure_level(self, fsm, level):
+        self.Default(fsm)
+
+    def next_turnpoint(self, fsm):
         self.Default(fsm)
 
     def start_trigger(self, fsm):
@@ -190,21 +187,6 @@ class FlightFSM_OnTask(FlightFSM_Default):
         ctxt = fsm.getOwner()
         ctxt.set_task("task")
 
-    def decrement_turnpoint(self, fsm):
-        ctxt = fsm.getOwner()
-        if fsm.getDebugFlag() == True:
-            fsm.getDebugStream().write("TRANSITION   : FlightFSM.OnTask.decrement_turnpoint()\n")
-
-        if len(ctxt.task) > (len(ctxt.tp_list) + 1) :
-            endState = fsm.getState()
-            fsm.clearState()
-            try:
-                ctxt.do_decrement_turnpoint()
-            finally:
-                fsm.setState(endState)
-        else:
-            FlightFSM_Default.decrement_turnpoint(self, fsm)
-        
     def divert(self, fsm, waypoint_id):
         ctxt = fsm.getOwner()
         if fsm.getDebugFlag() == True:
@@ -218,21 +200,18 @@ class FlightFSM_OnTask(FlightFSM_Default):
             fsm.setState(FlightFSM.Diverted)
             fsm.getState().Entry(fsm)
 
-    def increment_turnpoint(self, fsm):
+    def next_turnpoint(self, fsm):
         ctxt = fsm.getOwner()
         if fsm.getDebugFlag() == True:
-            fsm.getDebugStream().write("TRANSITION   : FlightFSM.OnTask.increment_turnpoint()\n")
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.OnTask.next_turnpoint()\n")
 
-        if len(ctxt.tp_list) > 1 :
-            endState = fsm.getState()
-            fsm.clearState()
-            try:
-                ctxt.do_increment_turnpoint()
-            finally:
-                fsm.setState(endState)
-        else:
-            FlightFSM_Default.increment_turnpoint(self, fsm)
-        
+        endState = fsm.getState()
+        fsm.clearState()
+        try:
+            ctxt.do_next_turnpoint()
+        finally:
+            fsm.setState(endState)
+
     def start_trigger(self, fsm):
         if fsm.getDebugFlag() == True:
             fsm.getDebugStream().write("TRANSITION   : FlightFSM.OnTask.start_trigger()\n")

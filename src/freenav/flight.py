@@ -84,11 +84,8 @@ class Flight:
     def trigger_start(self):
         self._fsm.start_trigger()
 
-    def increment_turnpoint(self):
-        self._fsm.increment_turnpoint()
-
-    def decrement_turnpoint(self):
-        self._fsm.decrement_turnpoint()
+    def next_turnpoint(self):
+        self._fsm.next_turnpoint()
 
     #------------------------------------------------------------------------
 
@@ -191,13 +188,10 @@ class Flight:
         self.tp_list = self.divert_tp_list
         self.notify_subscribers()
 
-    def do_increment_turnpoint(self):
+    def do_next_turnpoint(self):
         self.tp_list.pop(0)
-        self.notify_subscribers()
-
-    def do_decrement_turnpoint(self):
-        prev_tp = self.task[-(len(self.tp_list) + 1)]
-        self.tp_list.insert(0, prev_tp)
+        if len(self.tp_list) == 0:
+            self.tp_list = self.task[1:]
         self.notify_subscribers()
 
     def is_previous_start(self):
