@@ -63,7 +63,6 @@ class FreeControl:
 
     def info_button_press(self, widget, event, *args):
         """Handle button press in info box"""
-        print "Info button press", args[0]
         if args[0] == INFO_LEVEL:
             self.level_button_press()
         elif args[0] == INFO_TIME:
@@ -162,7 +161,6 @@ class FreeControl:
         ret = dialog.run()
         dialog.destroy()
         if ret == gtk.RESPONSE_YES:
-            print "XXX"
             self.flight.trigger_start()
 
     def display_task_info(self):

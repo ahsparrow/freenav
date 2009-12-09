@@ -45,7 +45,6 @@ Exit {do_takeoff();}
 // Launched, but not ready for start yet
 WaitingForStart
 {
-    // Time to go
     start_trigger
         OutsideStartSector
         {

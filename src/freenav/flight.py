@@ -11,7 +11,7 @@ KTS_TO_MPS = 1852.0 / 3600
 class Flight:
     def __init__(self):
         self._fsm = flight_sm.Flight_sm(self)
-        self._fsm.setDebugFlag(True)
+        #self._fsm.setDebugFlag(True)
 
         self.subscriber_list = set()
 
@@ -160,7 +160,6 @@ class Flight:
         """Get and store airfield altitude"""
         wps = self.db.get_nearest_landable(self.x, self.y)
         self.airfield_altitude = wps[0]['altitude']
-        print wps[0]['id']
 
     def do_update_pressure_level(self, level):
         """Record pressure level datum"""
@@ -178,7 +177,6 @@ class Flight:
 
     def set_task(self, task_state):
         self.task_state = task_state
-        print "TS", task_state
 
     def make_start(self):
         self.tp_list.pop(0)
@@ -206,7 +204,20 @@ class Flight:
         return False
 
     def in_start_sector(self):
-        return False
+        start = self.task[0]
+
+        dx = self.x - start['x']
+        dy = self.y - start['y']
+        dist = math.sqrt(dx ** 2 + dy ** 2)
+
+        in_sector = False
+        if dist < start['radius1']:
+            ang = math.atan2(dx, dy)
+            ang1 = (ang - math.radians(start['angle12'])) % (2 * math.pi)
+            if (ang1 > (math.pi / 2)) and (ang1 < (3 * math.pi / 2)):
+                in_sector = True
+
+        return in_sector
 
     #------------------------------------------------------------------------
     # Internal stuff
