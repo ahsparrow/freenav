@@ -30,6 +30,8 @@ class FreeControl:
         self.flight = flight
         self.flight.subscribe(self)
 
+        self.divert_flag = False
+
         self.level_display_type = 'flight_level'
 
         config = ConfigParser.ConfigParser()
@@ -65,20 +67,34 @@ class FreeControl:
         """Handle button press in info box"""
         if args[0] == INFO_LEVEL:
             self.level_button_press()
+        elif args[0] == INFO_TASK:
+            self.task_button_press()
         elif args[0] == INFO_TIME:
             self.time_button_press()
         return True
 
     def button_press(self, widget, event, *args):
         """Handle button press (mouse click/screen touch)"""
-        print "Button press", event.x, event.y
         win_width, win_height = widget.window.get_size()
+
         if (event.x < 75) and (event.y > (win_height -75)):
+            # Next turnpoint
             self.flight.next_turnpoint()
+        elif (event.x < 75) and (event.y < 75):
+            # Arm divert
+            self.divert_flag = True
+        elif self.divert_flag:
+            # Divert
+            self.divert_flag = False
+            x, y = self.view.win_to_view(event.x, event.y)
+            landable = self.flight.get_nearest_landable(x, y)
+            self.flight.divert(landable[0]['id'])
         else:
+            # Display airspace info
             x, y = self.view.win_to_view(event.x, event.y)
             info = self.view.mapcache.get_airspace_info(x, y)
             self.view.show_airspace_info(info)
+
         return True
 
     def key_press(self, widget, event, *args):
@@ -179,6 +195,9 @@ class FreeControl:
         else:
             info_str = task_state.title()
         self.view.info_label[INFO_TASK].set_text(info_str)
+
+    def task_button_press(self):
+        self.flight.cancel_divert()
 
     def main(self):
         gtk.main()

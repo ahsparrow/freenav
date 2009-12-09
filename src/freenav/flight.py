@@ -79,13 +79,31 @@ class Flight:
         self._fsm.divert(waypoint_id)
 
     def cancel_divert(self):
-        self._fsm.cancel_diversion()
+        self._fsm.cancel_divert()
 
     def trigger_start(self):
         self._fsm.start_trigger()
 
     def next_turnpoint(self):
         self._fsm.next_turnpoint()
+
+    def get_waypoint_list(self):
+        return self.db.get_waypoint_list()
+
+    def get_area_waypoint_list(self, x, y, width, height):
+        return self.db.get_area_waypoint_list(x, y, width, height)
+
+    def get_area_airspace(self, x, y, width, height):
+        return self.db.get_area_airspace(x, y, width, height)
+
+    def get_airspace_lines(self, id):
+        return self.db.get_airspace_lines(id)
+
+    def get_airspace_arcs(self, id):
+        return self.db.get_airspace_arcs(id)
+
+    def get_nearest_landable(self, x, y):
+        return self.db.get_nearest_landable(x, y)
 
     #------------------------------------------------------------------------
 
@@ -181,7 +199,7 @@ class Flight:
 
     def do_divert(self, waypoint_id):
         self.divert_tp_list = self.tp_list
-        self.tp_list = [db.get_waypoint(waypoint_id)]
+        self.tp_list = [self.db.get_waypoint(waypoint_id)]
         self.notify_subscribers()
 
     def do_cancel_divert(self):
@@ -231,21 +249,6 @@ class Flight:
 
     def reset_tp_list(self):
         self.tp_list = self.task[:]
-
-    def get_waypoint_list(self):
-        return self.db.get_waypoint_list()
-
-    def get_area_waypoint_list(self, x, y, width, height):
-        return self.db.get_area_waypoint_list(x, y, width, height)
-
-    def get_area_airspace(self, x, y, width, height):
-        return self.db.get_area_airspace(x, y, width, height)
-
-    def get_airspace_lines(self, id):
-        return self.db.get_airspace_lines(id)
-
-    def get_airspace_arcs(self, id):
-        return self.db.get_airspace_arcs(id)
 
 if __name__ == '__main__':
     f = Flight()
