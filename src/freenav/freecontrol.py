@@ -5,6 +5,7 @@ import os.path
 import time
 
 import dbus, dbus.mainloop.glib
+import gobject
 import gtk
 
 DBUS_SERVICE = "org.freedesktop.Gypsy"
@@ -21,19 +22,22 @@ POSITION_ALL_VALID = 0x7
 COURSE_SPEED_TRACK_VALID = 0x3
 
 INFO_LEVEL = 0
+INFO_GLIDE = 1
 INFO_TASK = 2
 INFO_TIME = 3
 
 class FreeControl:
     def __init__(self, flight, view):
+        # Links to view and model
         self.view = view
         self.flight = flight
         self.flight.subscribe(self)
 
-        self.divert_flag = False
-
+        # Controller state variables
+        self.divert_indicator_flag = False
         self.level_display_type = 'flight_level'
 
+        # Program configuration
         config = ConfigParser.ConfigParser()
         config.read(os.path.join(os.path.expanduser('~'), '.freeflight',
                                  'freenav.ini'))
@@ -65,12 +69,16 @@ class FreeControl:
 
     def info_button_press(self, widget, event, *args):
         """Handle button press in info box"""
-        if args[0] == INFO_LEVEL:
+        info = args[0]
+        if info == INFO_LEVEL:
             self.level_button_press()
-        elif args[0] == INFO_TASK:
+        elif info == INFO_GLIDE:
+            pass
+        elif info == INFO_TASK:
             self.task_button_press()
-        elif args[0] == INFO_TIME:
+        elif info == INFO_TIME:
             self.time_button_press()
+
         return True
 
     def button_press(self, widget, event, *args):
@@ -81,11 +89,19 @@ class FreeControl:
             # Next turnpoint
             self.flight.next_turnpoint()
         elif (event.x < 100) and (event.y < 100):
-            # Arm divert
-            self.divert_flag = True
-        elif self.divert_flag:
+            if (not self.divert_indicator_flag and
+                (self.flight.get_task_state() in ('task', 'divert'))):
+                # Arm divert
+                self.divert_indicator_flag = True
+                self.view.set_divert_indicator(True)
+                self.divert_timeout_id = gobject.timeout_add(5000,
+                                                    self.divert_timeout)
+        elif self.divert_indicator_flag:
             # Divert
-            self.divert_flag = False
+            self.divert_indicator_flag = False
+            self.view.set_divert_indicator(False)
+            gobject.source_remove(self.divert_timeout_id)
+
             x, y = self.view.win_to_view(event.x, event.y)
             landable = self.flight.get_nearest_landable(x, y)
             self.flight.divert(landable[0]['id'])
@@ -206,6 +222,11 @@ class FreeControl:
         else:
             info_str = task_state.title()
         self.view.info_label[INFO_TASK].set_text(info_str)
+
+    def divert_timeout(self):
+        self.divert_indicator_flag = False
+        self.view.set_divert_indicator(False)
+        return False
 
     def main(self):
         gtk.main()

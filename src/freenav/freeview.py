@@ -63,6 +63,8 @@ class FreeView:
         # Cache of displayed waypoints and airspace
         self.mapcache = mapcache.MapCache(flight)
 
+        self.divert_flag = False
+
         # Create top level window
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.window.add_events(gtk.gdk.KEY_PRESS_MASK)
@@ -352,7 +354,8 @@ class FreeView:
         yp = [y0, -y0 + x * c, -y * b, -y0 - x * c]
         poly = [(int(x + xc + 0.5), int(y + yc + 0.5)) for x, y in zip(xp, yp)]
 
-        win.draw_polygon(gc, True, poly)
+        filled = (self.divert_flag == False)
+        win.draw_polygon(gc, filled, poly)
 
     def draw_glide(self, gc, win, win_height):
         """Draw final glide information"""
@@ -492,4 +495,9 @@ class FreeView:
             label.show()
             dialog.run()
             dialog.destroy()
+
+    def set_divert_indicator(self, flag):
+        # Set indicator showing divert select is active
+        self.divert_flag = flag
+        self.redraw()
 

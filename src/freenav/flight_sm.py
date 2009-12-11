@@ -112,7 +112,7 @@ class FlightFSM_WaitingForStart(FlightFSM_Default):
 
     def Entry(self, fsm):
         ctxt = fsm.getOwner()
-        ctxt.set_task("Launch")
+        ctxt.set_task("launch")
 
     def start_trigger(self, fsm):
         if fsm.getDebugFlag() == True:
@@ -205,6 +205,7 @@ class FlightFSM_OnTask(FlightFSM_Default):
         fsm.clearState()
         try:
             ctxt.set_task("divert")
+            ctxt.do_save_task()
             ctxt.do_divert(waypoint_id)
         finally:
             fsm.setState(FlightFSM.Diverted)
@@ -245,6 +246,18 @@ class FlightFSM_Diverted(FlightFSM_Default):
         finally:
             fsm.setState(FlightFSM.OnTask)
             fsm.getState().Entry(fsm)
+
+    def divert(self, fsm, waypoint_id):
+        ctxt = fsm.getOwner()
+        if fsm.getDebugFlag() == True:
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.Diverted.divert(waypoint_id)\n")
+
+        endState = fsm.getState()
+        fsm.clearState()
+        try:
+            ctxt.do_divert(waypoint_id)
+        finally:
+            fsm.setState(endState)
 
 class FlightFSM(object):
 

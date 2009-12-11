@@ -218,15 +218,18 @@ class Flight:
         self.tp_list.pop(0)
         self.notify_subscribers()
 
+    def do_save_task(self):
+        """Save current task list"""
+        self.divert_tp_list = self.tp_list
+
     def do_divert(self, waypoint_id):
         """Divert to specified waypoint"""
         self.set_task("divert")
-        self.divert_tp_list = self.tp_list
         self.tp_list = [self.db.get_waypoint(waypoint_id)]
         self.notify_subscribers()
 
     def do_cancel_divert(self):
-        """Cancel waypoint diversion and return to task"""
+        """Cancel waypoint diversion and return to saved task"""
         self.tp_list = self.divert_tp_list
         self.notify_subscribers()
 

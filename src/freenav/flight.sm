@@ -44,7 +44,7 @@ Exit {do_takeoff();}
 
 // Launched, but not ready for start yet
 WaitingForStart
-Entry {set_task("Launch");}
+Entry {set_task("launch");}
 {
     start_trigger
         OutsideStartSector
@@ -96,6 +96,7 @@ OnTask
         Diverted
         {
             set_task("divert");
+            do_save_task();
             do_divert(waypoint_id);
         }
 
@@ -120,6 +121,12 @@ Diverted
         {
             set_task("task");
             do_cancel_divert();
+        }
+
+    divert(waypoint_id)
+        nil
+        {
+            do_divert(waypoint_id);
         }
 }
 
