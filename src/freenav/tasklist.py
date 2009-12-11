@@ -17,12 +17,13 @@ START_RAD = 3000
 FINISH_RAD = 500
 
 def make_tp(wp_id, rad1=RAD1, ang1=ANG1, rad2=RAD2, ang2=ANG2, dirn='SYM',
-            ang12=0):
+            ang12=0, mindistx=None, mindisty=None):
     """Generate a default turnpoint"""
     return {'waypoint_id': wp_id,
             'radius1': rad1, 'angle1': ang1,
             'radius2': rad2, 'angle2': ang2,
-            'direction': dirn, 'angle12': ang12}
+            'direction': dirn, 'angle12': ang12,
+            'mindistx': mindistx, 'mindisty': mindisty}
 
 def make_start_tp(wp_id, rad1=START_RAD, ang1=180, dirn='NEXT', ang12=0):
     """Generate a default start point"""
@@ -41,6 +42,9 @@ class TaskListStore(gtk.ListStore):
         p = self.db.get_projection()
         self.projection = freenav.projection.Lambert(
             p['Parallel1'], p['Parallel2'], p['Latitude'], p['Longitude'])
+
+        gobject.signal_new("task_changed", TaskListStore,
+                           gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, ())
 
     def get_task(self):
         """Return array of turnpoints"""
@@ -63,6 +67,7 @@ class TaskListStore(gtk.ListStore):
 
     def save(self):
         """Save task to database"""
+        self.update_min_dist()
         task = [x[0] for x in self]
         self.db.set_task(task, self.task_id)
         self.db.set_active_task_id(self.task_id)
@@ -195,7 +200,28 @@ class TaskListStore(gtk.ListStore):
                 ang = math.atan2(dx, dy) % (2 * math.pi)
                 tp['angle12'] = math.degrees(ang)
 
-gobject.signal_new("task_changed", TaskListStore, gobject.SIGNAL_RUN_FIRST,
-                   gobject.TYPE_NONE, ())
+    def update_min_dist(self):
+        """Calculate (simplistic) minimum distance TP positions"""
+        task = [tp[0] for tp in self]
+        wps = [self.db.get_waypoint(t['waypoint_id']) for t in task]
 
+        for tp, wp in zip(task, wps):
+            ang12 = math.radians(tp['angle12'])
+            rad1 = tp['radius1']
+            rad2 = tp['radius2']
 
+            if tp['angle1'] == 360:
+                dx = rad1 * math.sin(ang12)
+                dy = rad1 * math.cos(ang12)
+            elif tp['angle2'] == 360:
+                dx = rad2 * math.sin(ang12)
+                dy = rad2 * math.cos(ang12)
+            elif tp['angle1'] == 0:
+                dx = 0
+                dy = 0
+            else:
+                dx = -rad2 * math.sin(ang12)
+                dy = -rad2 * math.cos(ang12)
+
+            tp['mindistx'] = wp['x'] + dx
+            tp['mindisty'] = wp['y'] + dy

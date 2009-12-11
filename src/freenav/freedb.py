@@ -38,7 +38,8 @@ SCHEMA = {
         ('Waypoint_Id', 'TEXT'),
         ('Radius1', 'INTEGER'), ('Angle1', 'REAL'),
         ('Radius2', 'INTEGER'), ('Angle2', 'REAL'),
-        ('Direction', 'TEXT'), ('Angle12', 'REAL')],
+        ('Direction', 'TEXT'), ('Angle12', 'REAL'),
+        ('MinDistX', 'INTEGER'), ('MinDistY', 'INTEGER')],
 
     'Config': [('Task_Id', 'INTEGER'),
                ('QNE', 'REAL'),
@@ -161,13 +162,15 @@ class Freedb:
         self.c.execute(sql, (id, 0))
 
         sql = '''INSERT INTO Turnpoints (Task_Id, Task_Index, Waypoint_Id,
-              Radius1, Angle1, Radius2, Angle2, Direction, Angle12)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'''
+              Radius1, Angle1, Radius2, Angle2, Direction, Angle12,
+              MinDistX, MinDistY)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'''
         for tp_num, tp in enumerate(task):
             self.c.execute(sql, (id, tp_num, tp['waypoint_id'],
                                  tp['radius1'], tp['angle1'],
                                  tp['radius2'], tp['angle2'],
-                                 tp['direction'], tp['angle12']))
+                                 tp['direction'], tp['angle12'],
+                                 tp['mindistx'], tp['mindisty']))
 
     def get_task(self, id=-1):
         """Get turnpoints for specified task"""
