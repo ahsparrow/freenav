@@ -20,6 +20,9 @@ class Flight:
         self.projection = projection.Lambert(
                 p['Parallel1'], p['Parallel2'], p['Latitude'], p['Longitude'])
 
+        # Model configuration parameters
+        self.height_margin = 0
+
         # Initialise task and turnpoint list
         self.task = self.db.get_task()
         self.reset_tp_list()
@@ -56,6 +59,14 @@ class Flight:
         """Add a subscriber"""
         self.subscriber_list.add(subscriber)
 
+    def set_polar(self, polar):
+        """Set the reference polar coefficients"""
+        self.ref_polar = polar
+        self.update_vario(0.0, 1.0, 1.0)
+
+    #------------------------------------------------------------------------
+    # Flight change methods
+
     def update_position(self, secs, latitude, longitude, altitude,
                         ground_speed, track):
         "Update model with new position data"""
@@ -67,6 +78,11 @@ class Flight:
         self.track = track
         self.ground_speed = ground_speed
 
+        self.calc_wind()
+        self.calc_nav(x, y)
+        self.calc_glide()
+        self.calc_task()
+
         self._fsm.new_position()
         self.notify_subscribers()
 
@@ -76,18 +92,22 @@ class Flight:
         self.bugs = bugs
         self.ballast = ballast
 
+        # Adjust polar coefficients for ballast and bugs
+        a = self.ref_polar['a'] / math.sqrt(ballast) * bugs
+        b = self.ref_polar['b'] * bugs
+        c = self.ref_polar['c'] * math.sqrt(ballast) * bugs
+
+        # MacCready speed and sink rate
+        self.vm = math.sqrt((c - self.maccready) / a)
+        self.vm_sink_rate = -(a * self.vm ** 2 + b * self.vm + c)
+
     def update_pressure_level(self, level):
         """Update model with new pressure level data"""
         self.pressure_level = level
         self._fsm.new_pressure_level(level)
 
-    def divert(self, waypoint_id):
-        """Divert to specified waypoint"""
-        self._fsm.divert(waypoint_id)
-
-    def cancel_divert(self):
-        """Cancel divert (and return to task)"""
-        self._fsm.cancel_divert()
+    #------------------------------------------------------------------------
+    # Navigation change methods
 
     def trigger_start(self):
         """Start, or re-start, the task"""
@@ -97,8 +117,16 @@ class Flight:
         """Goto next turnpoing"""
         self._fsm.next_turnpoint()
 
+    def divert(self, waypoint_id):
+        """Divert to specified waypoint"""
+        self._fsm.divert(waypoint_id)
+
+    def cancel_divert(self):
+        """Cancel divert (and return to task)"""
+        self._fsm.cancel_divert()
+
     #------------------------------------------------------------------------
-    # Pass through function to database
+    # Pass through functions to database
 
     def get_waypoint_list(self):
         return self.db.get_waypoint_list()
@@ -117,6 +145,41 @@ class Flight:
 
     def get_nearest_landable(self, x, y):
         return self.db.get_nearest_landable(x, y)
+
+    #------------------------------------------------------------------------
+    # Calculations
+
+    def calc_wind(self):
+        pass
+
+    def calc_nav(self, x, y):
+        dx = self.tp_list[0]['x'] - self.x
+        dy = self.tp_list[0]['y'] - self.y
+        self.tp_distance = math.sqrt(dx * dx + dy * dy)
+        self.tp_bearing = math.atan2(dx, dy)
+        self.tp_relative_bearing = ((self.tp_bearing - self.track) %
+                                    (2 * math.pi))
+
+    def calc_glide(self):
+        # Get coordinates of minimum remaining task
+        coords = [(tp['mindistx'], tp['mindisty']) for tp in self.tp_list]
+
+        # Get height loss and ETE around remainder of task
+        wind = self.get_wind()
+        if self.vm > wind['speed']:
+            height_loss, ete = self.calc_height_loss_ete((self.x, self.y),
+                                                         coords, wind)
+            self.ete = ete
+            self.arrival_height = (self.altitude - height_loss -
+                                   self.tp_list[-1]['altitude'])
+            self.glide_margin = ((self.arrival_height - self.height_margin) /
+                                 height_loss)
+        else:
+            # XXX
+            pass
+
+    def calc_task(self):
+        pass
 
     #------------------------------------------------------------------------
     # Model query methods
@@ -157,24 +220,18 @@ class Flight:
         return (self.x, self.y)
 
     def get_nav(self):
-        """Return navigation (to current WP) data"""
-        dx = self.tp_list[0]['x'] - self.x
-        dy = self.tp_list[0]['y'] - self.y
-        distance = math.sqrt(dx * dx + dy * dy)
-        bearing = math.atan2(dx, dy)
-        relative_bearing = (bearing - self.track) % (2 * math.pi)
-
+        """Return navigation (to current TP) data"""
         return {'id': self.tp_list[0]['id'],
-                'distance': distance,
-                'bearing': bearing,
-                'relative_bearing': relative_bearing}
+                'distance': self.tp_distance,
+                'bearing': self.tp_bearing,
+                'relative_bearing': self.tp_relative_bearing}
 
     def get_glide(self):
         """Return final glide parameters"""
-        return {'margin': 1,
-                'height': 100,
-                'ete': 305,
-                'maccready': 1}
+        return {'margin': self.glide_margin,
+                'height': self.arrival_height,
+                'ete': self.ete,
+                'maccready': self.maccready}
 
     def get_velocity(self):
         """Return ground speed and track"""
@@ -182,11 +239,43 @@ class Flight:
 
     def get_wind(self):
         """Return wind speed and direction"""
-        return {'speed': 5, 'direction': math.pi * 1.5}
+        return {'speed': 10, 'direction': math.radians(117.4)}
 
     def get_task_state(self):
         """Return task state"""
         return self.task_state
+
+    #------------------------------------------------------------------------
+
+    def calc_height_loss_ete(self, posn, tps, wind):
+        """Calculate final glide height loss and ETE"""
+        if tps:
+            next_tp = tps[0]
+            height_loss1, ete1 = self.calc_height_loss_ete(next_tp, tps[1:],
+                                                           wind)
+            # Course and distance to next TP
+            dx = next_tp[0] - posn[0]
+            dy = next_tp[1] - posn[1]
+            dist = math.sqrt(dx ** 2 + dy ** 2)
+            course = math.atan2(dx, dy)
+
+            # Get ground speed (wind direction is direction it is blowing to)
+            swc = ((wind['speed'] / self.vm) *
+                   math.sin(wind['direction'] - course))
+            gspeed = (self.vm * math.sqrt(1 - swc ** 2) +
+                      wind['speed'] * math.cos(wind['direction'] - course))
+
+            # Height loss and ETE from this leg plus all the rest
+            height_loss = dist * self.vm_sink_rate / gspeed
+            ete = dist / gspeed
+
+            height_loss += height_loss1
+            ete += ete1
+        else:
+            height_loss = 0
+            ete = 0
+
+        return (height_loss, ete)
 
     #------------------------------------------------------------------------
     # State machine methods

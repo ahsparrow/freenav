@@ -60,6 +60,12 @@ class FreeControl:
         device = dbus.Interface(gps, dbus_interface=DEVICE_INTERFACE)
         device.Start()
 
+        # Get glider polar
+        polar = {}
+        for c in 'abc':
+            polar[c] = config.getfloat('Polar', c)
+        self.flight.set_polar(polar)
+
         # Handle user interface events
         view.drawing_area.connect('button_press_event', self.button_press)
         view.window.connect('key_press_event', self.key_press)
