@@ -130,7 +130,7 @@ class TaskApp(AppBase):
         # Create waypoint list
         wp_store = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
         for wp in self.task_db.get_waypoint_list():
-            wp_store.append((wp['Id'], wp['Name']))
+            wp_store.append((wp['id'], wp['name']))
 
         col1 = gtk.TreeViewColumn('ID')
         col1.pack_start(cell, True)

@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
+import ConfigParser
 import optparse
+import os.path
 
 import freenav.flight
 import freenav.freeview
@@ -18,9 +20,22 @@ def main():
                       help="run application in window mode")
     (opts, args) = parser.parse_args()
 
-    model = freenav.flight.Flight()
+    # Program configuration
+    config = ConfigParser.ConfigParser()
+    config.read(os.path.join(os.path.expanduser('~'), '.freeflight',
+                             'freenav.ini'))
+
+    # Get glider polar
+    polar = {}
+    for coeff in 'abc':
+        polar[coeff] = config.getfloat('Polar', coeff)
+
+    # Final glide safety height
+    safety_height = config.getint('FinalGlide', 'safety_height')
+
+    model = freenav.flight.Flight(polar, safety_height)
     view = freenav.freeview.FreeView(model, opts.fullscreen)
-    controller = freenav.freecontrol.FreeControl(model, view)
+    controller = freenav.freecontrol.FreeControl(model, view, config)
     controller.main()
 
 if __name__ == '__main__':

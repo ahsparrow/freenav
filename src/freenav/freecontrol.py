@@ -1,7 +1,5 @@
-import ConfigParser
 import collections
 import math
-import os.path
 import time
 
 import dbus, dbus.mainloop.glib
@@ -27,7 +25,7 @@ INFO_TASK = 2
 INFO_TIME = 3
 
 class FreeControl:
-    def __init__(self, flight, view):
+    def __init__(self, flight, view, config):
         # Links to view and model
         self.view = view
         self.flight = flight
@@ -36,11 +34,6 @@ class FreeControl:
         # Controller state variables
         self.divert_indicator_flag = False
         self.level_display_type = 'flight_level'
-
-        # Program configuration
-        config = ConfigParser.ConfigParser()
-        config.read(os.path.join(os.path.expanduser('~'), '.freeflight',
-                                 'freenav.ini'))
 
         # Set-up all the D-Bus stuff
         dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
@@ -59,12 +52,6 @@ class FreeControl:
 
         device = dbus.Interface(gps, dbus_interface=DEVICE_INTERFACE)
         device.Start()
-
-        # Get glider polar
-        polar = {}
-        for c in 'abc':
-            polar[c] = config.getfloat('Polar', c)
-        self.flight.set_polar(polar)
 
         # Handle user interface events
         view.drawing_area.connect('button_press_event', self.button_press)

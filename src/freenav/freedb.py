@@ -8,52 +8,58 @@ import time
 
 import sqlite3
 
+def dict_factory(cursor, row):
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d
+
 SCHEMA = {
     'Projection': [
-        ('Parallel1', 'REAL'), ('Parallel2', 'REAL'),
-        ('Latitude', 'REAL'), ('Longitude', 'REAL')],
+        ('parallel1', 'REAL'), ('parallel2', 'REAL'),
+        ('latitude', 'REAL'), ('longitude', 'REAL')],
 
     'Waypoints': [
-        ('Id', 'TEXT'), ('Name', 'TEXT'), ('X', 'INTEGER'), ('Y', 'INTEGER'),
-        ('Altitude', 'INTEGER'), ('Turnpoint', 'TEXT'),
-        ('Landable_Flag', 'INTEGER'), ('Comment', 'TEXT')],
+        ('id', 'TEXT'), ('name', 'TEXT'), ('x', 'INTEGER'), ('y', 'INTEGER'),
+        ('altitude', 'INTEGER'), ('turnpoint', 'TEXT'),
+        ('landable_flag', 'INTEGER'), ('comment', 'TEXT')],
 
     'Airspace': [
-        ('Id', 'TEXT'), ('Name', 'TEXT'), ('Base', 'TEXT'), ('Top', 'TEXT'),
-        ('X_Min', 'INTEGER'), ('Y_Min', 'INTEGER'),
-        ('X_Max', 'INTEGER'), ('Y_Max', 'INTEGER')],
+        ('id', 'TEXT'), ('name', 'TEXT'), ('base', 'TEXT'), ('top', 'TEXT'),
+        ('x_min', 'INTEGER'), ('y_min', 'INTEGER'),
+        ('x_max', 'INTEGER'), ('y_max', 'INTEGER')],
 
     'Airspace_Lines': [
-        ('Airspace_Id', 'TEXT'), ('X1', 'INTEGER'), ('Y1', 'INTEGER'),
-        ('X2', 'INTEGER'), ('Y2', 'INTEGER')],
+        ('airspace_id', 'TEXT'), ('x1', 'INTEGER'), ('y1', 'INTEGER'),
+        ('x2', 'INTEGER'), ('y2', 'INTEGER')],
 
     'Airspace_Arcs': [
-        ('Airspace_Id', 'TEXT'), ('X', 'INTEGER'), ('Y', 'INTEGER'),
-        ('Radius', 'INTEGER'), ('Start', 'INTEGER'), ('Length', 'INTEGER')],
+        ('airspace_id', 'TEXT'), ('x', 'INTEGER'), ('y', 'INTEGER'),
+        ('radius', 'INTEGER'), ('start', 'INTEGER'), ('length', 'INTEGER')],
 
-    'Tasks' : [('Id', 'INTEGER'), ('AAT_Flag', 'INTEGER')],
+    'Tasks' : [('id', 'INTEGER'), ('aat_flag', 'INTEGER')],
 
     'Turnpoints': [
-        ('Task_Id', 'INTEGER'), ('Task_Index', 'INTEGER'),
-        ('Waypoint_Id', 'TEXT'),
-        ('Radius1', 'INTEGER'), ('Angle1', 'REAL'),
-        ('Radius2', 'INTEGER'), ('Angle2', 'REAL'),
-        ('Direction', 'TEXT'), ('Angle12', 'REAL'),
-        ('MinDistX', 'INTEGER'), ('MinDistY', 'INTEGER')],
+        ('task_id', 'INTEGER'), ('task_index', 'INTEGER'),
+        ('waypoint_id', 'TEXT'),
+        ('radius1', 'INTEGER'), ('angle1', 'REAL'),
+        ('radius2', 'INTEGER'), ('angle2', 'REAL'),
+        ('direction', 'TEXT'), ('angle12', 'REAL'),
+        ('mindistx', 'INTEGER'), ('mindisty', 'INTEGER')],
 
-    'Config': [('Task_Id', 'INTEGER'),
-               ('QNE', 'REAL'),
-               ('QNE_Timestamp', 'INTEGER'),
-               ('Pressure_Level_Datum', 'REAL'),
-               ('Pressure_Level_Datum_Timestamp', 'INTEGER'),
-               ('Start_Time', 'INTEGER')]}
+    'Config': [('task_id', 'INTEGER'),
+               ('qne', 'REAL'),
+               ('qne_timestamp', 'INTEGER'),
+               ('pressure_level_datum', 'REAL'),
+               ('pressure_level_datum_timestamp', 'INTEGER'),
+               ('start_time', 'INTEGER')]}
 
 class Freedb:
     def __init__(self, file=''):
         if not file:
             file = os.path.join(os.getenv('HOME'), '.freeflight', 'free.db')
         self.db = sqlite3.connect(file)
-        self.db.row_factory = sqlite3.Row
+        self.db.row_factory = dict_factory
         self.c = self.db.cursor()
 
     def create_table(self, table_name, columns):
@@ -74,22 +80,22 @@ class Freedb:
             self.create_table(table_name, SCHEMA[table_name])
 
         sql = '''INSERT INTO Projection
-              (Parallel1, Parallel2, Latitude, Longitude)
+              (parallel1, parallel2, latitude, longitude)
               VALUES (?, ?, ?, ?)'''
         self.c.execute(sql, (parallel1, parallel2, latitude, longitude))
 
         sql = '''INSERT INTO Config
-              (Task_Id, QNE, QNE_Timestamp, Pressure_Level_Datum,
-               Pressure_Level_Datum_Timestamp, Start_Time)
+              (task_id, qne, qne_timestamp, pressure_level_datum,
+               pressure_level_datum_timestamp, start_time)
               VALUES (0, 0, 0, 0, 0, 0)'''
         self.c.execute(sql)
 
-        self.c.execute('CREATE INDEX X_Index ON Waypoints (X)')
-        self.c.execute('CREATE INDEX Y_Index ON Waypoints (Y)')
-        self.c.execute('CREATE INDEX Xmin_Index ON Airspace (X_Min)')
-        self.c.execute('CREATE INDEX Xmax_Index ON Airspace (X_Max)')
-        self.c.execute('CREATE INDEX Ymin_Index ON Airspace (Y_Min)')
-        self.c.execute('CREATE INDEX Ymax_Index ON Airspace (Y_Max)')
+        self.c.execute('CREATE INDEX X_Index ON Waypoints (x)')
+        self.c.execute('CREATE INDEX Y_Index ON Waypoints (y)')
+        self.c.execute('CREATE INDEX Xmin_Index ON Airspace (x_min)')
+        self.c.execute('CREATE INDEX Xmax_Index ON Airspace (x_max)')
+        self.c.execute('CREATE INDEX Ymin_Index ON Airspace (y_min)')
+        self.c.execute('CREATE INDEX Ymax_Index ON Airspace (y_max)')
 
         self.commit()
 
@@ -107,26 +113,26 @@ class Freedb:
                         landable_flag):
         """Add a new waypoint"""
         sql = '''INSERT INTO Waypoints
-              (Name, Id, X, Y, Altitude, Turnpoint, Comment, Landable_Flag)
+              (name, id, x, y, altitude, turnpoint, comment, landable_flag)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?)'''
-        self.c.execute(sql, (name, id, x, y,altitude, turnpoint, comment,
+        self.c.execute(sql, (name, id, x, y, altitude, turnpoint, comment,
                              landable_flag))
 
     def get_waypoint(self, id):
         """Return waypoint data"""
-        sql = 'SELECT * FROM Waypoints WHERE Id=?'
+        sql = 'SELECT * FROM Waypoints WHERE id=?'
         self.c.execute(sql, (id,))
         return self.c.fetchone()
 
     def get_waypoint_list(self):
         """Return a list of all waypoints"""
-        sql = 'SELECT * FROM Waypoints ORDER BY Id'
+        sql = 'SELECT * FROM Waypoints ORDER BY id'
         self.c.execute(sql)
         return self.c.fetchall()
 
     def get_area_waypoint_list(self, x, y, width, height):
         """Return list of waypoints filtered by area"""
-        sql = 'SELECT * FROM Waypoints WHERE X>? AND X<? AND Y>? AND Y<?'
+        sql = 'SELECT * FROM Waypoints WHERE x>? AND x<? AND y>? AND y<?'
         self.c.execute(sql, (x - width/2, x + width/2,
                              y - height/2, y + height/2))
         return self.c.fetchall()
@@ -134,36 +140,36 @@ class Freedb:
     def get_area_airspace(self, x, y, width, height):
         """Return list of airspace filtered by area"""
         sql = '''SELECT * FROM Airspace
-              WHERE ? < X_Max AND ? > X_Min AND ? < Y_Max AND ? > Y_Min'''
+              WHERE ? < x_max AND ? > x_min AND ? < y_max AND ? > y_min'''
         self.c.execute(sql, (x - width/2, x + width/2,
                              y - height/2, y + height/2))
         return self.c.fetchall()
 
     def get_airspace_lines(self, id):
         """Return list of boundary lines for given airspace id"""
-        sql = 'SELECT * FROM Airspace_Lines WHERE Airspace_Id=?'
+        sql = 'SELECT * FROM Airspace_Lines WHERE airspace_id=?'
         self.c.execute(sql, (id,))
         return self.c.fetchall()
 
     def get_airspace_arcs(self, id):
         """Return list of boundary arcs for given airspace id"""
-        sql = 'SELECT * FROM Airspace_Arcs WHERE Airspace_Id=?'
+        sql = 'SELECT * FROM Airspace_Arcs WHERE airspace_id=?'
         self.c.execute(sql, (id,))
         return self.c.fetchall()
 
     def set_task(self, task, id=0):
         """Delete old task data and add new"""
-        sql = 'DELETE FROM Tasks WHERE Id=? '
+        sql = 'DELETE FROM Tasks WHERE id=? '
         self.c.execute(sql, (id,))
-        sql = 'DELETE FROM Turnpoints WHERE Task_Id=?'
+        sql = 'DELETE FROM Turnpoints WHERE task_id=?'
         self.c.execute(sql, (id,))
 
-        sql = 'INSERT INTO Tasks (Id, AAT_Flag) VALUES (?, ?)'
+        sql = 'INSERT INTO Tasks (id, aat_flag) VALUES (?, ?)'
         self.c.execute(sql, (id, 0))
 
-        sql = '''INSERT INTO Turnpoints (Task_Id, Task_Index, Waypoint_Id,
-              Radius1, Angle1, Radius2, Angle2, Direction, Angle12,
-              MinDistX, MinDistY)
+        sql = '''INSERT INTO Turnpoints (task_id, task_index, Waypoint_Id,
+              radius1, angle1, radius2, angle2, direction, angle12,
+              mindistx, mindisty)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'''
         for tp_num, tp in enumerate(task):
             self.c.execute(sql, (id, tp_num, tp['waypoint_id'],
@@ -179,20 +185,20 @@ class Freedb:
             id = self.get_active_task_id()
 
         sql = '''SELECT * FROM Turnpoints INNER JOIN Waypoints
-              ON Turnpoints.Waypoint_Id=Waypoints.Id
-              WHERE Turnpoints.Task_Id = ? ORDER BY Turnpoints.Task_Index'''
+              ON Turnpoints.waypoint_id=Waypoints.id
+              WHERE Turnpoints.task_id = ? ORDER BY Turnpoints.task_index'''
         self.c.execute(sql, (id,))
         return self.c.fetchall()
 
     def get_active_task_id(self):
         """Get the current task id"""
-        sql = 'SELECT Task_Id FROM Config'
+        sql = 'SELECT * FROM Config'
         self.c.execute(sql)
-        return self.c.fetchone()[0]
+        return self.c.fetchone()['task_id']
 
     def set_active_task_id(self, task_id):
         """Set the current task id"""
-        sql = 'UPDATE Config SET Task_Id = ?'
+        sql = 'UPDATE Config SET task_id = ?'
         self.c.execute(sql, (task_id,))
 
     def delete_airspace(self):
@@ -204,21 +210,21 @@ class Freedb:
     def insert_airspace(self, id, name, base, top, xmin, ymin, xmax, ymax):
         """Insert new airspace record"""
         sql = '''INSERT INTO Airspace
-              (Id, Name, Base, Top, X_Min, Y_Min, X_Max, Y_Max)
+              (id, name, base, top, x_min, y_min, x_max, y_max)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?)'''
         self.c.execute(sql,
             (id, name, base, top, int(xmin), int(ymin), int(xmax), int(ymax)))
 
     def insert_airspace_line(self, id, x1, y1, x2, y2):
         """Insert an airspace line segment"""
-        sql = '''INSERT INTO Airspace_Lines (Airspace_Id, X1, Y1, X2, Y2)
+        sql = '''INSERT INTO Airspace_Lines (airspace_id, x1, y1, x2, y2)
               VALUES (?, ?, ?, ?, ?)'''
         self.c.execute(sql, (id, int(x1), int(y1), int(x2), int(y2)))
 
     def insert_airspace_arc(self, id, x, y, radius, startAngle, arcLength):
         """Insert an airspace arc segment"""
         sql = '''INSERT INTO Airspace_Arcs
-              (Airspace_Id, X, Y, Radius, Start, Length)
+              (airspace_id, x, y, radius, start, length)
               VALUES (?, ?, ?, ?, ?, ?)'''
         self.c.execute(sql, (id, int(x), int(y), int(radius),
                              int(startAngle * 64), int(arcLength * 64)))
@@ -230,7 +236,7 @@ class Freedb:
     def set_qne(self, qne):
         """Set QNE value and date"""
         time_stamp = int(time.time())
-        sql = 'UPDATE Config SET QNE = ?, QNE_Timestamp = ?'
+        sql = 'UPDATE Config SET qne=?, qne_timestamp=?'
         self.c.execute(sql, (qne, time_stamp))
 
     def get_config(self):
@@ -240,13 +246,13 @@ class Freedb:
 
     def set_pressure_level_datum(self, level, tim):
         """Set takeoff level and time"""
-        sql = '''UPDATE Config Set Pressure_Level_Datum = ?,
-              Pressure_Level_Datum_Timestamp = ?'''
+        sql = '''UPDATE Config Set pressure_level_datum=?,
+              pressure_level_datum_timestamp=?'''
         self.c.execute(sql, (level, tim))
 
     def get_nearest_landable(self, xpos, ypos):
         """Get list of landable waypoints sorted by distance"""
-        sql = 'SELECT * FROM Waypoints WHERE Landable_Flag != 0'
+        sql = 'SELECT * FROM Waypoints WHERE landable_flag != 0'
         self.c.execute(sql)
         wps = self.c.fetchall()
 

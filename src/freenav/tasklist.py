@@ -41,7 +41,7 @@ class TaskListStore(gtk.ListStore):
 
         p = self.db.get_projection()
         self.projection = freenav.projection.Lambert(
-            p['Parallel1'], p['Parallel2'], p['Latitude'], p['Longitude'])
+            p['parallel1'], p['parallel2'], p['latitude'], p['longitude'])
 
         gobject.signal_new("task_changed", TaskListStore,
                            gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, ())

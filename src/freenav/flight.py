@@ -9,19 +9,24 @@ import projection
 KTS_TO_MPS = 1852.0 / 3600
 
 class Flight:
-    def __init__(self):
+    def __init__(self, polar, safety_height):
         self._fsm = flight_sm.Flight_sm(self)
         #self._fsm.setDebugFlag(True)
 
+        # Model configuration parameters
+        self.ref_polar = polar
+        self.update_vario(0.0, bugs=1.0, ballast=1.0)
+
+        self.safety_height = safety_height
+
+        # List of observers
         self.subscriber_list = set()
 
+        # Get projection parameters
         self.db = freedb.Freedb()
         p = self.db.get_projection()
         self.projection = projection.Lambert(
-                p['Parallel1'], p['Parallel2'], p['Latitude'], p['Longitude'])
-
-        # Model configuration parameters
-        self.height_margin = 0
+                p['parallel1'], p['parallel2'], p['latitude'], p['longitude'])
 
         # Initialise task and turnpoint list
         self.task = self.db.get_task()
@@ -29,12 +34,23 @@ class Flight:
 
         self.task_state = ''
 
+        # Position, etc
         self.x = 0
         self.y = 0
         self.altitude = 0
         self.secs = 0
         self.ground_speed = 0
         self.track = 0
+
+        # TP navigation
+        self.tp_distance = 0
+        self.tp_bearing = 0
+        self.tp_relative_bearing = 0
+
+        # Final glide
+        self.ete = 0
+        self.arrival_height = 0
+        self.glide_margin = 0
 
         # Altimetry related stuff
         self.pressure_level = None
@@ -44,7 +60,7 @@ class Flight:
 
         # Get QNE value - use None if it wasn't set today
         config = self.db.get_config()
-        qne_date = datetime.date.fromtimestamp(config['QNE_Timestamp'])
+        qne_date = datetime.date.fromtimestamp(config['qne_timestamp'])
         if (qne_date == datetime.date.today()):
             self.qne = config['qne']
         else:
@@ -58,11 +74,6 @@ class Flight:
     def subscribe(self, subscriber):
         """Add a subscriber"""
         self.subscriber_list.add(subscriber)
-
-    def set_polar(self, polar):
-        """Set the reference polar coefficients"""
-        self.ref_polar = polar
-        self.update_vario(0.0, 1.0, 1.0)
 
     #------------------------------------------------------------------------
     # Flight change methods
@@ -162,7 +173,8 @@ class Flight:
 
     def calc_glide(self):
         # Get coordinates of minimum remaining task
-        coords = [(tp['mindistx'], tp['mindisty']) for tp in self.tp_list]
+        coords = [(tp.get('mindistx') or tp.get('x'),
+                   tp.get('mindisty') or tp.get('y')) for tp in self.tp_list]
 
         # Get height loss and ETE around remainder of task
         wind = self.get_wind()
@@ -172,7 +184,7 @@ class Flight:
             self.ete = ete
             self.arrival_height = (self.altitude - height_loss -
                                    self.tp_list[-1]['altitude'])
-            self.glide_margin = ((self.arrival_height - self.height_margin) /
+            self.glide_margin = ((self.arrival_height - self.safety_height) /
                                  height_loss)
         else:
             # XXX
@@ -314,7 +326,8 @@ class Flight:
     def do_divert(self, waypoint_id):
         """Divert to specified waypoint"""
         self.set_task("divert")
-        self.tp_list = [self.db.get_waypoint(waypoint_id)]
+        divert_wp = self.db.get_waypoint(waypoint_id)
+        self.tp_list = [divert_wp]
         self.notify_subscribers()
 
     def do_cancel_divert(self):

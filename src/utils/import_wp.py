@@ -70,8 +70,8 @@ def main():
 
     p = db.get_projection()
     importwp(db, open(wp_file),
-        freenav.projection.Lambert(p['Parallel1'], p['Parallel2'],
-                                   p['Latitude'], p['Longitude']))
+        freenav.projection.Lambert(p['parallel1'], p['parallel2'],
+                                   p['latitude'], p['longitude']))
     db.commit()
 
 if __name__ == '__main__':
