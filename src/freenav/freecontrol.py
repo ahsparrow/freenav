@@ -11,7 +11,10 @@ DBUS_PATH = "/org/freedesktop/Gypsy"
 
 CONTROL_INTERFACE = "org.freedesktop.Gypsy.Server"
 DEVICE_INTERFACE = "org.freedesktop.Gypsy.Device"
+POSITION_INTERFACE = "org.freedesktop.Gypsy.Position"
 COURSE_INTERFACE = "org.freedesktop.Gypsy.Course"
+VARIO_INTERFACE = "org.freedesktop.Gypsy.Vario"
+PRESSURE_LEVEL_INTERFACE = "org.freedesktop.Gypsy.PressureLevel"
 
 KTS_TO_MPS = 1852 / 3600.0
 FT_TO_M = 0.3048
@@ -44,14 +47,25 @@ class FreeControl:
         gps_dev = config.get('Devices', 'gps')
         path = control.Create(gps_dev, dbus_interface=CONTROL_INTERFACE)
         gps = bus.get_object(DBUS_SERVICE, path)
-        gps.connect_to_signal("PositionChanged", self.position_changed)
-        gps.connect_to_signal("PressureLevelChanged",
-                              self.pressure_level_changed)
 
-        self.course = dbus.Interface(gps, dbus_interface=COURSE_INTERFACE)
+        posn_if = dbus.Interface(gps, dbus_interface=POSITION_INTERFACE)
+        posn_if.connect_to_signal("PositionChanged", self.position_changed)
 
-        device = dbus.Interface(gps, dbus_interface=DEVICE_INTERFACE)
-        device.Start()
+        plevel_if = dbus.Interface(gps, dbus_interface=PRESSURE_LEVEL_INTERFACE)
+        plevel_if.connect_to_signal("PressureLevelChanged",
+                                    self.pressure_level_changed)
+
+        vario_dev = config.get('Devices', 'vario')
+        path = control.Create(vario_dev, dbus_interface=CONTROL_INTERFACE)
+        vario = bus.get_object(DBUS_SERVICE, path)
+
+        vario_if = dbus.Interface(vario, dbus_interface=VARIO_INTERFACE)
+        vario_if.connect_to_signal("VarioChanged", self.vario_changed)
+
+        self.course_if = dbus.Interface(gps, dbus_interface=COURSE_INTERFACE)
+
+        device_if = dbus.Interface(gps, dbus_interface=DEVICE_INTERFACE)
+        device_if.Start()
 
         # Handle user interface events
         view.drawing_area.connect('button_press_event', self.button_press)
@@ -133,7 +147,7 @@ class FreeControl:
         altitude = int(altitude)
 
         # Get course parameters
-        field_set, timestamp, speed, track, climb = self.course.GetCourse()
+        field_set, timestamp, speed, track, climb = self.course_if.GetCourse()
         speed = speed * KTS_TO_MPS
         track = math.radians(track)
 
@@ -144,6 +158,12 @@ class FreeControl:
     def pressure_level_changed(self, level):
         """Callback from D-Bus on new pressure altitude"""
         self.flight.update_pressure_level(level * FT_TO_M)
+
+    def vario_changed(self, tas, bugs, oat, vario, maccready, ballast):
+        """Callback from D-Bus on new vario settings"""
+        maccready = maccready * KTS_TO_MPS
+        bugs = (100 + bugs) / 100.0
+        self.flight.update_vario(maccready, bugs, ballast)
 
     def flight_update(self, flight):
         """Callback on flight model change"""

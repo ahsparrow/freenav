@@ -251,7 +251,7 @@ class Flight:
 
     def get_wind(self):
         """Return wind speed and direction"""
-        return {'speed': 10, 'direction': math.radians(117.4)}
+        return {'speed': 0, 'direction': math.radians(0)}
 
     def get_task_state(self):
         """Return task state"""
