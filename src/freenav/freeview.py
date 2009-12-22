@@ -15,7 +15,7 @@ MPS_TO_KTS = 3600 / 1852.0
 
 # Map scale limits (metres per pixel)
 SCALE = [6, 9, 12, 17, 25, 35, 50, 71, 100, 141, 200, 282, 400]
-DEFAULT_SCALE = SCALE[8]
+DEFAULT_SCALE = SCALE[4]
 
 # Number and size of info boxes
 NUM_INFO_BOXES = 4
@@ -421,8 +421,8 @@ class FreeView:
         wind = self.flight.get_wind()
         x = math.sin(wind['direction'])
         y = -math.cos(wind['direction'])
-        xc = win_width - 35 
-        yc = 35
+        xc = win_width - 40 
+        yc = 40
         a, b, c = 30, 6, 14
 
         x0, y0 = x * a, y * a
@@ -436,7 +436,7 @@ class FreeView:
         self.wind_layout.set_text(str(int(speed)))
         x, y = self.wind_layout.get_pixel_size()
 
-        win.draw_layout(gc, xc - x - 35, yc - y / 2, self.wind_layout,
+        win.draw_layout(gc, xc - x - 40, yc - y / 2, self.wind_layout,
                         background=None)
 
     # External methods - for use by controller

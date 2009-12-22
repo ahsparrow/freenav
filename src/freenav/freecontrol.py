@@ -168,6 +168,7 @@ class FreeControl:
     def flight_update(self, flight):
         """Callback on flight model change"""
         self.display_level()
+        self.display_glide()
         self.display_task_info()
         self.display_time(flight.get_secs())
         self.view.update_position(*flight.get_position())
@@ -226,6 +227,12 @@ class FreeControl:
         """Update time info label"""
         s = time.strftime('%H:%M', time.localtime(secs))
         self.view.info_label[INFO_TIME].set_text(s)
+
+    def display_glide(self):
+        """Update glide info label"""
+        s = "%0.1f" % (self.flight.thermal_calculator.thermal_average /
+                       KTS_TO_MPS)
+        self.view.info_label[INFO_GLIDE].set_text(s)
 
     def display_task_info(self):
         """Update task info label"""

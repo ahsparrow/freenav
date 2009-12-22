@@ -5,6 +5,7 @@ import math
 import flight_sm
 import freedb
 import projection
+import thermal
 
 KTS_TO_MPS = 1852.0 / 3600
 
@@ -21,6 +22,9 @@ class Flight:
 
         # List of observers
         self.subscriber_list = set()
+
+        # Thermal/wind calculator
+        self.thermal_calculator = thermal.ThermalCalculator()
 
         # Get projection parameters
         self.db = freedb.Freedb()
@@ -93,6 +97,7 @@ class Flight:
         self.calc_nav(x, y)
         self.calc_glide()
         self.calc_task()
+        self.thermal_calculator.update(x, y, altitude, secs)
 
         self._fsm.new_position()
         self.notify_subscribers()
@@ -187,8 +192,9 @@ class Flight:
             self.glide_margin = ((self.arrival_height - self.safety_height) /
                                  height_loss)
         else:
-            # XXX
-            pass
+            self.ete = 0
+            self.arrival_height = 0
+            self.glide_margin = 0
 
     def calc_task(self):
         pass
@@ -251,7 +257,9 @@ class Flight:
 
     def get_wind(self):
         """Return wind speed and direction"""
-        return {'speed': 0, 'direction': math.radians(0)}
+        speed = self.thermal_calculator.wind_speed
+        dirn = self.thermal_calculator.wind_direction
+        return {'speed': speed, 'direction': dirn}
 
     def get_task_state(self):
         """Return task state"""
