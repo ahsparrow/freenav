@@ -7,9 +7,11 @@ import termios
 import time
 
 KTS_TO_MPS = 1852.0 / 3600
+M_TO_FT = 1 / 0.3048
 
 GPRMC_FMT = "$GPRMC,%s,A,%02d%06.3f,%s,%03d%06.3f,%s,%.1f,%d,%s,0.0,E"
 GPGGA_FMT = "$GPGGA,%s,%02d%06.3f,%s,%03d%06.3f,%s,1,12,1.0,%d,M,0.0,M,,"
+PGRMZ_FMT = "$PGRMZ,%d,F,2"
 
 GPS_SYMLINK_NAME = "/tmp/gps"
 
@@ -34,6 +36,12 @@ def gen_gpgga(lat, lon, altitude, dt):
 
     nmea = GPGGA_FMT % (tim_str, lat_deg, lat_min, northing,
                         lon_deg, lon_min, easting, int(altitude))
+    nmea = add_checksum(nmea)
+    return nmea
+
+def gen_pgrmz(altitude):
+    alt_ft = altitude * M_TO_FT
+    nmea = PGRMZ_FMT % alt_ft
     nmea = add_checksum(nmea)
     return nmea
 
@@ -62,7 +70,8 @@ def igc_parse(rec):
     tim_str = rec[1:7]
     lat_str = rec[7:15]
     lon_str = rec[15:24]
-    alt_str = rec[30:35]
+    pressure_alt_str = rec[25:30]
+    gps_alt_str = rec[30:35]
     gs_str = rec[35:38]
     trk_str = rec[41:44]
 
@@ -76,11 +85,12 @@ def igc_parse(rec):
     if lon_str[-1] == 'W':
         lon = -lon
 
-    alt = int(alt_str)
+    gps_alt = int(gps_alt_str)
+    pressure_alt = int(pressure_alt_str)
     gs = int(gs_str) * KTS_TO_MPS
     trk = math.radians(int(trk_str))
 
-    return dt, lat, lon, alt, gs, trk
+    return dt, lat, lon, gps_alt, pressure_alt, gs, trk
 
 def main():
     master_fd, slave_fd = pty.openpty()
@@ -104,9 +114,10 @@ def main():
 
     for rec in igc_file:
         if rec[0] == 'B':
-            dt, lat, lon, alt, gs, trk = igc_parse(rec)
+            dt, lat, lon, gps_alt, pressure_alt, gs, trk = igc_parse(rec)
             os.write(master_fd, gen_gprmc(lat, lon, gs, trk, dt))
-            os.write(master_fd, gen_gpgga(lat, lon, alt, dt))
+            os.write(master_fd, gen_gpgga(lat, lon, gps_alt, dt))
+            os.write(master_fd, gen_pgrmz(pressure_alt))
             time.sleep(0.5)
 
 if __name__ == "__main__":

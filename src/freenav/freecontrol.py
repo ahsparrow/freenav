@@ -208,7 +208,7 @@ class FreeControl:
             if height is None:
                 s = '+****'
             else:
-                s = '+' + str(int(height / FT_TO_M))
+                s = "%+d" % (height / FT_TO_M)
         elif self.level_display_type == 'altitude':
             altitude = self.flight.get_pressure_altitude()
             if altitude is None:
