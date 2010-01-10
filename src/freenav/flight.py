@@ -42,7 +42,7 @@ class Flight:
         self.x = 0
         self.y = 0
         self.altitude = 0
-        self.secs = 0
+        self.utc_secs = 0
         self.ground_speed = 0
         self.track = 0
 
@@ -82,10 +82,10 @@ class Flight:
     #------------------------------------------------------------------------
     # Flight change methods
 
-    def update_position(self, secs, latitude, longitude, altitude,
+    def update_position(self, utc_secs, latitude, longitude, altitude,
                         ground_speed, track):
         "Update model with new position data"""
-        self.secs = secs
+        self.utc_secs = utc_secs
         x, y = self.projection.forward(latitude, longitude)
         self.x = int(x)
         self.y = int(y)
@@ -97,7 +97,7 @@ class Flight:
         self.calc_nav(x, y)
         self.calc_glide()
         self.calc_task()
-        self.thermal_calculator.update(x, y, altitude, secs)
+        self.thermal_calculator.update(x, y, altitude, utc_secs)
 
         self._fsm.new_position()
         self.notify_subscribers()
@@ -202,9 +202,9 @@ class Flight:
     #------------------------------------------------------------------------
     # Model query methods
 
-    def get_secs(self):
+    def get_utc_secs(self):
         """Return GPS time, in seconds"""
-        return self.secs
+        return self.utc_secs
 
     def get_pressure_height(self):
         """Return height above airfield"""
@@ -371,6 +371,9 @@ class Flight:
 
         return in_sector
 
+    def calc_task_speed(self):
+        pass
+
     #------------------------------------------------------------------------
     # Internal stuff
 
@@ -385,7 +388,8 @@ class Flight:
                                      len(self.pressure_level_deque))
         self.pressure_level_deque.clear()
 
-        self.db.set_pressure_level_datum(self.pressure_level_datum, self.secs)
+        self.db.set_pressure_level_datum(self.pressure_level_datum,
+                                         self.utc_secs)
 
     def reset_tp_list(self):
         """Reset the task turnpoint list"""

@@ -170,7 +170,7 @@ class FreeControl:
         self.display_level()
         self.display_glide()
         self.display_task_info()
-        self.display_time(flight.get_secs())
+        self.display_time(flight.get_utc_secs())
         self.view.update_position(*flight.get_position())
 
     #------------------------------------------------------------------
