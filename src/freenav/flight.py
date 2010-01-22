@@ -10,6 +10,9 @@ import thermal
 KTS_TO_MPS = 1852.0 / 3600
 
 class Flight:
+    TAKEOFF_SPEED = 10
+    STOPPED_SPEED = 2
+
     def __init__(self, polar, safety_height):
         self._fsm = flight_sm.Flight_sm(self)
         #self._fsm.setDebugFlag(True)
@@ -35,8 +38,6 @@ class Flight:
         # Initialise task and turnpoint list
         self.task = self.db.get_task()
         self.reset_tp_list()
-
-        self.task_state = ''
 
         # Position, etc
         self.x = 0
@@ -93,14 +94,7 @@ class Flight:
         self.track = track
         self.ground_speed = ground_speed
 
-        self.calc_wind()
-        self.calc_nav(x, y)
-        self.calc_glide()
-        self.calc_task()
-        self.thermal_calculator.update(x, y, altitude, utc_secs)
-
         self._fsm.new_position()
-        self.notify_subscribers()
 
     def update_vario(self, maccready, bugs, ballast):
         """Update model with new vario parameters"""
@@ -120,6 +114,7 @@ class Flight:
     def update_pressure_level(self, level):
         """Update model with new pressure level data"""
         self.pressure_level = level
+
         self._fsm.new_pressure_level(level)
 
     #------------------------------------------------------------------------
@@ -165,10 +160,7 @@ class Flight:
     #------------------------------------------------------------------------
     # Calculations
 
-    def calc_wind(self):
-        pass
-
-    def calc_nav(self, x, y):
+    def calc_nav(self):
         dx = self.tp_list[0]['x'] - self.x
         dy = self.tp_list[0]['y'] - self.y
         self.tp_distance = math.sqrt(dx * dx + dy * dy)
@@ -195,9 +187,6 @@ class Flight:
             self.ete = 0
             self.arrival_height = 0
             self.glide_margin = 0
-
-    def calc_task(self):
-        pass
 
     #------------------------------------------------------------------------
     # Model query methods
@@ -263,7 +252,11 @@ class Flight:
 
     def get_task_state(self):
         """Return task state"""
-        return self.task_state
+        if self._fsm.isInTransition():
+            state = self._fsm.getPreviousState()
+        else:
+            state = self._fsm.getState()
+        return state.getName().split('.')[-1]
 
     #------------------------------------------------------------------------
 
@@ -300,10 +293,20 @@ class Flight:
     #------------------------------------------------------------------------
     # State machine methods
 
-    def init_ground(self):
+    def do_init_ground(self):
         """Get and store airfield altitude"""
         wps = self.db.get_nearest_landable(self.x, self.y)
         self.airfield_altitude = wps[0]['altitude']
+
+        self.notify_subscribers()
+
+    def do_update_position(self, notify=False):
+        self.calc_nav()
+        self.calc_glide()
+        self.thermal_calculator.update(self.x, self.y, self.altitude,
+                                       self.utc_secs)
+        if notify:
+            self.notify_subscribers()
 
     def do_update_pressure_level(self, level):
         """Record pressure level datum"""
@@ -313,42 +316,54 @@ class Flight:
         if len(self.pressure_level_deque) > 60:
             self.set_pressure_level_datum()
 
-    def do_takeoff(self):
+    def do_launch(self):
         """Leaving the ground"""
         if self.pressure_level_datum is None and self.pressure_level_deque:
             # In case we haven't had time to accumulate a full sample
             self.set_pressure_level_datum()
 
-    def set_task(self, task_state):
-        self.task_state = task_state
+        self.notify_subscribers()
 
-    def make_start(self):
-        """Start task"""
+    def do_reset_task(self):
+        """Reset TP list from task"""
+        self.reset_tp_list()
+        self.notify_subscribers()
+
+    def do_start_sector(self):
+        """Entry start sector"""
+        self.notify_subscribers()
+
+    def do_line(self):
+        """Crossing line - start task"""
         self.tp_list.pop(0)
+        self.notify_subscribers()
+
+    def do_task(self):
+        """Start (or re-start saved) task"""
         self.notify_subscribers()
 
     def do_save_task(self):
         """Save current task list"""
         self.divert_tp_list = self.tp_list
 
-    def do_divert(self, waypoint_id):
-        """Divert to specified waypoint"""
-        self.set_task("divert")
+    def do_set_divert(self, waypoint_id):
+        """Set divert to specified waypoint"""
         divert_wp = self.db.get_waypoint(waypoint_id)
         self.tp_list = [divert_wp]
+
+    def do_divert(self):
+        """Start a new diversion"""
         self.notify_subscribers()
 
     def do_cancel_divert(self):
         """Cancel waypoint diversion and return to saved task"""
         self.tp_list = self.divert_tp_list
-        self.notify_subscribers()
 
     def do_next_turnpoint(self):
         """Goto next turnpoint (wrapping at end of list)"""
         self.tp_list.pop(0)
         if len(self.tp_list) == 0:
             self.tp_list = self.task[1:]
-        self.notify_subscribers()
 
     def is_previous_start(self):
         """Return true if a start has already been made"""
@@ -371,9 +386,6 @@ class Flight:
 
         return in_sector
 
-    def calc_task_speed(self):
-        pass
-
     #------------------------------------------------------------------------
     # Internal stuff
 
@@ -394,7 +406,6 @@ class Flight:
     def reset_tp_list(self):
         """Reset the task turnpoint list"""
         self.tp_list = self.task[:]
-        self.notify_subscribers()
 
 if __name__ == '__main__':
     f = Flight()

@@ -1,141 +1,176 @@
 %class Flight
 
-%start FlightFSM::Initialising
+%start FlightFSM::Init
 %map FlightFSM
 %%
+//---------------------------------------------------------------------------
 // Waiting for first GPS fix
-Initialising
+
+Init
 {
     // Restart in air after task start
-    new_position [(ctxt.ground_speed > 10) and ctxt.is_previous_start()]
-        OnTask
+    new_position [(ctxt.ground_speed > ctxt.TAKEOFF_SPEED) and ctxt.is_previous_start()]
+        Task
         {
+            do_update_position();
         }
 
     // Restart after launch, but before start
-    new_position [ctxt.ground_speed > 10]
-        WaitingForStart
+    new_position [ctxt.ground_speed > ctxt.TAKEOFF_SPEED and not ctxt.is_previous_start()]
+        Launch
         {
+            do_update_position();
         }
 
     // Start on grid
-    new_position [ctxt.ground_speed < 2]
-        OnGround
+    new_position [ctxt.ground_speed < ctxt.STOPPED_SPEED]
+        Ground
         {
-            init_ground();
+            do_update_position();
         }
 }
 
+//---------------------------------------------------------------------------
 // On the ground, waiting for takeoff
-OnGround
-Exit {do_takeoff();}
+
+Ground
+    Entry {do_init_ground();}
 {
-    new_position [ctxt.ground_speed > 10]
-        WaitingForStart
+    // Takeoff
+    new_position [ctxt.ground_speed > ctxt.TAKEOFF_SPEED]
+        Launch
         {
+            do_update_position();
         }
 
-    new_pressure_level (level)
+    // Update pressure reference
+    new_pressure_level(level)
         nil
         {
             do_update_pressure_level(level);
         }
 }
 
+//---------------------------------------------------------------------------
 // Launched, but not ready for start yet
-WaitingForStart
-Entry {set_task("launch");}
+
+Launch
+    Entry {do_launch();}
 {
     start_trigger
-        OutsideStartSector
+        Start
         {
         }
 }
 
+//---------------------------------------------------------------------------
 // Ready for start - outsite start sector
-OutsideStartSector
-Entry {set_task("start"); reset_tp_list();}
+
+Start
+    Entry {do_reset_task();}
 {
     new_position [ctxt.in_start_sector()]
-        InsideStartSector
+        Sector
         {
+            do_update_position();
         }
 
     start_trigger
-        OnTask
+        Line
         {
-            set_task("task");
-            make_start();
         }
 }
 
+//---------------------------------------------------------------------------
 // Ready for start - inside start sector
-InsideStartSector
-Entry {set_task("sector");}
+
+Sector
+    Entry {do_start_sector();}
 {
     new_position [not ctxt.in_start_sector()]
-        OnTask
+        Line
         {
-            set_task("task");
-            make_start();
+            do_update_position();
         }
 
     start_trigger
-        OnTask
+        Line
         {
-            set_task("task");
-            make_start();
         }
 }
 
+//---------------------------------------------------------------------------
+// Start line
+
+Line
+    Entry {do_line();}
+{
+    new_position
+        Task
+        {
+            do_update_position();
+        }
+}
+
+//---------------------------------------------------------------------------
 // On task
-OnTask
+
+Task
+    Entry {do_task();}
 {
     // Suspend task and go somewhere else
     divert(waypoint_id)
-        Diverted
+        Divert
         {
-            set_task("divert");
             do_save_task();
-            do_divert(waypoint_id);
+            do_set_divert(waypoint_id);
         }
 
     next_turnpoint
-        nil
+        Task
         {
             do_next_turnpoint();
         }
 
     start_trigger
-        OutsideStartSector
+        Start
         {
         }
 }
 
+//---------------------------------------------------------------------------
 // Diverting to (non-task) waypoint
-Diverted
+
+Divert
+    Entry {do_divert();}
 {
-    // Finished faffing... back to task
     cancel_divert
-        OnTask
+        Task
         {
-            set_task("task");
             do_cancel_divert();
         }
 
     divert(waypoint_id)
-        nil
+        Divert
         {
-            do_divert(waypoint_id);
+            do_set_divert(waypoint_id);
         }
 }
 
+//---------------------------------------------------------------------------
 // Default stuff
+
 Default
 {
     Default
         nil
         {
+        }
+
+    new_position
+        nil
+        {
+            do_update_position(True);
         }
 }
 %%

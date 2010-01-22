@@ -97,7 +97,7 @@ class FreeControl:
             self.flight.next_turnpoint()
         elif (event.x < 100) and (event.y < 100):
             if (not self.divert_indicator_flag and
-                (self.flight.get_task_state() in ('task', 'divert'))):
+                (self.flight.get_task_state() in ('Task', 'Divert'))):
                 # Arm divert
                 self.divert_indicator_flag = True
                 self.view.set_divert_indicator(True)
@@ -188,7 +188,7 @@ class FreeControl:
     def time_button_press(self):
         """Button press in the time info box. Start the task"""
         task_state = self.flight.get_task_state()
-        if task_state and task_state != "divert":
+        if task_state in ("Launch", "Start", "Sector", "Task"):
             dialog = gtk.MessageDialog(buttons=gtk.BUTTONS_YES_NO,
                                        message_format='Start task?',
                                        type=gtk.MESSAGE_QUESTION)
@@ -237,10 +237,7 @@ class FreeControl:
     def display_task_info(self):
         """Update task info label"""
         task_state = self.flight.get_task_state()
-        if task_state == 'task':
-            info_str = 'Task'
-        else:
-            info_str = task_state.title()
+        info_str = task_state
         self.view.info_label[INFO_TASK].set_text(info_str)
 
     def divert_timeout(self):
