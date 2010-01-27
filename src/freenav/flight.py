@@ -128,6 +128,10 @@ class Flight:
         """Goto next turnpoing"""
         self._fsm.next_turnpoint()
 
+    def prev_turnpoint(self):
+        """Goto prev turnpoing"""
+        self._fsm.prev_turnpoint()
+
     def divert(self, waypoint_id):
         """Divert to specified waypoint"""
         self._fsm.divert(waypoint_id)
@@ -156,37 +160,6 @@ class Flight:
 
     def get_nearest_landable(self, x, y):
         return self.db.get_nearest_landable(x, y)
-
-    #------------------------------------------------------------------------
-    # Calculations
-
-    def calc_nav(self):
-        dx = self.tp_list[0]['x'] - self.x
-        dy = self.tp_list[0]['y'] - self.y
-        self.tp_distance = math.sqrt(dx * dx + dy * dy)
-        self.tp_bearing = math.atan2(dx, dy)
-        self.tp_relative_bearing = ((self.tp_bearing - self.track) %
-                                    (2 * math.pi))
-
-    def calc_glide(self):
-        # Get coordinates of minimum remaining task
-        coords = [(tp.get('mindistx') or tp.get('x'),
-                   tp.get('mindisty') or tp.get('y')) for tp in self.tp_list]
-
-        # Get height loss and ETE around remainder of task
-        wind = self.get_wind()
-        if self.vm > wind['speed']:
-            height_loss, ete = self.calc_height_loss_ete((self.x, self.y),
-                                                         coords, wind)
-            self.ete = ete
-            self.arrival_height = (self.altitude - height_loss -
-                                   self.tp_list[-1]['altitude'])
-            self.glide_margin = ((self.arrival_height - self.safety_height) /
-                                 height_loss)
-        else:
-            self.ete = 0
-            self.arrival_height = 0
-            self.glide_margin = 0
 
     #------------------------------------------------------------------------
     # Model query methods
@@ -259,38 +232,6 @@ class Flight:
         return state.getName().split('.')[-1]
 
     #------------------------------------------------------------------------
-
-    def calc_height_loss_ete(self, posn, tps, wind):
-        """Calculate final glide height loss and ETE"""
-        if tps:
-            next_tp = tps[0]
-            height_loss1, ete1 = self.calc_height_loss_ete(next_tp, tps[1:],
-                                                           wind)
-            # Course and distance to next TP
-            dx = next_tp[0] - posn[0]
-            dy = next_tp[1] - posn[1]
-            dist = math.sqrt(dx ** 2 + dy ** 2)
-            course = math.atan2(dx, dy)
-
-            # Get ground speed (wind direction is direction it is blowing to)
-            swc = ((wind['speed'] / self.vm) *
-                   math.sin(wind['direction'] - course))
-            gspeed = (self.vm * math.sqrt(1 - swc ** 2) +
-                      wind['speed'] * math.cos(wind['direction'] - course))
-
-            # Height loss and ETE from this leg plus all the rest
-            height_loss = dist * self.vm_sink_rate / gspeed
-            ete = dist / gspeed
-
-            height_loss += height_loss1
-            ete += ete1
-        else:
-            height_loss = 0
-            ete = 0
-
-        return (height_loss, ete)
-
-    #------------------------------------------------------------------------
     # State machine methods
 
     def do_init_ground(self):
@@ -340,6 +281,8 @@ class Flight:
 
     def do_task(self):
         """Start (or re-start saved) task"""
+        # XXX calc more than this
+        self.calc_nav()
         self.notify_subscribers()
 
     def do_save_task(self):
@@ -360,10 +303,15 @@ class Flight:
         self.tp_list = self.divert_tp_list
 
     def do_next_turnpoint(self):
-        """Goto next turnpoint (wrapping at end of list)"""
-        self.tp_list.pop(0)
-        if len(self.tp_list) == 0:
-            self.tp_list = self.task[1:]
+        """Goto next turnpoint"""
+        if len(self.tp_list) > 1:
+            self.tp_list.pop(0)
+
+    def do_prev_turnpoint(self):
+        """Goto previous turnpoint"""
+        num_tps = len(self.tp_list)
+        if num_tps < (len(self.task) - 1):
+            self.tp_list.insert(0, self.task[-(num_tps + 1)])
 
     def is_previous_start(self):
         """Return true if a start has already been made"""
@@ -406,6 +354,67 @@ class Flight:
     def reset_tp_list(self):
         """Reset the task turnpoint list"""
         self.tp_list = self.task[:]
+
+    #------------------------------------------------------------------------
+    # Calculations
+
+    def calc_nav(self):
+        dx = self.tp_list[0]['x'] - self.x
+        dy = self.tp_list[0]['y'] - self.y
+        self.tp_distance = math.sqrt(dx * dx + dy * dy)
+        self.tp_bearing = math.atan2(dx, dy)
+        self.tp_relative_bearing = ((self.tp_bearing - self.track) %
+                                    (2 * math.pi))
+
+    def calc_glide(self):
+        # Get coordinates of minimum remaining task
+        coords = [(tp.get('mindistx') or tp.get('x'),
+                   tp.get('mindisty') or tp.get('y')) for tp in self.tp_list]
+
+        # Get height loss and ETE around remainder of task
+        wind = self.get_wind()
+        if self.vm > wind['speed']:
+            height_loss, ete = self.calc_height_loss_ete((self.x, self.y),
+                                                         coords, wind)
+            self.ete = ete
+            self.arrival_height = (self.altitude - height_loss -
+                                   self.tp_list[-1]['altitude'])
+            self.glide_margin = ((self.arrival_height - self.safety_height) /
+                                 height_loss)
+        else:
+            self.ete = 0
+            self.arrival_height = 0
+            self.glide_margin = 0
+
+    def calc_height_loss_ete(self, posn, tps, wind):
+        """Calculate final glide height loss and ETE"""
+        if tps:
+            next_tp = tps[0]
+            height_loss1, ete1 = self.calc_height_loss_ete(next_tp, tps[1:],
+                                                           wind)
+            # Course and distance to next TP
+            dx = next_tp[0] - posn[0]
+            dy = next_tp[1] - posn[1]
+            dist = math.sqrt(dx ** 2 + dy ** 2)
+            course = math.atan2(dx, dy)
+
+            # Get ground speed (wind direction is direction it is blowing to)
+            swc = ((wind['speed'] / self.vm) *
+                   math.sin(wind['direction'] - course))
+            gspeed = (self.vm * math.sqrt(1 - swc ** 2) +
+                      wind['speed'] * math.cos(wind['direction'] - course))
+
+            # Height loss and ETE from this leg plus all the rest
+            height_loss = dist * self.vm_sink_rate / gspeed
+            ete = dist / gspeed
+
+            height_loss += height_loss1
+            ete += ete1
+        else:
+            height_loss = 0
+            ete = 0
+
+        return (height_loss, ete)
 
 if __name__ == '__main__':
     f = Flight()

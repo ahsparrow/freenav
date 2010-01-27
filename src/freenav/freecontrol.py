@@ -93,8 +93,12 @@ class FreeControl:
         win_width, win_height = widget.window.get_size()
 
         if (event.x < 100) and (event.y > (win_height - 100)):
-            # Next turnpoint
-            self.flight.next_turnpoint()
+            # Next/prev turnpoint
+            if self.divert_indicator_flag:
+                self.flight.prev_turnpoint()
+                self.reset_divert()
+            else:
+                self.flight.next_turnpoint()
         elif (event.x < 100) and (event.y < 100):
             if (not self.divert_indicator_flag and
                 (self.flight.get_task_state() in ('Task', 'Divert'))):
@@ -105,10 +109,7 @@ class FreeControl:
                                                     self.divert_timeout)
         elif self.divert_indicator_flag:
             # Divert
-            self.divert_indicator_flag = False
-            self.view.set_divert_indicator(False)
-            gobject.source_remove(self.divert_timeout_id)
-
+            self.reset_divert()
             x, y = self.view.win_to_view(event.x, event.y)
             landable = self.flight.get_nearest_landable(x, y)
             self.flight.divert(landable[0]['id'])
@@ -188,7 +189,10 @@ class FreeControl:
     def time_button_press(self):
         """Button press in the time info box. Start the task"""
         task_state = self.flight.get_task_state()
-        if task_state in ("Launch", "Start", "Sector", "Task"):
+        if task_state == "Launch":
+            self.flight.trigger_start()
+
+        elif task_state in ("Start", "Sector", "Task"):
             dialog = gtk.MessageDialog(buttons=gtk.BUTTONS_YES_NO,
                                        message_format='Start task?',
                                        type=gtk.MESSAGE_QUESTION)
@@ -244,6 +248,11 @@ class FreeControl:
         self.divert_indicator_flag = False
         self.view.set_divert_indicator(False)
         return False
+
+    def reset_divert(self):
+        self.divert_indicator_flag = False
+        self.view.set_divert_indicator(False)
+        gobject.source_remove(self.divert_timeout_id)
 
     def main(self):
         gtk.main()

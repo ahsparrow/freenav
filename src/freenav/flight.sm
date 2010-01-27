@@ -132,6 +132,12 @@ Task
             do_next_turnpoint();
         }
 
+    prev_turnpoint
+        Task
+        {
+            do_prev_turnpoint();
+        }
+
     start_trigger
         Start
         {
