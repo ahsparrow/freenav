@@ -101,7 +101,7 @@ class FreeControl:
                 self.flight.next_turnpoint()
         elif (event.x < 100) and (event.y < 100):
             if (not self.divert_indicator_flag and
-                (self.flight.get_task_state() in ('Task', 'Divert'))):
+                (self.flight.get_state() in ('Task', 'Divert'))):
                 # Arm divert
                 self.divert_indicator_flag = True
                 self.view.set_divert_indicator(True)
@@ -188,7 +188,7 @@ class FreeControl:
 
     def time_button_press(self):
         """Button press in the time info box. Start the task"""
-        task_state = self.flight.get_task_state()
+        task_state = self.flight.get_state()
         if task_state == "Launch":
             self.flight.trigger_start()
 
@@ -240,7 +240,7 @@ class FreeControl:
 
     def display_task_info(self):
         """Update task info label"""
-        task_state = self.flight.get_task_state()
+        task_state = self.flight.get_state()
         info_str = task_state
         self.view.info_label[INFO_TASK].set_text(info_str)
 

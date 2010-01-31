@@ -250,7 +250,8 @@ class FreeView:
 
     def draw_task(self, gc, win):
         """Draw task and turnpoint sectors"""
-        pts = [self.view_to_win(tp['x'], tp['y']) for tp in self.flight.task]
+        pts = [self.view_to_win(tp['mindistx'], tp['mindisty'])
+               for tp in self.flight.task]
         win.draw_lines(gc, pts)
 
         # Draw sectors

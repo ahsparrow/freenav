@@ -223,8 +223,8 @@ class Flight:
         dirn = self.thermal_calculator.wind_direction
         return {'speed': speed, 'direction': dirn}
 
-    def get_task_state(self):
-        """Return task state"""
+    def get_state(self):
+        """Return flight state"""
         if self._fsm.isInTransition():
             state = self._fsm.getPreviousState()
         else:

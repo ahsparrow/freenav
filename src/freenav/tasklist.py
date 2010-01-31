@@ -210,18 +210,21 @@ class TaskListStore(gtk.ListStore):
             rad1 = tp['radius1']
             rad2 = tp['radius2']
 
-            if tp['angle1'] == 360:
-                dx = rad1 * math.sin(ang12)
-                dy = rad1 * math.cos(ang12)
-            elif tp['angle2'] == 360:
-                dx = rad2 * math.sin(ang12)
-                dy = rad2 * math.cos(ang12)
-            elif tp['angle1'] == 0:
-                dx = 0
-                dy = 0
+            if rad1 <= 500:
+                dx = dy = 0
             else:
-                dx = -rad2 * math.sin(ang12)
-                dy = -rad2 * math.cos(ang12)
+                if tp['angle1'] == 360:
+                    dx = rad1 * math.sin(ang12)
+                    dy = rad1 * math.cos(ang12)
+                elif tp['angle2'] == 360:
+                    dx = rad2 * math.sin(ang12)
+                    dy = rad2 * math.cos(ang12)
+                elif tp['angle1'] == 0:
+                    dx = 0
+                    dy = 0
+                else:
+                    dx = -rad2 * math.sin(ang12)
+                    dy = -rad2 * math.cos(ang12)
 
             tp['mindistx'] = wp['x'] + dx
             tp['mindisty'] = wp['y'] + dy
