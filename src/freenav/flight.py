@@ -36,8 +36,7 @@ class Flight:
                 p['parallel1'], p['parallel2'], p['latitude'], p['longitude'])
 
         # Initialise task and turnpoint list
-        self.task = self.db.get_task()
-        self.reset_tp_list()
+        self.reset_task()
 
         # Position, etc
         self.x = 0
@@ -50,12 +49,16 @@ class Flight:
         # TP navigation
         self.tp_distance = 0
         self.tp_bearing = 0
-        self.tp_relative_bearing = 0
 
         # Final glide
         self.ete = 0
         self.arrival_height = 0
         self.glide_margin = 0
+
+        # Task
+        self.start_utc_secs = 0
+        self.task_secs = 0
+        self.task_speed = 0
 
         # Altimetry related stuff
         self.pressure_level = None
@@ -63,7 +66,7 @@ class Flight:
         self.pressure_level_deque = collections.deque()
         self.airfield_altitude = None
 
-        # Get QNE value - use None if it wasn't set today
+        # Get QNE value - use None if it hasn't been set today
         config = self.db.get_config()
         qne_date = datetime.date.fromtimestamp(config['qne_timestamp'])
         if (qne_date == datetime.date.today()):
@@ -201,10 +204,9 @@ class Flight:
 
     def get_nav(self):
         """Return navigation (to current TP) data"""
-        return {'id': self.tp_list[0]['id'],
+        return {'id': self.task[self.tp_index]['id'],
                 'distance': self.tp_distance,
-                'bearing': self.tp_bearing,
-                'relative_bearing': self.tp_relative_bearing}
+                'bearing': self.tp_bearing}
 
     def get_glide(self):
         """Return final glide parameters"""
@@ -216,6 +218,18 @@ class Flight:
     def get_velocity(self):
         """Return ground speed and track"""
         return {'speed': self.ground_speed, 'track': self.track}
+
+    def get_start_time(self):
+        """Return the start time"""
+        return self.start_utc_secs
+
+    def get_task_secs(self):
+        """Return the estimated task time"""
+        return self.task_secs
+
+    def get_task_speed(self):
+        """Return current task speed"""
+        return self.task_speed
 
     def get_wind(self):
         """Return wind speed and direction"""
@@ -267,7 +281,7 @@ class Flight:
 
     def do_reset_task(self):
         """Reset TP list from task"""
-        self.reset_tp_list()
+        self.reset_task()
         self.notify_subscribers()
 
     def do_start_sector(self):
@@ -276,23 +290,30 @@ class Flight:
 
     def do_line(self):
         """Crossing line - start task"""
-        self.tp_list.pop(0)
-        self.notify_subscribers()
+        self.start_utc_secs = self.utc_secs
+        self.tp_index += 1
+
+        for s in self.subscriber_list:
+            s.flight_task_start(self)
 
     def do_task(self):
-        """Start (or re-start saved) task"""
+        """Update task"""
         # XXX calc more than this
         self.calc_nav()
         self.notify_subscribers()
 
     def do_save_task(self):
         """Save current task list"""
-        self.divert_tp_list = self.tp_list
+        self.divert_task = self.task
+        self.divert_tp_index = self.tp_index
 
     def do_set_divert(self, waypoint_id):
         """Set divert to specified waypoint"""
         divert_wp = self.db.get_waypoint(waypoint_id)
-        self.tp_list = [divert_wp]
+        divert_wp["mindistx"] = divert_wp["x"]
+        divert_wp["mindisty"] = divert_wp["y"]
+        self.task = [divert_wp]
+        self.tp_index = 0
 
     def do_divert(self):
         """Start a new diversion"""
@@ -300,18 +321,18 @@ class Flight:
 
     def do_cancel_divert(self):
         """Cancel waypoint diversion and return to saved task"""
-        self.tp_list = self.divert_tp_list
+        self.task = self.divert_task
+        self.tp_index = self.divert_tp_index
 
     def do_next_turnpoint(self):
         """Goto next turnpoint"""
-        if len(self.tp_list) > 1:
-            self.tp_list.pop(0)
+        if self.tp_index < (len(self.task) - 1):
+            self.tp_index += 1
 
     def do_prev_turnpoint(self):
         """Goto previous turnpoint"""
-        num_tps = len(self.tp_list)
-        if num_tps < (len(self.task) - 1):
-            self.tp_list.insert(0, self.task[-(num_tps + 1)])
+        if self.tp_index > 0:
+            self.tp_index -= 1
 
     def is_previous_start(self):
         """Return true if a start has already been made"""
@@ -351,25 +372,40 @@ class Flight:
         self.db.set_pressure_level_datum(self.pressure_level_datum,
                                          self.utc_secs)
 
-    def reset_tp_list(self):
+    def reset_task(self):
         """Reset the task turnpoint list"""
-        self.tp_list = self.task[:]
+        self.task = self.db.get_task()
+        self.tp_index = 0
 
     #------------------------------------------------------------------------
     # Calculations
 
     def calc_nav(self):
-        dx = self.tp_list[0]['x'] - self.x
-        dy = self.tp_list[0]['y'] - self.y
+        """Calculate TP distance and bearing"""
+        tp = self.get_tp_minxy(self.task[self.tp_index])
+        dx = tp[0] - self.x
+        dy = tp[1] - self.y
         self.tp_distance = math.sqrt(dx * dx + dy * dy)
         self.tp_bearing = math.atan2(dx, dy)
-        self.tp_relative_bearing = ((self.tp_bearing - self.track) %
-                                    (2 * math.pi))
+
+    def xcalc_glide(self):
+        """Calculate ETE, arrival height and glide margin"""
+        pass
+
+    def xcalc_task_time(self):
+        """Calculate remaining time on task"""
+        pass
+
+    def xcalc_task_glide(self):
+        """Calculate glide around whole task"""
+        # Get coordinates of minimum task
+        coords = [get_tp_minxy(tp) for tp in self.task]
 
     def calc_glide(self):
         # Get coordinates of minimum remaining task
-        coords = [(tp.get('mindistx') or tp.get('x'),
-                   tp.get('mindisty') or tp.get('y')) for tp in self.tp_list]
+        coords = [self.get_tp_minxy(tp) for tp in self.task[self.tp_index:]]
+
+        wind = self.get_wind()
 
         # Get height loss and ETE around remainder of task
         wind = self.get_wind()
@@ -378,7 +414,7 @@ class Flight:
                                                          coords, wind)
             self.ete = ete
             self.arrival_height = (self.altitude - height_loss -
-                                   self.tp_list[-1]['altitude'])
+                                   self.task[-1]['altitude'])
             self.glide_margin = ((self.arrival_height - self.safety_height) /
                                  height_loss)
         else:
@@ -415,6 +451,16 @@ class Flight:
             ete = 0
 
         return (height_loss, ete)
+
+    #------------------------------------------------------------------------
+
+    def get_tp_minxy(self, tp):
+        if tp.has_key('mindistx'):
+            xy = (tp['mindistx'], tp['mindisty'])
+        else:
+            xy = (tp['x'], tp['y'])
+        return xy
+
 
 if __name__ == '__main__':
     f = Flight()

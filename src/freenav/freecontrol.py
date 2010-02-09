@@ -17,10 +17,8 @@ VARIO_INTERFACE = "org.freedesktop.Gypsy.Vario"
 PRESSURE_LEVEL_INTERFACE = "org.freedesktop.Gypsy.PressureLevel"
 
 KTS_TO_MPS = 1852 / 3600.0
+KPH_TO_MPS = 1000 / 3600.0
 FT_TO_M = 0.3048
-
-POSITION_ALL_VALID = 0x7
-COURSE_SPEED_TRACK_VALID = 0x3
 
 INFO_LEVEL = 0
 INFO_GLIDE = 1
@@ -36,8 +34,12 @@ class FreeControl:
 
         # Controller state variables
         self.divert_indicator_flag = False
-        self.level_display_type = 'flight_level'
-
+        self.level_display_type = collections.deque(["flight_level",
+                                                     "altitude",
+                                                     "height"])
+        self.task_display_type = collections.deque(["start_time",
+                                                    "task_speed",
+                                                    "task_time"])
         # Set-up all the D-Bus stuff
         dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
@@ -76,11 +78,13 @@ class FreeControl:
 
     def info_button_press(self, widget, event, *args):
         """Handle button press in info box"""
+        if event.type != gtk.gdk.BUTTON_PRESS:
+            # Ignore double press
+            return False
+
         info = args[0]
         if info == INFO_LEVEL:
             self.level_button_press()
-        elif info == INFO_GLIDE:
-            pass
         elif info == INFO_TASK:
             self.task_button_press()
         elif info == INFO_TIME:
@@ -168,23 +172,24 @@ class FreeControl:
 
     def flight_update(self, flight):
         """Callback on flight model change"""
-        self.display_level()
-        self.display_glide()
+        self.display_level_info()
+        self.display_glide_info()
         self.display_task_info()
-        self.display_time(flight.get_utc_secs())
+        self.display_time_info(flight.get_utc_secs())
         self.view.update_position(*flight.get_position())
+
+    def flight_task_start(self, flight):
+        """Call back on task start - reset task display type"""
+        while self.task_display_type[0] != "start_time":
+            self.task_display_type.rotate()
+        self.flight_update(flight)
 
     #------------------------------------------------------------------
 
     def level_button_press(self):
         """Button press in the level info box. Change between level displays"""
-        if self.level_display_type == 'flight_level':
-            self.level_display_type = 'altitude'
-        elif self.level_display_type == 'altitude':
-            self.level_display_type = 'height'
-        else:
-            self.level_display_type = 'flight_level'
-        self.display_level()
+        self.level_display_type.rotate()
+        self.display_level_info()
 
     def time_button_press(self):
         """Button press in the time info box. Start the task"""
@@ -203,17 +208,21 @@ class FreeControl:
 
     def task_button_press(self):
         """Button press in the task info box"""
-        self.flight.cancel_divert()
+        if self.flight.get_state() == "Task":
+            self.task_display_type.rotate()
+            self.display_task_info()
+        else:
+            self.flight.cancel_divert()
 
-    def display_level(self):
+    def display_level_info(self):
         """Update pressure level info label"""
-        if self.level_display_type == 'height':
+        if self.level_display_type[0] == 'height':
             height = self.flight.get_pressure_height()
             if height is None:
                 s = '+****'
             else:
                 s = "%+d" % (height / FT_TO_M)
-        elif self.level_display_type == 'altitude':
+        elif self.level_display_type[0] == 'altitude':
             altitude = self.flight.get_pressure_altitude()
             if altitude is None:
                 s = '****'
@@ -227,12 +236,7 @@ class FreeControl:
                 s = 'FL%02d' % round((fl / FT_TO_M) / 100)
         self.view.info_label[INFO_LEVEL].set_text(s)
 
-    def display_time(self, secs):
-        """Update time info label"""
-        s = time.strftime('%H:%M', time.localtime(secs))
-        self.view.info_label[INFO_TIME].set_text(s)
-
-    def display_glide(self):
+    def display_glide_info(self):
         """Update glide info label"""
         s = "%0.1f" % (self.flight.thermal_calculator.thermal_average /
                        KTS_TO_MPS)
@@ -241,8 +245,28 @@ class FreeControl:
     def display_task_info(self):
         """Update task info label"""
         task_state = self.flight.get_state()
-        info_str = task_state
+        if task_state == "Task":
+            if self.task_display_type[0] == "start_time":
+                # Start time
+                info_str = time.strftime(
+                    "%H:%M", time.localtime(self.flight.start_utc_secs))
+            elif self.task_display_type[0] == "task_speed":
+                # Task speed, limited to 999kph
+                speed = min(self.flight.get_task_speed(), 999)
+                info_str = ("%.0f" % (speed / KPH_TO_MPS))
+            else:
+                # Task time, limited to 9:59
+                task_secs = min(self.flight.get_task_secs(), 35940)
+                tim_str = time.strftime("%H:%M", time.gmtime(task_secs))
+                info_str = tim_str[1:]
+        else:
+            info_str = task_state
         self.view.info_label[INFO_TASK].set_text(info_str)
+
+    def display_time_info(self, secs):
+        """Update time info label"""
+        s = time.strftime('%H:%M', time.localtime(secs))
+        self.view.info_label[INFO_TIME].set_text(s)
 
     def divert_timeout(self):
         self.divert_indicator_flag = False

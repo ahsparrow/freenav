@@ -218,7 +218,7 @@ class FreeView:
 
     def draw_waypoints(self, win, gc):
         """Draw waypoints"""
-        tps = [tp['waypoint_id'] for tp in self.flight.task]
+        tps = [tp['id'] for tp in self.flight.task]
         for wp in self.mapcache.wps:
             if self.view_scale<=100 or wp['landable_flag'] or wp['id'] in tps:
                 x, y = self.view_to_win(wp['x'], wp['y'])
@@ -343,7 +343,7 @@ class FreeView:
                         background=self.bg_color)
 
         # Draw arrow for relative bearing to TP
-        rb = nav['relative_bearing']
+        rb = nav['bearing'] - self.flight.get_velocity()['track']
         x, y = math.sin(rb), -math.cos(rb)
 
         xc = 40
