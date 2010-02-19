@@ -50,8 +50,9 @@ SCHEMA = {
     'Config': [('task_id', 'INTEGER'),
                ('qne', 'REAL'),
                ('qne_timestamp', 'INTEGER'),
-               ('pressure_level_datum', 'REAL'),
-               ('pressure_level_datum_timestamp', 'INTEGER'),
+               ('takeoff_pressure_level', 'REAL'),
+               ('takeoff_altitude', 'REAL'),
+               ('takeoff_time', 'INTEGER'),
                ('start_time', 'INTEGER')]}
 
 class Freedb:
@@ -85,9 +86,9 @@ class Freedb:
         self.c.execute(sql, (parallel1, parallel2, latitude, longitude))
 
         sql = '''INSERT INTO Config
-              (task_id, qne, qne_timestamp, pressure_level_datum,
-               pressure_level_datum_timestamp, start_time)
-              VALUES (0, 0, 0, 0, 0, 0)'''
+              (task_id, qne, qne_timestamp, takeoff_pressure_level,
+               takeoff_time, takeoff_altitude, start_time)
+              VALUES (0, 0, 0, 0, 0, 0, 0)'''
         self.c.execute(sql)
 
         self.c.execute('CREATE INDEX X_Index ON Waypoints (x)')
@@ -244,11 +245,16 @@ class Freedb:
         self.c.execute('SELECT * FROM Config')
         return self.c.fetchone()
 
-    def set_pressure_level_datum(self, level, tim):
-        """Set takeoff level and time"""
-        sql = '''UPDATE Config Set pressure_level_datum=?,
-              pressure_level_datum_timestamp=?'''
-        self.c.execute(sql, (level, tim))
+    def set_takeoff(self, level, tim, altitude):
+        """Set takeoff pressure level, time and altitude"""
+        sql = '''UPDATE Config Set takeoff_pressure_level=?,
+              takeoff_time=?, takeoff_altitude=?'''
+        self.c.execute(sql, (level, tim, altitude))
+
+    def set_start(self, tim):
+        """Set start time"""
+        sql = "UPDATE Config Set start_time=?"
+        self.c.execute(sql, (tim,))
 
     def get_nearest_landable(self, xpos, ypos):
         """Get list of landable waypoints sorted by distance"""

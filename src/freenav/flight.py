@@ -15,12 +15,10 @@ class Flight:
 
     def __init__(self, polar, safety_height):
         self._fsm = flight_sm.Flight_sm(self)
-        #self._fsm.setDebugFlag(True)
 
         # Model configuration parameters
         self.ref_polar = polar
         self.update_vario(0.0, bugs=1.0, ballast=1.0)
-
         self.safety_height = safety_height
 
         # List of observers
@@ -29,14 +27,11 @@ class Flight:
         # Thermal/wind calculator
         self.thermal_calculator = thermal.ThermalCalculator()
 
-        # Get projection parameters
+        # Projection parameters
         self.db = freedb.Freedb()
         p = self.db.get_projection()
         self.projection = projection.Lambert(
                 p['parallel1'], p['parallel2'], p['latitude'], p['longitude'])
-
-        # Initialise task and turnpoint list
-        self.reset_task()
 
         # Position, etc
         self.x = 0
@@ -60,20 +55,14 @@ class Flight:
         self.task_secs = 0
         self.task_speed = 0
 
-        # Altimetry related stuff
+        # Altimetry
+        self.takeoff_pressure_level = None
+        self.takeoff_altitude = None
+
         self.pressure_level = None
-        self.pressure_level_datum = None
         self.pressure_level_deque = collections.deque()
-        self.airfield_altitude = None
 
-        # Get QNE value - use None if it hasn't been set today
-        config = self.db.get_config()
-        qne_date = datetime.date.fromtimestamp(config['qne_timestamp'])
-        if (qne_date == datetime.date.today()):
-            self.qne = config['qne']
-        else:
-            self.qne = None
-
+        # Initialise state machine
         self._fsm.enterStartState()
 
     #------------------------------------------------------------------------
@@ -172,20 +161,20 @@ class Flight:
         return self.utc_secs
 
     def get_pressure_height(self):
-        """Return height above airfield"""
-        if self.pressure_level is None or self.pressure_level_datum is None:
+        """Return height above takeoff airfield"""
+        if self.pressure_level is None or self.takeoff_pressure_level is None:
             height = None
         else:
-            height = self.pressure_level - self.pressure_level_datum
+            height = self.pressure_level - self.takeoff_pressure_level
         return height
 
     def get_pressure_altitude(self):
         """Return height above sea level"""
         height = self.get_pressure_height()
-        if height is None or self.airfield_altitude is None:
+        if height is None or self.takeoff_altitude is None:
             altitude = None
         else:
-            altitude = height + self.airfield_altitude
+            altitude = height + self.takeoff_altitude
         return altitude
 
     def get_flight_level(self):
@@ -194,8 +183,8 @@ class Flight:
             level = None
         else:
             level = self.pressure_level
-            if not (self.qne is None or self.pressure_level_datum is None):
-                level = level - self.pressure_level_datum + self.qne
+            if not (self.qne is None or self.takeoff_pressure_level is None):
+                level = level - self.takeoff_pressure_level + self.qne
         return level
 
     def get_position(self):
@@ -248,14 +237,48 @@ class Flight:
     #------------------------------------------------------------------------
     # State machine methods
 
+    def do_init(self):
+        """Initialisation"""
+        # Initialise task and turnpoint list
+        self.reset_task()
+
+        # Get QNE value - use None if it wasn't set today
+        config = self.db.get_config()
+        qne_date = datetime.date.fromtimestamp(config['qne_timestamp'])
+
+        if (qne_date == datetime.date.today()):
+            self.qne = config['qne']
+        else:
+            self.qne = None
+
     def do_init_ground(self):
         """Get and store airfield altitude"""
         wps = self.db.get_nearest_landable(self.x, self.y)
-        self.airfield_altitude = wps[0]['altitude']
+        self.takeoff_altitude = wps[0]['altitude']
+
+        self.notify_subscribers()
+
+    def do_init_air(self):
+        """In-air initialisation"""
+        config = self.db.get_config()
+
+        takeoff_date = datetime.date.fromtimestamp(config["takeoff_time"])
+        if (takeoff_date == datetime.date.today()):
+            self.takeoff_pressure_level = config["takeoff_pressure_level"]
+            self.takeoff_altitude = config["takeoff_altitude"]
+
+        self.notify_subscribers()
+
+    def do_resume(self):
+        """Resume task after program re-start in air"""
+        config = self.db.get_config()
+        self.start_utc_secs = config["start_time"]
+        self.tp_index += 1
 
         self.notify_subscribers()
 
     def do_update_position(self, notify=False):
+        """Update model with new position data"""
         self.calc_nav()
         self.calc_glide()
         self.thermal_calculator.update(self.x, self.y, self.altitude,
@@ -264,19 +287,28 @@ class Flight:
             self.notify_subscribers()
 
     def do_update_pressure_level(self, level):
-        """Record pressure level datum"""
+        """Average takeoff pressure level"""
         self.pressure_level_deque.append(level)
 
         # Calculate average over 60 samples
         if len(self.pressure_level_deque) > 60:
-            self.set_pressure_level_datum()
+            self.set_takeoff_pressure_level(self.pressure_level_deque)
+
+    def do_takeoff(self):
+        """Leaving the ground"""
+        if self.takeoff_pressure_level is None and self.pressure_level_deque:
+            # We didn't have time to accumulate a full sample
+            self.set_takeoff_pressure_level(self.pressure_level_deque)
+
+        # Store takeoff info to database
+        self.db.set_takeoff(self.takeoff_pressure_level, self.utc_secs,
+                            self.takeoff_altitude)
+        self.db.commit()
+
+        self.notify_subscribers()
 
     def do_launch(self):
-        """Leaving the ground"""
-        if self.pressure_level_datum is None and self.pressure_level_deque:
-            # In case we haven't had time to accumulate a full sample
-            self.set_pressure_level_datum()
-
+        """Off the ground"""
         self.notify_subscribers()
 
     def do_reset_task(self):
@@ -293,13 +325,16 @@ class Flight:
         self.start_utc_secs = self.utc_secs
         self.tp_index += 1
 
+        self.db.set_start(self.start_utc_secs)
+        self.db.commit()
+
         for s in self.subscriber_list:
             s.flight_task_start(self)
 
     def do_task(self):
         """Update task"""
-        # XXX calc more than this
         self.calc_nav()
+        self.calc_glide()
         self.notify_subscribers()
 
     def do_save_task(self):
@@ -317,6 +352,8 @@ class Flight:
 
     def do_divert(self):
         """Start a new diversion"""
+        self.calc_nav()
+        self.calc_glide()
         self.notify_subscribers()
 
     def do_cancel_divert(self):
@@ -335,8 +372,11 @@ class Flight:
             self.tp_index -= 1
 
     def is_previous_start(self):
-        """Return true if a start has already been made"""
-        return False
+        """Return true if a start has already been made today"""
+        config = self.db.get_config()
+
+        start_date = datetime.date.fromtimestamp(config["start_time"])
+        return (start_date == datetime.date.today())
 
     def in_start_sector(self):
         """Return true if in start sector (2D only)"""
@@ -363,14 +403,10 @@ class Flight:
         for s in self.subscriber_list:
             s.flight_update(self)
 
-    def set_pressure_level_datum(self):
-        """Update datum and store to database"""
-        self.pressure_level_datum = (sum(self.pressure_level_deque) /
-                                     len(self.pressure_level_deque))
-        self.pressure_level_deque.clear()
-
-        self.db.set_pressure_level_datum(self.pressure_level_datum,
-                                         self.utc_secs)
+    def set_takeoff_pressure_level(self, level_deque):
+        """Update takeoff level and store to database"""
+        self.takeoff_pressure_level = (sum(level_deque) / len(level_deque))
+        level_deque.clear()
 
     def reset_task(self):
         """Reset the task turnpoint list"""

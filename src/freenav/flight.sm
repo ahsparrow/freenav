@@ -7,17 +7,11 @@
 // Waiting for first GPS fix
 
 Init
+    Entry {do_init();}
 {
     // Restart in air after task start
-    new_position [(ctxt.ground_speed > ctxt.TAKEOFF_SPEED) and ctxt.is_previous_start()]
-        Task
-        {
-            do_update_position();
-        }
-
-    // Restart after launch, but before start
-    new_position [ctxt.ground_speed > ctxt.TAKEOFF_SPEED and not ctxt.is_previous_start()]
-        Launch
+    new_position [(ctxt.ground_speed > ctxt.TAKEOFF_SPEED)]
+        Air
         {
             do_update_position();
         }
@@ -35,6 +29,7 @@ Init
 
 Ground
     Entry {do_init_ground();}
+    Exit {do_takeoff();}
 {
     // Takeoff
     new_position [ctxt.ground_speed > ctxt.TAKEOFF_SPEED]
@@ -48,6 +43,25 @@ Ground
         nil
         {
             do_update_pressure_level(level);
+        }
+}
+
+//---------------------------------------------------------------------------
+// Program (re-)initialisation in air
+
+Air
+    Entry {do_init_air();}
+{
+    new_position [not ctxt.is_previous_start()]
+        Launch
+        {
+            do_update_position();
+        }
+
+    new_position [ctxt.is_previous_start()]
+        Resume
+        {
+            do_update_position();
         }
 }
 
@@ -104,6 +118,19 @@ Sector
 
 Line
     Entry {do_line();}
+{
+    new_position
+        Task
+        {
+            do_update_position();
+        }
+}
+
+//---------------------------------------------------------------------------
+// Resume from previous start
+
+Resume
+    Entry {do_resume();}
 {
     new_position
         Task
