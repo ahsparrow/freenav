@@ -30,16 +30,16 @@ class MapCache():
         self.height = height
 
         # Get waypoints
-        self.wps = self.flight.get_area_waypoint_list(x, y, width, height)
+        self.wps = self.flight.db.get_area_waypoint_list(x, y, width, height)
 
         # Get airspace
-        self.airspace = self.flight.get_area_airspace(x, y, width, height)
+        self.airspace = self.flight.db.get_area_airspace(x, y, width, height)
         self.airspace_lines = {}
         self.airspace_arcs = {}
         for a in self.airspace:
             id = a['id']
-            self.airspace_lines[id] = self.flight.get_airspace_lines(id)
-            self.airspace_arcs[id] = self.flight.get_airspace_arcs(id)
+            self.airspace_lines[id] = self.flight.db.get_airspace_lines(id)
+            self.airspace_arcs[id] = self.flight.db.get_airspace_arcs(id)
 
     def get_airspace_info(self, x, y):
         """Returns list of airspace info at the given x,y position.

@@ -42,7 +42,7 @@ Ground
     new_pressure_level(level)
         nil
         {
-            do_update_pressure_level(level);
+            do_ground_pressure_level(level);
         }
 }
 
@@ -81,7 +81,7 @@ Launch
 // Ready for start - outsite start sector
 
 Start
-    Entry {do_reset_task();}
+    Entry {do_start();}
 {
     new_position [ctxt.in_start_sector()]
         Sector
@@ -149,7 +149,6 @@ Task
     divert(waypoint_id)
         Divert
         {
-            do_save_task();
             do_set_divert(waypoint_id);
         }
 

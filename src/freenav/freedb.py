@@ -245,7 +245,7 @@ class Freedb:
         self.c.execute('SELECT * FROM Config')
         return self.c.fetchone()
 
-    def set_takeoff(self, level, tim, altitude):
+    def set_takeoff(self, tim, level, altitude):
         """Set takeoff pressure level, time and altitude"""
         sql = '''UPDATE Config Set takeoff_pressure_level=?,
               takeoff_time=?, takeoff_altitude=?'''

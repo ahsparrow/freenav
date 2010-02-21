@@ -115,7 +115,7 @@ class FreeControl:
             # Divert
             self.reset_divert()
             x, y = self.view.win_to_view(event.x, event.y)
-            landable = self.flight.get_nearest_landable(x, y)
+            landable = self.flight.db.get_nearest_landable(x, y)
             self.flight.divert(landable[0]['id'])
         else:
             # Display airspace info
@@ -168,7 +168,7 @@ class FreeControl:
         """Callback from D-Bus on new vario settings"""
         maccready = maccready * KTS_TO_MPS
         bugs = (100 + bugs) / 100.0
-        self.flight.update_vario(maccready, bugs, ballast)
+        self.flight.update_maccready(maccready, bugs, ballast)
 
     def flight_update(self, flight):
         """Callback on flight model change"""
@@ -217,19 +217,19 @@ class FreeControl:
     def display_level_info(self):
         """Update pressure level info label"""
         if self.level_display_type[0] == 'height':
-            height = self.flight.get_pressure_height()
+            height = self.flight.pressure_alt.get_pressure_height()
             if height is None:
                 s = '+****'
             else:
                 s = "%+d" % (height / FT_TO_M)
         elif self.level_display_type[0] == 'altitude':
-            altitude = self.flight.get_pressure_altitude()
+            altitude = self.flight.pressure_alt.get_pressure_altitude()
             if altitude is None:
                 s = '****'
             else:
                 s = str(int(altitude / FT_TO_M))
         else:
-            fl = self.flight.get_flight_level()
+            fl = self.flight.pressure_alt.get_flight_level()
             if fl is None:
                 s = 'FL**'
             else:
@@ -249,7 +249,7 @@ class FreeControl:
             if self.task_display_type[0] == "start_time":
                 # Start time
                 info_str = time.strftime(
-                    "%H:%M", time.localtime(self.flight.start_utc_secs))
+                    "%H:%M", time.localtime(self.flight.task.start_time))
             elif self.task_display_type[0] == "task_speed":
                 # Task speed, limited to 999kph
                 speed = min(self.flight.get_task_speed(), 999)

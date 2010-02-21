@@ -218,7 +218,7 @@ class FreeView:
 
     def draw_waypoints(self, win, gc):
         """Draw waypoints"""
-        tps = [tp['id'] for tp in self.flight.task]
+        tps = [tp['id'] for tp in self.flight.task.tp_list]
         for wp in self.mapcache.wps:
             if self.view_scale<=100 or wp['landable_flag'] or wp['id'] in tps:
                 x, y = self.view_to_win(wp['x'], wp['y'])
@@ -251,16 +251,16 @@ class FreeView:
     def draw_task(self, gc, win):
         """Draw task and turnpoint sectors"""
         pts = [self.view_to_win(tp['mindistx'], tp['mindisty'])
-               for tp in self.flight.task]
+               for tp in self.flight.task.tp_list]
         win.draw_lines(gc, pts)
 
         # Draw sectors
-        if len(self.flight.task) > 1:
-            for tp in self.flight.task[:-1]:
+        if len(self.flight.task.tp_list) > 1:
+            for tp in self.flight.task.tp_list[:-1]:
                 self.draw_tp_sector(gc, win, tp)
 
             # Draw finish line
-            self.draw_tp_line(gc, win, self.flight.task[-1])
+            self.draw_tp_line(gc, win, self.flight.task.tp_list[-1])
 
     def draw_tp_line(self, gc, win, tp):
         """Draw turnpoint (finish) line"""
@@ -360,7 +360,7 @@ class FreeView:
 
     def draw_glide(self, gc, win, win_height):
         """Draw final glide information"""
-        glide = self.flight.get_glide()
+        glide = self.flight.task.get_glide()
 
         # Draw origin
         y = win_height / 2
