@@ -1,4 +1,6 @@
 #!/usr/bin/python2.5
+import datetime
+
 import gtk
 import gobject
 
@@ -23,7 +25,12 @@ class QneApp(AppBase):
         AppBase.__init__(self)
 
         self.db = freenav.freedb.Freedb()
-        qne = int(round(self.db.get_config()['qne'] / FT_TO_M))
+        config = self.db.get_config()
+        qne_date = datetime.date.fromtimestamp(config['qne_timestamp'])
+        if (qne_date == datetime.date.today()):
+            qne = int(round(self.db.get_config()['qne'] / FT_TO_M))
+        else:
+            qne = 0
 
         # Create window and add event handlers
         if is_hildon_app:
@@ -54,8 +61,11 @@ class QneApp(AppBase):
         ok_button.connect("clicked", self.on_ok_button)
         cancel_button = gtk.Button("Cancel")
         cancel_button.connect("clicked", self.on_cancel_button)
-        button_box.add(cancel_button)
+        clear_button = gtk.Button("Clear")
+        clear_button.connect("clicked", self.on_clear_button)
         button_box.add(ok_button)
+        button_box.add(cancel_button)
+        button_box.add(clear_button)
 
         vbox = gtk.VBox(False, 0)
         vbox.pack_start(alignment, True, False, 10)
@@ -71,6 +81,12 @@ class QneApp(AppBase):
     def on_ok_button(self, widget):
         """OK button pressed"""
         self.db.set_qne(self.spin_button.get_value_as_int() * FT_TO_M)
+        self.db.commit()
+        gtk.main_quit()
+
+    def on_clear_button(self, widget):
+        """Clear button pressed"""
+        self.db.clear_qne()
         self.db.commit()
         gtk.main_quit()
 

@@ -240,6 +240,10 @@ class Freedb:
         sql = 'UPDATE Config SET qne=?, qne_timestamp=?'
         self.c.execute(sql, (qne, time_stamp))
 
+    def clear_qne(self):
+        """Clear QNE data"""
+        self.c.execute("UPDATE Config SET qne_timestamp=0")
+
     def get_config(self):
         """Returns configuration values"""
         self.c.execute('SELECT * FROM Config')
