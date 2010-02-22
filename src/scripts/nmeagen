@@ -37,7 +37,7 @@ class NmeaGen:
         self.lambert = projection.Lambert(
             p['parallel1'], p['parallel2'], p['latitude'], p['longitude'])
 
-        wp = self.db.get_waypoint('RIV')
+        wp = self.db.get_waypoint('HUS')
         self.x = wp['x']
         self.y = wp['y']
         self.time = time.time()
