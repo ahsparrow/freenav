@@ -157,6 +157,9 @@ class Flight:
         wps = self.db.get_nearest_landable(self.x, self.y)
         self.pressure_alt.set_takeoff_altitude(wps[0]['altitude'])
 
+        # Temporary divert to takeoff WP
+        self.task.divert(wps[0])
+
         self.notify_subscribers()
 
     def do_init_air(self):

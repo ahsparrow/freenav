@@ -8,7 +8,7 @@ class Task:
         self.safety_height = safety_height
 
         self.tp_index = 0
-        self.saved_tp_list = None
+        self.divert_wp = None
 
         self.ete = 0
         self.arrival_height = 0
@@ -18,6 +18,7 @@ class Task:
     def reset(self):
         """Reset turnpoint index"""
         self.tp_index = 0
+        self.divert_wp = None
 
     def start(self, start_time):
         """Start task"""
@@ -33,19 +34,10 @@ class Task:
             self.tp_index -= 1
 
     def divert(self, wp):
-        if not self.saved_tp_list:
-            self.saved_tp_list = self.tp_list
-            self.saved_tp_index = self.tp_index
-
-        wp["mindistx"] = wp["x"]
-        wp["mindisty"] = wp["y"]
-        self.tp_list = [wp]
-        self.tp_index = 0
+        self.divert_wp = wp
 
     def cancel_divert(self):
-        self.tp_list = self.saved_tp_list
-        self.tp_index = self.saved_tp_index
-        self.save_tp_list = None
+        self.divert_wp = None
 
     def set_maccready(self, maccready, bugs, ballast):
         """Set new Maccready parameters"""
@@ -70,10 +62,20 @@ class Task:
                 'maccready': self.maccready}
 
     def get_tp_xy(self):
-        return self.tp_minxy(self.tp_list[self.tp_index])
+        """Return XY coordinates of active TP"""
+        if self.divert_wp:
+            tp = self.divert_wp
+        else:
+            tp = self.tp_list[self.tp_index]
+        return self.tp_minxy(tp)
 
     def get_tp_id(self):
-        return self.tp_list[self.tp_index]["id"]
+        """Return ID of active TP"""
+        if self.divert_wp:
+            tp = self.divert_wp
+        else:
+            tp = self.tp_list[self.tp_index]
+        return tp["id"]
 
     def in_start_sector(self, x, y):
         """Return true if in start sector (2D only)"""
@@ -94,7 +96,11 @@ class Task:
 
     def calc_glide(self, x, y, altitude, wind):
         # Get coordinates of minimum remaining task
-        coords = [self.tp_minxy(tp) for tp in self.tp_list[self.tp_index:]]
+        if self.divert_wp:
+            tps = [self.divert_wp]
+        else:
+            tps = self.tp_list[self.tp_index:]
+        coords = [self.tp_minxy(tp) for tp in tps]
 
         # Get height loss and ETE around remainder of task
         if self.vm > wind['speed']:
