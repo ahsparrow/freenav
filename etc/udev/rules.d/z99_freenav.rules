@@ -1,0 +1,2 @@
+KERNEL=="ttyUSB*", ATTRS{product}=="Freenav GPS", SYMLINK+="freegps"
+

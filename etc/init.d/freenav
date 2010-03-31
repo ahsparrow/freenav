@@ -1,0 +1,29 @@
+#! /bin/sh
+set +e
+
+KVER=$(uname -r)
+MODDIR=/usr/local/lib/modules/$KVER
+
+case "$1" in
+
+  start)
+        if [ -e $MODDIR/usbserial.ko ] && [ -e $MODDIR/ftdi_sio.ko ]; then
+		echo -n "Loading USB serial modules"
+		insmod $MODDIR/usbserial.ko
+		insmod $MODDIR/ftdi_sio.ko
+        fi
+	;;
+  stop)
+        ;;
+  restart)
+        ;;
+  force-reload)
+        ;;
+
+  *)
+        echo "Usage: /etc/init.d/frenav start"
+        exit 1
+esac
+
+exit 0
+
