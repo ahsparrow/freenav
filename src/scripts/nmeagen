@@ -5,6 +5,7 @@ import optparse
 import os
 import time
 import pty
+import serial
 import signal
 import termios
 
@@ -127,11 +128,11 @@ class NmeaGen:
         return data + '*' + checksum + '\r\n'
 
 class NmeaApp:
-    def __init__(self, bt_flag, qnh):
+    def __init__(self, bt_flag, serial_dev, baud_rate, qnh):
         self.bt_flag = bt_flag
         self.stream_is_open = False
 
-        self.open_stream(bt_flag)
+        self.open_stream(bt_flag, serial_dev, baud_rate)
         self.nmea_gen = NmeaGen(qnh)
 
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -177,7 +178,7 @@ class NmeaApp:
         self.window.add(vbox)
         self.window.show_all()
 
-    def open_stream(self, bt_flag): 
+    def open_stream(self, bt_flag, serial_dev, baud_rate): 
         if bt_flag:
             self.serv_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
             self.serv_sock.bind(("", RF_COMM_CHANNEL))
@@ -185,6 +186,10 @@ class NmeaApp:
             gobject.io_add_watch(self.serv_sock, gobject.IO_IN,
                                  self.socket_listener)
             print "Listening for Bluetooth connection..."
+        elif serial_dev:
+            ser = serial.Serial(serial_dev, baud_rate)
+            self.stream = gio.unix.OutputStream(ser.fd, True)
+            self.stream_is_open = True
         else:
             master_fd, slave_fd = pty.openpty()
             self.stream = gio.unix.OutputStream(master_fd, True)
@@ -244,9 +249,13 @@ def main():
                       dest="bt_flag", action="store_true", default=False,
                       help="Bluetooth server")
     parser.add_option("-q", "--qnh", default=1013, help="QNH pressure")
+    parser.add_option("-s", "--serial_dev", default=None, help="Serial device")
+    parser.add_option("-r", "--baud_rate", default=4800,
+                      help="Serial device baud rate")
     (options, args) = parser.parse_args()
 
-    nmea_app = NmeaApp(options.bt_flag, int(options.qnh))
+    nmea_app = NmeaApp(options.bt_flag, options.serial_dev,
+                       int(options.baud_rate), int(options.qnh))
     nmea_app.main()
 
 if __name__ == '__main__':

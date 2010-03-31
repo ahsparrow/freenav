@@ -46,35 +46,56 @@ class FreeControl:
         bus = dbus.SystemBus()
         control = bus.get_object(DBUS_SERVICE, DBUS_PATH)
 
-        gps_dev = config.get('Devices', 'gps')
-        path = control.Create(gps_dev, dbus_interface=CONTROL_INTERFACE)
+        # GPS device
+        gps_dev_path = config.get('Devices', 'gps')
+        path = control.Create(gps_dev_path, dbus_interface=CONTROL_INTERFACE)
         gps = bus.get_object(DBUS_SERVICE, path)
 
+        # Various interfaces
+        self.gps_dev_if = dbus.Interface(gps, dbus_interface=DEVICE_INTERFACE)
         posn_if = dbus.Interface(gps, dbus_interface=POSITION_INTERFACE)
-        posn_if.connect_to_signal("PositionChanged", self.position_changed)
-
         plevel_if = dbus.Interface(gps, dbus_interface=PRESSURE_LEVEL_INTERFACE)
-        plevel_if.connect_to_signal("PressureLevelChanged",
-                                    self.pressure_level_changed)
-
-        vario_dev = config.get('Devices', 'vario')
-        path = control.Create(vario_dev, dbus_interface=CONTROL_INTERFACE)
-        vario = bus.get_object(DBUS_SERVICE, path)
-
-        vario_if = dbus.Interface(vario, dbus_interface=VARIO_INTERFACE)
-        vario_if.connect_to_signal("VarioChanged", self.vario_changed)
-
         self.course_if = dbus.Interface(gps, dbus_interface=COURSE_INTERFACE)
 
-        device_if = dbus.Interface(gps, dbus_interface=DEVICE_INTERFACE)
-        device_if.Start()
+        # Signal handlers for position and pressure level changes
+        posn_if.connect_to_signal("PositionChanged", self.position_changed)
+        plevel_if.connect_to_signal("PressureLevelChanged",
+                                    self.pressure_level_changed)
+        # Start the GPS
+        self.gps_dev_if.Start()
+
+        # Vario device
+        vario_dev_path = config.get('Devices', 'vario')
+        if vario_dev_path == gps_dev_path:
+            # Vario uses same device as the GPS
+            vario = gps
+            self.vario_dev_if = None
+        else:
+            # Separate device for vario
+            path = control.Create(vario_dev_path,
+                                  dbus_interface=CONTROL_INTERFACE)
+            vario = bus.get_object(DBUS_SERVICE, path)
+            self.vario_dev_if = dbus.Interface(vario,
+                                               dbus_interface=DEVICE_INTERFACE)
+            self.vario_dev_if.Start()
+
+        # Signal handler for vario
+        vario_if = dbus.Interface(vario, dbus_interface=VARIO_INTERFACE)
+        vario_if.connect_to_signal("VarioChanged", self.vario_changed)
 
         # Handle user interface events
         view.drawing_area.connect('button_press_event', self.button_press)
         view.window.connect('key_press_event', self.key_press)
-        view.window.connect('destroy', gtk.main_quit)
+        view.window.connect('destroy', self.destroy)
         for i, ibox in enumerate(view.info_box):
             ibox.connect("button_press_event", self.info_button_press, i)
+
+    def destroy(self, widget):
+        """Stop input devices and quit"""
+        self.gps_dev_if.Stop()
+        if self.vario_dev_if:
+            self.vario_dev_if.Stop()
+        gtk.main_quit()
 
     def info_button_press(self, widget, event, *args):
         """Handle button press in info box"""
@@ -129,7 +150,7 @@ class FreeControl:
         """Handle key(board) press"""
         keyname = gtk.gdk.keyval_name(event.keyval)
         if keyname in ('q', 'Q'):
-            gtk.main_quit()
+            self.view.window.destroy()
         elif keyname == 'Up':
             self.view.zoom_in()
             self.view.redraw()
