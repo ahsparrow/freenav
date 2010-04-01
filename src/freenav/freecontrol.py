@@ -6,6 +6,13 @@ import dbus, dbus.mainloop.glib
 import gobject
 import gtk
 
+try:
+    import hildon
+    import osso
+    is_hildon_app = True
+except ImportError:
+    is_hildon_app = False
+
 DBUS_SERVICE = "org.freedesktop.Gypsy"
 DBUS_PATH = "/org/freedesktop/Gypsy"
 
@@ -90,6 +97,17 @@ class FreeControl:
         for i, ibox in enumerate(view.info_box):
             ibox.connect("button_press_event", self.info_button_press, i)
 
+        if is_hildon_app:
+            """Add timeout callback to keep the N810 display on"""
+            osso_c = osso.Context("freecontrol", "0.0.1", False)
+            self.osso_device = osso.DeviceState(osso_c)
+            gobject.timeout_add(25000, self.blank_timeout)
+
+    def blank_timeout(self):
+        """Stop the N810 display from blanking"""
+        self.osso_device.display_blanking_pause()
+        return True
+
     def destroy(self, widget):
         """Stop input devices and quit"""
         self.gps_dev_if.Stop()
@@ -151,10 +169,12 @@ class FreeControl:
         keyname = gtk.gdk.keyval_name(event.keyval)
         if keyname in ('q', 'Q'):
             self.view.window.destroy()
-        elif keyname == 'Up':
+        elif keyname in ('Up', 'F7'):
+            # F7 is N810 'Zoom in' key
             self.view.zoom_in()
             self.view.redraw()
-        elif keyname == 'Down':
+        elif keyname in ('Down', 'F8'):
+            # F8 is N810 'Zoom out' key
             self.view.zoom_out()
             self.view.redraw()
         elif keyname == 'Right':
