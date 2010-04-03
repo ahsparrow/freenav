@@ -13,6 +13,8 @@ try:
 except ImportError:
     is_hildon_app = False
 
+OSSO_APPLICATION = "uk.org.freeflight.freenav"
+
 DBUS_SERVICE = "org.freedesktop.Gypsy"
 DBUS_PATH = "/org/freedesktop/Gypsy"
 
@@ -98,9 +100,10 @@ class FreeControl:
             ibox.connect("button_press_event", self.info_button_press, i)
 
         if is_hildon_app:
-            """Add timeout callback to keep the N810 display on"""
-            osso_c = osso.Context("freecontrol", "0.0.1", False)
-            self.osso_device = osso.DeviceState(osso_c)
+            """Add timeout callback to keep the N810 display on. Need to make
+               osso_c object variable otherwise program core dumps"""
+            self.osso_c = osso.Context(OSSO_APPLICATION, "0.0.1", False)
+            self.osso_device = osso.DeviceState(self.osso_c)
             gobject.timeout_add(25000, self.blank_timeout)
 
     def blank_timeout(self):
@@ -179,8 +182,6 @@ class FreeControl:
             self.view.redraw()
         elif keyname == 'Right':
             self.flight.next_turnpoint()
-        else:
-            print "Unhandled key:",keyname
 
         return True
 
