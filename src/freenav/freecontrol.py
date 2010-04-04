@@ -251,7 +251,7 @@ class FreeControl:
     def task_button_press(self):
         """Button press in the task info box"""
         if self.flight.get_state() == "Task":
-            self.task_display_type.rotate()
+            # XXX self.task_display_type.rotate()
             self.display_task_info()
         else:
             self.flight.cancel_divert()
