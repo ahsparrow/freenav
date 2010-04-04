@@ -64,6 +64,7 @@ class FreeView:
         self.mapcache = mapcache.MapCache(flight)
 
         self.divert_flag = False
+        self.maccready_flag = False
 
         # Create top level window
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -393,9 +394,12 @@ class FreeView:
         else:
             ete_str = "%d:%02d" % (ete_mins / 60, ete_mins % 60)
 
-        self.fg_layout.set_text('%d\n%s\n%.1f' %
-                      (glide['height'] * M_TO_FT, ete_str,
-                       glide['maccready'] * MPS_TO_KTS))
+        if self.maccready_flag:
+            fmt = '%d\n%s\n%.1f*'
+        else:
+            fmt = '%d\n%s\n%.1f'
+        self.fg_layout.set_text(fmt % (glide['height'] * M_TO_FT, ete_str,
+                                       glide['maccready'] * MPS_TO_KTS))
         x, y = self.fg_layout.get_pixel_size()
         win.draw_layout(gc, FG_WIDTH + 5, (win_height / 2) - (2 * y / 3),
                         self.fg_layout, background=None)
@@ -501,4 +505,23 @@ class FreeView:
         # Set indicator showing divert select is active
         self.divert_flag = flag
         self.redraw()
+
+    def set_maccready_indicator(self, flag):
+        # Set indicator showing Maccready is active
+        self.maccready_flag = flag
+        self.redraw()
+
+    def get_button_region(self, x, y):
+        win_width, win_height = self.drawing_area.window.get_size()
+        if x < 100:
+            if y < 100:
+                return 'divert'
+            elif y > (win_height - 100):
+                return 'turnpoint'
+            elif abs(y - (win_height / 2)) < 50:
+                return 'glide'
+            else:
+                return 'background'
+        else:
+            return 'background'
 

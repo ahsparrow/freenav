@@ -14,11 +14,12 @@ class Flight:
     TAKEOFF_SPEED = 10
     STOPPED_SPEED = 2
 
-    def __init__(self, polar, safety_height):
+    def __init__(self, polar, bugs, ballast, safety_height):
         self._fsm = flight_sm.Flight_sm(self)
 
         self.db = freedb.Freedb()
-        self.task = task.Task(self.db.get_task(), polar, safety_height)
+        self.task = task.Task(self.db.get_task(),
+                              polar, bugs, ballast, safety_height)
         self.pressure_alt = altimetry.PressureAltimetry()
         self.thermal_calculator = thermal.ThermalCalculator()
 
@@ -67,9 +68,17 @@ class Flight:
 
         self._fsm.new_position()
 
-    def update_maccready(self, maccready, bugs, ballast):
+    def update_maccready(self, maccready):
         """Update model with new Maccready parameters"""
-        self.task.set_maccready(maccready, bugs, ballast)
+        self.task.set_maccready(maccready)
+
+    def incr_maccready(self, incr):
+        """Increment the Maccready setting"""
+        self.task.incr_maccready(incr)
+
+    def decr_maccready(self, decr):
+        """Decrement the Maccready setting"""
+        self.task.decr_maccready(decr)
 
     def update_pressure_level(self, level):
         """Update model with new pressure level data"""

@@ -22,12 +22,16 @@ CONTROL_INTERFACE = "org.freedesktop.Gypsy.Server"
 DEVICE_INTERFACE = "org.freedesktop.Gypsy.Device"
 POSITION_INTERFACE = "org.freedesktop.Gypsy.Position"
 COURSE_INTERFACE = "org.freedesktop.Gypsy.Course"
-VARIO_INTERFACE = "org.freedesktop.Gypsy.Vario"
 PRESSURE_LEVEL_INTERFACE = "org.freedesktop.Gypsy.PressureLevel"
 
 KTS_TO_MPS = 1852 / 3600.0
 KPH_TO_MPS = 1000 / 3600.0
 FT_TO_M = 0.3048
+
+DIVERT_TIMEOUT = 5000
+MACCREADY_TIMEOUT = 3000
+
+MACCREADY_STEP = 0.5 * KTS_TO_MPS
 
 INFO_LEVEL = 0
 INFO_GLIDE = 1
@@ -43,6 +47,7 @@ class FreeControl:
 
         # Controller state variables
         self.divert_indicator_flag = False
+        self.maccready_indicator_flag = False
         self.level_display_type = collections.deque(["flight_level",
                                                      "altitude",
                                                      "height"])
@@ -73,25 +78,6 @@ class FreeControl:
         # Start the GPS
         self.gps_dev_if.Start()
 
-        # Vario device
-        vario_dev_path = config.get('Devices', 'vario')
-        if vario_dev_path == gps_dev_path:
-            # Vario uses same device as the GPS
-            vario = gps
-            self.vario_dev_if = None
-        else:
-            # Separate device for vario
-            path = control.Create(vario_dev_path,
-                                  dbus_interface=CONTROL_INTERFACE)
-            vario = bus.get_object(DBUS_SERVICE, path)
-            self.vario_dev_if = dbus.Interface(vario,
-                                               dbus_interface=DEVICE_INTERFACE)
-            self.vario_dev_if.Start()
-
-        # Signal handler for vario
-        vario_if = dbus.Interface(vario, dbus_interface=VARIO_INTERFACE)
-        vario_if.connect_to_signal("VarioChanged", self.vario_changed)
-
         # Handle user interface events
         view.drawing_area.connect('button_press_event', self.button_press)
         view.window.connect('key_press_event', self.key_press)
@@ -114,8 +100,6 @@ class FreeControl:
     def destroy(self, widget):
         """Stop input devices and quit"""
         self.gps_dev_if.Stop()
-        if self.vario_dev_if:
-            self.vario_dev_if.Stop()
         gtk.main_quit()
 
     def info_button_press(self, widget, event, *args):
@@ -136,29 +120,35 @@ class FreeControl:
 
     def button_press(self, widget, event, *args):
         """Handle button press (mouse click/screen touch)"""
-        win_width, win_height = widget.window.get_size()
+        region = self.view.get_button_region(event.x, event.y)
 
-        if (event.x < 100) and (event.y > (win_height - 100)):
+        if region == 'turnpoint' and self.flight.get_state() != 'Divert':
             # Next/prev turnpoint
             if self.divert_indicator_flag:
                 self.flight.prev_turnpoint()
                 self.reset_divert()
             else:
                 self.flight.next_turnpoint()
-        elif (event.x < 100) and (event.y < 100):
-            if (not self.divert_indicator_flag and
-                (self.flight.get_state() in ('Task', 'Divert'))):
-                # Arm divert
-                self.divert_indicator_flag = True
-                self.view.set_divert_indicator(True)
-                self.divert_timeout_id = gobject.timeout_add(5000,
-                                                    self.divert_timeout)
         elif self.divert_indicator_flag:
             # Divert
             self.reset_divert()
             x, y = self.view.win_to_view(event.x, event.y)
             landable = self.flight.db.get_nearest_landable(x, y)
             self.flight.divert(landable[0]['id'])
+        elif region == 'divert':
+            if (not self.divert_indicator_flag and
+                (self.flight.get_state() in ('Task', 'Divert'))):
+                # Arm divert
+                self.divert_indicator_flag = True
+                self.view.set_divert_indicator(True)
+                self.divert_timeout_id = gobject.timeout_add(
+                                            DIVERT_TIMEOUT, self.divert_timeout)
+        elif region == 'glide':
+            if not self.maccready_indicator_flag:
+                self.maccready_indicator_flag = True
+                self.view.set_maccready_indicator(True)
+                self.maccready_timeout_id = gobject.timeout_add(
+                                    MACCREADY_TIMEOUT, self.maccready_timeout)
         else:
             # Display airspace info
             x, y = self.view.win_to_view(event.x, event.y)
@@ -174,11 +164,19 @@ class FreeControl:
             self.view.window.destroy()
         elif keyname in ('Up', 'F7'):
             # F7 is N810 'Zoom in' key
-            self.view.zoom_in()
+            if self.maccready_indicator_flag:
+                self.flight.incr_maccready(MACCREADY_STEP)
+                self.restart_maccready_timeout()
+            else:
+                self.view.zoom_in()
             self.view.redraw()
         elif keyname in ('Down', 'F8'):
             # F8 is N810 'Zoom out' key
-            self.view.zoom_out()
+            if self.maccready_indicator_flag:
+                self.flight.decr_maccready(MACCREADY_STEP)
+                self.restart_maccready_timeout()
+            else:
+                self.view.zoom_out()
             self.view.redraw()
         elif keyname == 'Right':
             self.flight.next_turnpoint()
@@ -205,12 +203,6 @@ class FreeControl:
     def pressure_level_changed(self, level):
         """Callback from D-Bus on new pressure altitude"""
         self.flight.update_pressure_level(level * FT_TO_M)
-
-    def vario_changed(self, tas, bugs, oat, vario, maccready, ballast):
-        """Callback from D-Bus on new vario settings"""
-        maccready = maccready * KTS_TO_MPS
-        bugs = (100 + bugs) / 100.0
-        self.flight.update_maccready(maccready, bugs, ballast)
 
     def flight_update(self, flight):
         """Callback on flight model change"""
@@ -251,7 +243,7 @@ class FreeControl:
     def task_button_press(self):
         """Button press in the task info box"""
         if self.flight.get_state() == "Task":
-            self.task_display_type.rotate()
+            # XXX self.task_display_type.rotate()
             self.display_task_info()
         else:
             self.flight.cancel_divert()
@@ -319,6 +311,16 @@ class FreeControl:
         self.divert_indicator_flag = False
         self.view.set_divert_indicator(False)
         gobject.source_remove(self.divert_timeout_id)
+
+    def maccready_timeout(self):
+        self.maccready_indicator_flag = False
+        self.view.set_maccready_indicator(False)
+        return False
+
+    def restart_maccready_timeout(self):
+        gobject.source_remove(self.maccready_timeout_id)
+        self.maccready_timeout_id = gobject.timeout_add(MACCREADY_TIMEOUT,
+                                                        self.maccready_timeout)
 
     def main(self):
         gtk.main()

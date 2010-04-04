@@ -1,10 +1,12 @@
 import math
 
 class Task:
-    def __init__(self, tp_list, polar, safety_height):
+    def __init__(self, tp_list, polar, bugs, ballast, safety_height):
         """Class initialisation"""
         self.tp_list = tp_list
         self.polar = polar
+        self.bugs = bugs
+        self.ballast = ballast
         self.safety_height = safety_height
 
         self.tp_index = 0
@@ -13,7 +15,7 @@ class Task:
         self.ete = 0
         self.arrival_height = 0
         self.glide_margin = 0
-        self.set_maccready(0.0, 1.0, 1.0)
+        self.set_maccready(0.0)
 
     def reset(self):
         """Reset turnpoint index"""
@@ -39,20 +41,30 @@ class Task:
     def cancel_divert(self):
         self.divert_wp = None
 
-    def set_maccready(self, maccready, bugs, ballast):
+    def set_maccready(self, maccready):
         """Set new Maccready parameters"""
         self.maccready = maccready
-        self.bugs = bugs
-        self.ballast = ballast
 
         # Adjust polar coefficients for ballast and bugs
-        a = self.polar['a'] / math.sqrt(ballast) * bugs
-        b = self.polar['b'] * bugs
-        c = self.polar['c'] * math.sqrt(ballast) * bugs
+        a = self.polar['a'] / math.sqrt(self.ballast) * self.bugs
+        b = self.polar['b'] * self.bugs
+        c = self.polar['c'] * math.sqrt(self.ballast) * self.bugs
 
         # MacCready speed and sink rate
         self.vm = math.sqrt((c - self.maccready) / a)
         self.vm_sink_rate = -(a * self.vm ** 2 + b * self.vm + c)
+
+    def incr_maccready(self, incr):
+        """Increment Maccready setting"""
+        self.set_maccready(self.maccready + incr)
+
+
+    def decr_maccready(self, decr):
+        """Decrement Maccready setting"""
+        maccready = self.maccready - decr
+        if maccready < 0.1:
+            maccready = 0
+        self.set_maccready(maccready)
 
     def get_glide(self):
         """Return final glide parameters"""
