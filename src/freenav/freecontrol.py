@@ -98,6 +98,7 @@ class FreeControl:
         view.window.connect('destroy', self.destroy)
         for i, ibox in enumerate(view.info_box):
             ibox.connect("button_press_event", self.info_button_press, i)
+        view.window.connect('window-state-event', self.on_window_state_change)
 
         if is_hildon_app:
             """Add timeout callback to keep the N810 display on. Need to make
@@ -117,6 +118,13 @@ class FreeControl:
         if self.vario_dev_if:
             self.vario_dev_if.Stop()
         gtk.main_quit()
+
+    def on_window_state_change(self, widget, event, *args):
+        """Callback on window state change"""
+        if event.new_window_state & gtk.gdk.WINDOW_STATE_FULLSCREEN:
+            self.window_in_fullscreen = True
+        else:
+            self.window_in_fullscreen = False
 
     def info_button_press(self, widget, event, *args):
         """Handle button press in info box"""
@@ -182,6 +190,11 @@ class FreeControl:
             self.view.redraw()
         elif keyname == 'Right':
             self.flight.next_turnpoint()
+        elif event.keyval == gtk.keysyms.F6:
+            if self.window_in_fullscreen:
+                self.view.window.unfullscreen()
+            else:
+                self.view.window.fullscreen()
 
         return True
 

@@ -4,6 +4,14 @@ import time
 import gtk, gobject, pango
 import gtk.gdk
 
+is_hildon_app = True
+try:
+    import hildon
+    AppBase = hildon.Program
+except ImportError:
+    is_hildon_app = False
+    AppBase = object
+
 import mapcache
 
 # Constants for drawing arcs
@@ -47,8 +55,10 @@ def add_div(box):
         div.set_size_request(3, -1)
     box.pack_start(div, expand=False)
 
-class FreeView:
+class FreeView(AppBase):
     def __init__(self, flight, fullscreen):
+        AppBase.__init__(self)
+
         self.flight = flight
 
         # Font size juju
@@ -66,7 +76,10 @@ class FreeView:
         self.divert_flag = False
 
         # Create top level window
-        self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        if is_hildon_app:
+            self.window = hildon.Window()
+        else:
+            self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.window.add_events(gtk.gdk.KEY_PRESS_MASK)
 
         # Horizontal box
