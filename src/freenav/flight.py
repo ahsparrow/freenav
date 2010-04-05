@@ -35,6 +35,7 @@ class Flight:
         self.utc_secs = 0
         self.ground_speed = 0
         self.track = 0
+        self.num_satellites = 0
 
         # TP navigation
         self.tp_distance = 0
@@ -57,7 +58,7 @@ class Flight:
     # Flight change methods
 
     def update_position(self, utc_secs, latitude, longitude, altitude,
-                        ground_speed, track):
+                        ground_speed, track, num_satellites):
         "Update model with new position data"""
         self.utc_secs = utc_secs
         x, y = [int(p) for p in self.projection.forward(latitude, longitude)]
@@ -65,6 +66,7 @@ class Flight:
         self.altitude = altitude
         self.track = track
         self.ground_speed = ground_speed
+        self.num_satellites = num_satellites
 
         self._fsm.new_position()
 
@@ -143,6 +145,10 @@ class Flight:
         else:
             state = self._fsm.getState()
         return state.getName().split('.')[-1]
+
+    def get_num_satellites(self):
+        """Return number of satellites in view"""
+        return self.num_satellites
 
     #------------------------------------------------------------------------
     # State machine methods

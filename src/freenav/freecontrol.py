@@ -23,6 +23,7 @@ DEVICE_INTERFACE = "org.freedesktop.Gypsy.Device"
 POSITION_INTERFACE = "org.freedesktop.Gypsy.Position"
 COURSE_INTERFACE = "org.freedesktop.Gypsy.Course"
 PRESSURE_LEVEL_INTERFACE = "org.freedesktop.Gypsy.PressureLevel"
+SATELLITE_INTERFACE = "org.freedesktop.Gypsy.Satellite"
 
 KTS_TO_MPS = 1852 / 3600.0
 KPH_TO_MPS = 1000 / 3600.0
@@ -70,6 +71,8 @@ class FreeControl:
         posn_if = dbus.Interface(gps, dbus_interface=POSITION_INTERFACE)
         plevel_if = dbus.Interface(gps, dbus_interface=PRESSURE_LEVEL_INTERFACE)
         self.course_if = dbus.Interface(gps, dbus_interface=COURSE_INTERFACE)
+        self.satellite_if = dbus.Interface(gps,
+                                           dbus_interface=SATELLITE_INTERFACE)
 
         # Signal handlers for position and pressure level changes
         posn_if.connect_to_signal("PositionChanged", self.position_changed)
@@ -84,6 +87,7 @@ class FreeControl:
         view.window.connect('destroy', self.destroy)
         for i, ibox in enumerate(view.info_box):
             ibox.connect("button_press_event", self.info_button_press, i)
+        view.window.connect('window-state-event', self.on_window_state_change)
 
         if is_hildon_app:
             """Add timeout callback to keep the N810 display on. Need to make
@@ -101,6 +105,13 @@ class FreeControl:
         """Stop input devices and quit"""
         self.gps_dev_if.Stop()
         gtk.main_quit()
+
+    def on_window_state_change(self, widget, event, *args):
+        """Callback on window state change"""
+        if event.new_window_state & gtk.gdk.WINDOW_STATE_FULLSCREEN:
+            self.window_in_fullscreen = True
+        else:
+            self.window_in_fullscreen = False
 
     def info_button_press(self, widget, event, *args):
         """Handle button press in info box"""
@@ -180,6 +191,11 @@ class FreeControl:
             self.view.redraw()
         elif keyname == 'Right':
             self.flight.next_turnpoint()
+        elif event.keyval == gtk.keysyms.F6:
+            if self.window_in_fullscreen:
+                self.view.window.unfullscreen()
+            else:
+                self.view.window.fullscreen()
 
         return True
 
@@ -196,9 +212,11 @@ class FreeControl:
         speed = speed * KTS_TO_MPS
         track = math.radians(track)
 
+        num_satellites = self.satellite_if.GetNumSatellites()
+
         # Update model with new position
         self.flight.update_position(secs, latitude, longitude, altitude,
-                                    speed, track)
+                                    speed, track, num_satellites)
 
     def pressure_level_changed(self, level):
         """Callback from D-Bus on new pressure altitude"""

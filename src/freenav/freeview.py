@@ -4,6 +4,14 @@ import time
 import gtk, gobject, pango
 import gtk.gdk
 
+is_hildon_app = True
+try:
+    import hildon
+    AppBase = hildon.Program
+except ImportError:
+    is_hildon_app = False
+    AppBase = object
+
 import mapcache
 
 # Constants for drawing arcs
@@ -47,8 +55,10 @@ def add_div(box):
         div.set_size_request(3, -1)
     box.pack_start(div, expand=False)
 
-class FreeView:
+class FreeView(AppBase):
     def __init__(self, flight, fullscreen):
+        AppBase.__init__(self)
+
         self.flight = flight
 
         # Font size juju
@@ -67,7 +77,10 @@ class FreeView:
         self.maccready_flag = False
 
         # Create top level window
-        self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        if is_hildon_app:
+            self.window = hildon.Window()
+        else:
+            self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.window.add_events(gtk.gdk.KEY_PRESS_MASK)
 
         # Horizontal box
@@ -214,6 +227,9 @@ class FreeView:
         # Wind arrow
         gc.line_width = 2
         self.draw_wind(gc, win, win_width)
+
+        # Number of satellites
+        self.draw_satellites(gc, win, win_height)
 
         return True
 
@@ -442,6 +458,13 @@ class FreeView:
         x, y = self.wind_layout.get_pixel_size()
 
         win.draw_layout(gc, xc - x - 40, yc - y / 2, self.wind_layout,
+                        background=None)
+
+    def draw_satellites(self, gc, win, win_height):
+        """Draw number of satellites in view"""
+        self.tp_layout.set_text('%d' % self.flight.get_num_satellites())
+        x, y = self.tp_layout.get_pixel_size()
+        win.draw_layout(gc, 2, win_height - (2 * y), self.tp_layout,
                         background=None)
 
     # External methods - for use by controller
