@@ -148,7 +148,7 @@ class FreeView(AppBase):
         self.fg_layout.set_attributes(attr_list)
 
         attr_list = pango.AttrList()
-        attr_list.insert(pango.AttrSize(self.font_size * 75, 0, 999))
+        attr_list.insert(pango.AttrSize(self.font_size * 100, 0, 999))
         attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
         self.wind_layout = pango.Layout(
                 self.drawing_area.create_pango_context())
@@ -225,7 +225,7 @@ class FreeView(AppBase):
 
         # Wind arrow
         gc.line_width = 2
-        self.draw_wind(gc, win, win_width)
+        self.draw_wind(gc, win, win_width, win_height)
 
         # Number of satellites
         self.draw_satellites(gc, win, win_height)
@@ -433,7 +433,7 @@ class FreeView(AppBase):
             win.draw_line(gc, int(xc + x1 + 0.5), int(yc + y1 + 0.5),
                               int(xc + x2 + 0.5), int(yc + y2 + 0.5))
 
-    def draw_wind(self, gc, win, win_width):
+    def draw_wind(self, gc, win, win_width, win_height):
         """Draw wind speed/direction"""
         wind = self.flight.get_wind()
         x = math.sin(wind['direction'])
@@ -455,6 +455,13 @@ class FreeView(AppBase):
 
         win.draw_layout(gc, xc - x - 40, yc - y / 2, self.wind_layout,
                         background=None)
+
+        ground_speed = self.flight.get_velocity()['speed'] * MPS_TO_KTS
+        self.wind_layout.set_text(str(int(ground_speed)))
+        x, y = self.wind_layout.get_pixel_size()
+
+        win.draw_layout(gc, win_width - x - 2, win_height - y,
+                        self.wind_layout, background=None)
 
     def draw_satellites(self, gc, win, win_height):
         """Draw number of satellites in view"""
