@@ -227,6 +227,9 @@ class FreeView(AppBase):
         gc.line_width = 2
         self.draw_wind(gc, win, win_width)
 
+        # Number of satellites
+        self.draw_satellites(gc, win, win_height)
+
         return True
 
     def draw_waypoints(self, win, gc):
@@ -451,6 +454,13 @@ class FreeView(AppBase):
         x, y = self.wind_layout.get_pixel_size()
 
         win.draw_layout(gc, xc - x - 40, yc - y / 2, self.wind_layout,
+                        background=None)
+
+    def draw_satellites(self, gc, win, win_height):
+        """Draw number of satellites in view"""
+        self.tp_layout.set_text('%d' % self.flight.get_num_satellites())
+        x, y = self.tp_layout.get_pixel_size()
+        win.draw_layout(gc, 2, win_height - (2 * y), self.tp_layout,
                         background=None)
 
     # External methods - for use by controller

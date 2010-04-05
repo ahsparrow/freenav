@@ -24,6 +24,7 @@ POSITION_INTERFACE = "org.freedesktop.Gypsy.Position"
 COURSE_INTERFACE = "org.freedesktop.Gypsy.Course"
 VARIO_INTERFACE = "org.freedesktop.Gypsy.Vario"
 PRESSURE_LEVEL_INTERFACE = "org.freedesktop.Gypsy.PressureLevel"
+SATELLITE_INTERFACE = "org.freedesktop.Gypsy.Satellite"
 
 KTS_TO_MPS = 1852 / 3600.0
 KPH_TO_MPS = 1000 / 3600.0
@@ -65,6 +66,8 @@ class FreeControl:
         posn_if = dbus.Interface(gps, dbus_interface=POSITION_INTERFACE)
         plevel_if = dbus.Interface(gps, dbus_interface=PRESSURE_LEVEL_INTERFACE)
         self.course_if = dbus.Interface(gps, dbus_interface=COURSE_INTERFACE)
+        self.satellite_if = dbus.Interface(gps,
+                                           dbus_interface=SATELLITE_INTERFACE)
 
         # Signal handlers for position and pressure level changes
         posn_if.connect_to_signal("PositionChanged", self.position_changed)
@@ -211,9 +214,11 @@ class FreeControl:
         speed = speed * KTS_TO_MPS
         track = math.radians(track)
 
+        num_satellites = self.satellite_if.GetNumSatellites()
+
         # Update model with new position
         self.flight.update_position(secs, latitude, longitude, altitude,
-                                    speed, track)
+                                    speed, track, num_satellites)
 
     def pressure_level_changed(self, level):
         """Callback from D-Bus on new pressure altitude"""
