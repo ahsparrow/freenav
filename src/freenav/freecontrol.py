@@ -253,12 +253,8 @@ class FreeControl:
             self.flight.trigger_start()
 
         elif task_state in ("Start", "Sector", "Task"):
-            dialog = gtk.MessageDialog(buttons=gtk.BUTTONS_YES_NO,
-                                       message_format='Start task?',
-                                       type=gtk.MESSAGE_QUESTION)
-            ret = dialog.run()
-            dialog.destroy()
-            if ret == gtk.RESPONSE_YES:
+            stat = self.view.task_start_dialog()
+            if stat == gtk.RESPONSE_YES:
                 self.flight.trigger_start()
 
     def task_button_press(self):

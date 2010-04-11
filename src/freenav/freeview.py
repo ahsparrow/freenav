@@ -518,18 +518,57 @@ class FreeView(AppBase):
         if msgs:
             msg = "\n\n".join(msgs)
             dialog = gtk.Dialog("Airspace", None,
-                                gtk.DIALOG_MODAL | gtk.DIALOG_NO_SEPARATOR,
-                                (gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
+                                gtk.DIALOG_MODAL | gtk.DIALOG_NO_SEPARATOR)
 
-            label = gtk.Label(msg)
             attr_list = pango.AttrList()
             attr_list.insert(pango.AttrSize(self.font_size * 75, 0, 999))
-            label.set_attributes(attr_list)
 
+            label = gtk.Label('OK')
+            label.set_attributes(attr_list)
+            button = gtk.Button()
+            button.set_size_request(200, 100)
+            button.add(label)
+            dialog.add_action_widget(button, gtk.RESPONSE_ACCEPT)
+
+            label = gtk.Label(msg)
+            label.set_attributes(attr_list)
             dialog.vbox.pack_start(label)
-            label.show()
+
+            dialog.show_all()
             dialog.run()
             dialog.destroy()
+
+    def task_start_dialog(self):
+        """ Puts up a dialog to ask whether or not task to be started"""
+        dialog = gtk.Dialog("Start", None,
+                            gtk.DIALOG_MODAL | gtk.DIALOG_NO_SEPARATOR)
+
+        attr_list = pango.AttrList()
+        attr_list.insert(pango.AttrSize(self.font_size * 150, 0, 999))
+
+        label = gtk.Label("Start?")
+        label.set_attributes(attr_list)
+        dialog.vbox.pack_start(label)
+
+        label = gtk.Label('YES')
+        label.set_attributes(attr_list)
+        button = gtk.Button()
+        button.set_size_request(200, 150)
+        button.add(label)
+        dialog.add_action_widget(button, gtk.RESPONSE_YES)
+
+        label = gtk.Label('NO')
+        label.set_attributes(attr_list)
+        button = gtk.Button()
+        button.set_size_request(200, 150)
+        button.add(label)
+        dialog.add_action_widget(button, gtk.RESPONSE_NO)
+
+        dialog.show_all()
+        ret = dialog.run()
+        dialog.destroy()
+
+        return ret
 
     def set_divert_indicator(self, flag):
         # Set indicator showing divert select is active
