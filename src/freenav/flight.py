@@ -14,12 +14,13 @@ class Flight:
     TAKEOFF_SPEED = 10
     STOPPED_SPEED = 2
 
-    def __init__(self, polar, bugs, ballast, safety_height):
+    def __init__(self, polar):
         self._fsm = flight_sm.Flight_sm(self)
 
         self.db = freedb.Freedb()
-        self.task = task.Task(self.db.get_task(),
-                              polar, bugs, ballast, safety_height)
+        config = self.db.get_config()
+
+        self.task = task.Task(self.db.get_task(), polar, config)
         self.pressure_alt = altimetry.PressureAltimetry()
         self.thermal_calculator = thermal.ThermalCalculator()
 

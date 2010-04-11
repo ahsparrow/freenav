@@ -1,13 +1,13 @@
 import math
 
 class Task:
-    def __init__(self, tp_list, polar, bugs, ballast, safety_height):
+    def __init__(self, tp_list, polar, config):
         """Class initialisation"""
         self.tp_list = tp_list
         self.polar = polar
-        self.bugs = bugs
-        self.ballast = ballast
-        self.safety_height = safety_height
+        self.bugs = config['bugs']
+        self.ballast = config['ballast']
+        self.safety_height = config['safety_height']
 
         self.tp_index = 0
         self.divert_wp = None

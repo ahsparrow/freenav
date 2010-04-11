@@ -8,6 +8,8 @@ import time
 
 import sqlite3
 
+GPS_DEVS = ['Serial-1', 'Serial-2', 'Bluetooth-1', 'Bluetooth-2']
+
 def dict_factory(cursor, row):
     d = {}
     for idx, col in enumerate(cursor.description):
@@ -53,7 +55,11 @@ SCHEMA = {
                ('takeoff_pressure_level', 'REAL'),
                ('takeoff_altitude', 'REAL'),
                ('takeoff_time', 'INTEGER'),
-               ('start_time', 'INTEGER')]}
+               ('start_time', 'INTEGER'),
+               ('bugs', 'REAL'),
+               ('ballast', 'REAL'),
+               ('safety_height', 'INTEGER'),
+               ('gps_device', 'TEXT')]}
 
 class Freedb:
     def __init__(self, file=''):
@@ -87,9 +93,10 @@ class Freedb:
 
         sql = '''INSERT INTO Config
               (task_id, qne, qne_timestamp, takeoff_pressure_level,
-               takeoff_time, takeoff_altitude, start_time)
-              VALUES (0, 0, 0, 0, 0, 0, 0)'''
-        self.c.execute(sql)
+               takeoff_time, takeoff_altitude, start_time, bugs, ballast,
+               safety_height, gps_device)
+              VALUES (0, 0, 0, 0, 0, 0, 0, 1.0, 1.0, 0, ?)'''
+        self.c.execute(sql, (GPS_DEVS[0], ))
 
         self.c.execute('CREATE INDEX X_Index ON Waypoints (x)')
         self.c.execute('CREATE INDEX Y_Index ON Waypoints (y)')
@@ -259,6 +266,26 @@ class Freedb:
         """Set start time"""
         sql = "UPDATE Config Set start_time=?"
         self.c.execute(sql, (tim,))
+
+    def set_gps_dev(self, gps_dev):
+        """Set GPS device string"""
+        sql = "UPDATE Config SET gps_device=?)"
+        self.c.execute(sql, (gps_dev,))
+
+    def set_bugs(self, bugs):
+        """Set bugs value"""
+        sql = "UPDATE Config SET bugs=?)"
+        self.c.execute(sql, (bugs,))
+
+    def set_ballast(self, ballast):
+        """Set ballast value"""
+        sql = "UPDATE Config SET ballast=?)"
+        self.c.execute(sql, (ballast,))
+
+    def set_safety_height(self, safety_height):
+        """Set safety height value"""
+        sql = "UPDATE Config SET safety_height=?)"
+        self.c.execute(sql, (safety_height,))
 
     def get_nearest_landable(self, xpos, ypos):
         """Get list of landable waypoints sorted by distance"""

@@ -30,12 +30,7 @@ def main():
     for coeff in 'abc':
         polar[coeff] = config.getfloat('Polar', coeff)
 
-    # Bugs, ballast and final glide safety height
-    bugs = config.getfloat('Glider', 'bugs')
-    ballast = config.getfloat('Glider', 'ballast')
-    safety_height = config.getint('FinalGlide', 'safety_height')
-
-    model = freenav.flight.Flight(polar, bugs, ballast, safety_height)
+    model = freenav.flight.Flight(polar)
     view = freenav.freeview.FreeView(model, opts.fullscreen)
     controller = freenav.freecontrol.FreeControl(model, view, config)
     controller.main()

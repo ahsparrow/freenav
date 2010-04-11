@@ -13,6 +13,8 @@ try:
 except ImportError:
     is_hildon_app = False
 
+import freedb
+
 OSSO_APPLICATION = "uk.org.freeflight.freenav"
 
 DBUS_SERVICE = "org.freedesktop.Gypsy"
@@ -45,6 +47,7 @@ class FreeControl:
         self.view = view
         self.flight = flight
         self.flight.subscribe(self)
+        db = freedb.Freedb()
 
         # Controller state variables
         self.divert_indicator_flag = False
@@ -62,7 +65,8 @@ class FreeControl:
         control = bus.get_object(DBUS_SERVICE, DBUS_PATH)
 
         # GPS device
-        gps_dev_path = config.get('Devices', 'gps')
+        gps_dev_path = config.get('Devices', db.get_config()['gps_device'])
+        print gps_dev_path
         path = control.Create(gps_dev_path, dbus_interface=CONTROL_INTERFACE)
         gps = bus.get_object(DBUS_SERVICE, path)
 
