@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Encoding=UTF-8
-Name=QNE
+Name=FreeConf
 Exec=/usr/bin/freeconf
 Icon=qgn_list_cntlpane
 Type=Application
