@@ -2,8 +2,8 @@
 Version=1.0
 Encoding=UTF-8
 Name=QNE
-Exec=/usr/bin/qne
+Exec=/usr/bin/freeconf
 Icon=qgn_list_cntlpane
 Type=Application
-X-Osso-Service=uk.org.freeflight.qne
+X-Osso-Service=uk.org.freeflight.freeconf
 X-Osso-Type=application/x-executable

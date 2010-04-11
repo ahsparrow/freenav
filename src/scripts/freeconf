@@ -32,6 +32,11 @@ class QneApp(AppBase):
         else:
             qne = 0
 
+        safety_height = round(config['safety_height'] / FT_TO_M)
+        bugs = 100 * (config['bugs'] - 1)
+        ballast = 100 * (config['ballast'] - 1)
+        gps_device = config['gps_device']
+
         # Create window and add event handlers
         if is_hildon_app:
             self.window = hildon.Window()
@@ -43,16 +48,66 @@ class QneApp(AppBase):
         self.window.connect('destroy', gtk.main_quit)
         self.window.connect('window-state-event', self.on_window_state_change)
 
+        table = gtk.Table(homogeneous=True)
+        table.set_col_spacings(10)
+        table.set_row_spacings(5)
+
+        # Serial device select
+        label = gtk.Label('GPS:')
+        label.set_alignment(1, 0.5)
+        self.gps_combo = gtk.combo_box_new_text()
+        for dev in freenav.freedb.GPS_DEVS:
+            self.gps_combo.append_text(dev)
+        self.gps_combo.set_active(freenav.freedb.GPS_DEVS.index(gps_device))
+
+        align = gtk.Alignment(0, 0.5)
+        align.add(self.gps_combo)
+        table.attach(label, 0, 1, 0, 1)
+        table.attach(align, 1, 2, 0, 1)
+
         # Create QNE entry control
         label = gtk.Label('QNE (feet):')
+        label.set_alignment(1, 0.5)
         adjustment = gtk.Adjustment(qne, -1000, 2500, 1)
-        self.spin_button = gtk.SpinButton(adjustment, climb_rate=0.5)
-        hbox = gtk.HBox(False, 0)
-        hbox.pack_start(label, False, True, 5)
-        hbox.pack_start(self.spin_button, False, True, 5)
+        self.qne_spin = gtk.SpinButton(adjustment, climb_rate=0.5)
 
-        alignment = gtk.Alignment(xalign=0.5)
-        alignment.add(hbox)
+        align = gtk.Alignment(0, 0.5)
+        align.add(self.qne_spin)
+        table.attach(label, 0, 1, 1, 2)
+        table.attach(align, 1, 2, 1, 2)
+
+        # Safety height
+        label = gtk.Label('Safety Height (ft):')
+        label.set_alignment(1, 0.5)
+        adjustment = gtk.Adjustment(safety_height, 0, 1000, 10)
+        self.safety_spin = gtk.SpinButton(adjustment, climb_rate=0.5)
+
+        align = gtk.Alignment(0, 0.5)
+        align.add(self.safety_spin)
+        table.attach(label, 0, 1, 2, 3)
+        table.attach(align, 1, 2, 2, 3)
+
+        # Bugs
+        label = gtk.Label('Bugs (%):')
+        label.set_alignment(1, 0.5)
+        adjustment = gtk.Adjustment(bugs, 0, 30, 1)
+        self.bugs_spin = gtk.SpinButton(adjustment, climb_rate=0.5)
+
+        align = gtk.Alignment(0, 0.5)
+        align.add(self.bugs_spin)
+        table.attach(label, 0, 1, 3, 4)
+        table.attach(align, 1, 2, 3, 4)
+
+        # Ballast
+        label = gtk.Label('Ballast (%):')
+        label.set_alignment(1, 0.5)
+        adjustment = gtk.Adjustment(ballast, 0, 50, 1)
+        self.ballast_spin = gtk.SpinButton(adjustment, climb_rate=0.5)
+
+        align = gtk.Alignment(0, 0.5)
+        align.add(self.ballast_spin)
+        table.attach(label, 0, 1, 4, 5)
+        table.attach(align, 1, 2, 4, 5)
 
         # Buttons
         button_box = gtk.HButtonBox()
@@ -61,14 +116,14 @@ class QneApp(AppBase):
         ok_button.connect("clicked", self.on_ok_button)
         cancel_button = gtk.Button("Cancel")
         cancel_button.connect("clicked", self.on_cancel_button)
-        clear_button = gtk.Button("Clear")
+        clear_button = gtk.Button("QNE Clear")
         clear_button.connect("clicked", self.on_clear_button)
         button_box.add(ok_button)
         button_box.add(cancel_button)
         button_box.add(clear_button)
 
         vbox = gtk.VBox(False, 0)
-        vbox.pack_start(alignment, True, False, 10)
+        vbox.pack_start(table, True, False, 10)
         vbox.pack_start(button_box, False, True, 10)
         self.window.add(vbox)
 
@@ -80,7 +135,11 @@ class QneApp(AppBase):
 
     def on_ok_button(self, widget):
         """OK button pressed"""
-        self.db.set_qne(self.spin_button.get_value_as_int() * FT_TO_M)
+        self.db.set_gps_dev(self.gps_combo.get_active_text())
+        self.db.set_qne(self.qne_spin.get_value_as_int() * FT_TO_M)
+        self.db.set_safety_height(self.safety_spin.get_value_as_int() * FT_TO_M)
+        self.db.set_bugs((self.bugs_spin.get_value_as_int() / 100.0) + 1)
+        self.db.set_ballast((self.ballast_spin.get_value_as_int() / 100.0) + 1)
         self.db.commit()
         gtk.main_quit()
 
@@ -88,7 +147,7 @@ class QneApp(AppBase):
         """Clear button pressed"""
         self.db.clear_qne()
         self.db.commit()
-        gtk.main_quit()
+        self.qne_spin.get_adjustment().set_value(0)
 
     def on_window_state_change(self, widget, event, *args):
         """Callback on window state change"""

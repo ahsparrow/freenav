@@ -1,3 +1,0 @@
-[D-BUS Service]
-Name=uk.org.freeflight.qne
-Exec=/usr/bin/qne

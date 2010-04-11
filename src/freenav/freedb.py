@@ -269,22 +269,22 @@ class Freedb:
 
     def set_gps_dev(self, gps_dev):
         """Set GPS device string"""
-        sql = "UPDATE Config SET gps_device=?)"
+        sql = "UPDATE Config SET gps_device=?"
         self.c.execute(sql, (gps_dev,))
 
     def set_bugs(self, bugs):
         """Set bugs value"""
-        sql = "UPDATE Config SET bugs=?)"
+        sql = "UPDATE Config SET bugs=?"
         self.c.execute(sql, (bugs,))
 
     def set_ballast(self, ballast):
         """Set ballast value"""
-        sql = "UPDATE Config SET ballast=?)"
+        sql = "UPDATE Config SET ballast=?"
         self.c.execute(sql, (ballast,))
 
     def set_safety_height(self, safety_height):
         """Set safety height value"""
-        sql = "UPDATE Config SET safety_height=?)"
+        sql = "UPDATE Config SET safety_height=?"
         self.c.execute(sql, (safety_height,))
 
     def get_nearest_landable(self, xpos, ypos):
