@@ -55,6 +55,44 @@ def add_div(box):
         div.set_size_request(3, -1)
     box.pack_start(div, expand=False)
 
+class BigButtonDialog(gtk.Window):
+    def __init__(self, title=None, buttons=None):
+        gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
+        self.set_modal(True)
+        self.set_resizable(False)
+        self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_DIALOG)
+        self.set_title(title)
+
+        self.connect("delete_event", self.delete_event)
+
+        self.vbox = gtk.VBox(spacing=10)
+        self.vbox.set_border_width(5)
+        self.add(self.vbox)
+
+        button_box = gtk.HBox(homogeneous=True, spacing=10)
+        button_box.set_size_request(300, 150)
+        for (b, resp) in zip(buttons[::2], buttons[1::2]):
+            button = gtk.Button(stock=b)
+            button.connect("clicked", self.callback, resp)
+            button_box.pack_start(button)
+
+        self.vbox.pack_end(button_box)
+
+    def set_label(self, widget):
+        self.vbox.pack_start(widget)
+
+    def callback(self, widget, data):
+        self.response = data
+        gtk.main_quit()
+
+    def delete_event(self, widget, event):
+        self.response = gtk.RESPONSE_DELETE_EVENT
+        gtk.main_quit()
+
+    def run(self):
+        gtk.main()
+        return self.response
+
 class FreeView(AppBase):
     def __init__(self, flight, fullscreen):
         AppBase.__init__(self)
@@ -62,8 +100,7 @@ class FreeView(AppBase):
         self.flight = flight
 
         # Font size juju
-        self.font_size = int(1000.0 * gtk.gdk.screen_height_mm() /
-                             gtk.gdk.screen_height())
+        self.font_size = pango.SCALE
 
         # viewx/viewy is geographic position at center of window
         self.viewx = 0
@@ -111,7 +148,8 @@ class FreeView(AppBase):
         for i in range(NUM_INFO_BOXES):
             label = gtk.Label()
             attr_list = pango.AttrList()
-            attr_list.insert(pango.AttrSize(self.font_size * 100, 0, 999))
+            attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 40,
+                                                    0, 999))
             attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
             label.set_attributes(attr_list)
 
@@ -132,24 +170,24 @@ class FreeView(AppBase):
 
         # Pango layouts for text on map display
         attr_list = pango.AttrList()
-        attr_list.insert(pango.AttrSize(self.font_size * 60, 0, 999))
+        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 25, 0, 999))
         self.wp_layout = pango.Layout(self.drawing_area.create_pango_context())
         self.wp_layout.set_attributes(attr_list)
 
         attr_list = pango.AttrList()
-        attr_list.insert(pango.AttrSize(self.font_size * 100, 0, 999))
+        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 40, 0, 999))
         attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
         self.tp_layout = pango.Layout(self.drawing_area.create_pango_context())
         self.tp_layout.set_attributes(attr_list)
 
         attr_list = pango.AttrList()
-        attr_list.insert(pango.AttrSize(self.font_size * 80, 0, 999))
+        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 35, 0, 999))
         attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
         self.fg_layout = pango.Layout(self.drawing_area.create_pango_context())
         self.fg_layout.set_attributes(attr_list)
 
         attr_list = pango.AttrList()
-        attr_list.insert(pango.AttrSize(self.font_size * 100, 0, 999))
+        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 35, 0, 999))
         attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
         self.wind_layout = pango.Layout(
                 self.drawing_area.create_pango_context())
@@ -517,22 +555,15 @@ class FreeView(AppBase):
 
         if msgs:
             msg = "\n\n".join(msgs)
-            dialog = gtk.Dialog("Airspace", None,
-                                gtk.DIALOG_MODAL | gtk.DIALOG_NO_SEPARATOR)
+            dialog = BigButtonDialog("Airspace",
+                                     (gtk.STOCK_OK, gtk.RESPONSE_OK))
 
             attr_list = pango.AttrList()
-            attr_list.insert(pango.AttrSize(self.font_size * 75, 0, 999))
-
-            label = gtk.Label('OK')
-            label.set_attributes(attr_list)
-            button = gtk.Button()
-            button.set_size_request(200, 100)
-            button.add(label)
-            dialog.add_action_widget(button, gtk.RESPONSE_ACCEPT)
-
+            attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 30,
+                                                    0, 999))
             label = gtk.Label(msg)
             label.set_attributes(attr_list)
-            dialog.vbox.pack_start(label)
+            dialog.set_label(label)
 
             dialog.show_all()
             dialog.run()
@@ -540,29 +571,14 @@ class FreeView(AppBase):
 
     def task_start_dialog(self):
         """ Puts up a dialog to ask whether or not task to be started"""
-        dialog = gtk.Dialog("Start", None,
-                            gtk.DIALOG_MODAL | gtk.DIALOG_NO_SEPARATOR)
-
+        dialog = BigButtonDialog("Start", (gtk.STOCK_NO, gtk.RESPONSE_NO,
+                                           gtk.STOCK_YES, gtk.RESPONSE_YES))
         attr_list = pango.AttrList()
-        attr_list.insert(pango.AttrSize(self.font_size * 150, 0, 999))
+        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 40, 0, 999))
 
         label = gtk.Label("Start?")
         label.set_attributes(attr_list)
-        dialog.vbox.pack_start(label)
-
-        label = gtk.Label('YES')
-        label.set_attributes(attr_list)
-        button = gtk.Button()
-        button.set_size_request(200, 150)
-        button.add(label)
-        dialog.add_action_widget(button, gtk.RESPONSE_YES)
-
-        label = gtk.Label('NO')
-        label.set_attributes(attr_list)
-        button = gtk.Button()
-        button.set_size_request(200, 150)
-        button.add(label)
-        dialog.add_action_widget(button, gtk.RESPONSE_NO)
+        dialog.set_label(label)
 
         dialog.show_all()
         ret = dialog.run()
