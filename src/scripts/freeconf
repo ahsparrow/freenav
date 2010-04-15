@@ -1,5 +1,7 @@
 #!/usr/bin/python2.5
+import ConfigParser
 import datetime
+import os.path
 
 import gtk
 import gobject
@@ -20,10 +22,11 @@ if is_hildon_app:
 else:
     AppBase = object
 
-class QneApp(AppBase):
-    def __init__(self):
+class SettingsApp(AppBase):
+    def __init__(self, config):
         AppBase.__init__(self)
 
+        self.config = config
         self.db = freenav.freedb.Freedb()
         settings = self.db.get_settings()
         qne_date = datetime.date.fromtimestamp(settings['qne_timestamp'])
@@ -53,12 +56,17 @@ class QneApp(AppBase):
         table.set_row_spacings(5)
 
         # Serial device select
+        devices = config.items('Devices')
         label = gtk.Label('GPS:')
         label.set_alignment(1, 0.5)
         self.gps_combo = gtk.combo_box_new_text()
-        for dev in freenav.freedb.GPS_DEVS:
-            self.gps_combo.append_text(dev)
-        self.gps_combo.set_active(freenav.freedb.GPS_DEVS.index(gps_device))
+        for dev in devices:
+            self.gps_combo.append_text(dev[0])
+        try:
+            idx = [d[0] for d in devices].index(gps_device)
+        except ValueError:
+            idx = -1
+        self.gps_combo.set_active(idx)
 
         align = gtk.Alignment(0, 0.5)
         align.add(self.gps_combo)
@@ -169,5 +177,11 @@ class QneApp(AppBase):
         gtk.main()
 
 if __name__ == '__main__':
-    qne_app = QneApp()
-    qne_app.run()
+    # Create config parser (with case preserved keys)
+    config = ConfigParser.ConfigParser()
+    config.optionxform = str
+    config.read(os.path.join(os.path.expanduser('~'), '.freeflight',
+                             'freenav.ini'))
+
+    settings_app = SettingsApp(config)
+    settings_app.run()
