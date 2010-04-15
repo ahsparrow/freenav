@@ -18,9 +18,9 @@ class Flight:
         self._fsm = flight_sm.Flight_sm(self)
 
         self.db = freedb.Freedb()
-        config = self.db.get_config()
+        settings = self.db.get_settings()
 
-        self.task = task.Task(self.db.get_task(), polar, config)
+        self.task = task.Task(self.db.get_task(), polar, settings)
         self.pressure_alt = altimetry.PressureAltimetry()
         self.thermal_calculator = thermal.ThermalCalculator()
 
@@ -159,11 +159,11 @@ class Flight:
         self.task.reset()
 
         # Get QNE value - use None if it wasn't set today
-        config = self.db.get_config()
-        qne_date = datetime.date.fromtimestamp(config['qne_timestamp'])
+        settings = self.db.get_settings()
+        qne_date = datetime.date.fromtimestamp(settings['qne_timestamp'])
 
         if (qne_date == datetime.date.today()):
-            qne = config['qne']
+            qne = settings['qne']
         else:
             qne = None
         self.pressure_alt.set_qne(qne)
@@ -180,20 +180,20 @@ class Flight:
 
     def do_init_air(self):
         """In-air initialisation"""
-        config = self.db.get_config()
+        settings = self.db.get_settings()
 
-        takeoff_date = datetime.date.fromtimestamp(config["takeoff_time"])
+        takeoff_date = datetime.date.fromtimestamp(settings["takeoff_time"])
         if (takeoff_date == datetime.date.today()):
             self.pressure_alt.set_takeoff_pressure_level(
-                                            config["takeoff_pressure_level"])
-            self.pressure_alt.set_takeoff_altitude(config["takeoff_altitude"])
+                                            settings["takeoff_pressure_level"])
+            self.pressure_alt.set_takeoff_altitude(settings["takeoff_altitude"])
 
         self.notify_subscribers()
 
     def do_resume(self):
         """Resume task after program re-start in air"""
-        config = self.db.get_config()
-        self.task.start(config["start_time"])
+        settings = self.db.get_settings()
+        self.task.start(settings["start_time"])
 
         self.notify_subscribers()
 
@@ -277,9 +277,9 @@ class Flight:
 
     def is_previous_start(self):
         """Return true if a start has already been made today"""
-        config = self.db.get_config()
+        settings = self.db.get_settings()
 
-        start_date = datetime.date.fromtimestamp(config["start_time"])
+        start_date = datetime.date.fromtimestamp(settings["start_time"])
         return (start_date == datetime.date.today())
 
     def in_start_sector(self):

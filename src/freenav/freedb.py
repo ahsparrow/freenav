@@ -49,17 +49,17 @@ SCHEMA = {
         ('direction', 'TEXT'), ('angle12', 'REAL'),
         ('mindistx', 'INTEGER'), ('mindisty', 'INTEGER')],
 
-    'Config': [('task_id', 'INTEGER'),
-               ('qne', 'REAL'),
-               ('qne_timestamp', 'INTEGER'),
-               ('takeoff_pressure_level', 'REAL'),
-               ('takeoff_altitude', 'REAL'),
-               ('takeoff_time', 'INTEGER'),
-               ('start_time', 'INTEGER'),
-               ('bugs', 'REAL'),
-               ('ballast', 'REAL'),
-               ('safety_height', 'INTEGER'),
-               ('gps_device', 'TEXT')]}
+    'Settings': [('task_id', 'INTEGER'),
+                 ('qne', 'REAL'),
+                 ('qne_timestamp', 'INTEGER'),
+                 ('takeoff_pressure_level', 'REAL'),
+                 ('takeoff_altitude', 'REAL'),
+                 ('takeoff_time', 'INTEGER'),
+                 ('start_time', 'INTEGER'),
+                 ('bugs', 'REAL'),
+                 ('ballast', 'REAL'),
+                 ('safety_height', 'INTEGER'),
+                 ('gps_device', 'TEXT')]}
 
 class Freedb:
     def __init__(self, file=''):
@@ -91,7 +91,7 @@ class Freedb:
               VALUES (?, ?, ?, ?)'''
         self.c.execute(sql, (parallel1, parallel2, latitude, longitude))
 
-        sql = '''INSERT INTO Config
+        sql = '''INSERT INTO Settings
               (task_id, qne, qne_timestamp, takeoff_pressure_level,
                takeoff_time, takeoff_altitude, start_time, bugs, ballast,
                safety_height, gps_device)
@@ -200,13 +200,13 @@ class Freedb:
 
     def get_active_task_id(self):
         """Get the current task id"""
-        sql = 'SELECT * FROM Config'
+        sql = 'SELECT * FROM Settings'
         self.c.execute(sql)
         return self.c.fetchone()['task_id']
 
     def set_active_task_id(self, task_id):
         """Set the current task id"""
-        sql = 'UPDATE Config SET task_id = ?'
+        sql = 'UPDATE Settings SET task_id = ?'
         self.c.execute(sql, (task_id,))
 
     def delete_airspace(self):
@@ -244,47 +244,47 @@ class Freedb:
     def set_qne(self, qne):
         """Set QNE value and date"""
         time_stamp = int(time.time())
-        sql = 'UPDATE Config SET qne=?, qne_timestamp=?'
+        sql = 'UPDATE Settings SET qne=?, qne_timestamp=?'
         self.c.execute(sql, (qne, time_stamp))
 
     def clear_qne(self):
         """Clear QNE data"""
-        self.c.execute("UPDATE Config SET qne_timestamp=0")
+        self.c.execute("UPDATE Settings SET qne_timestamp=0")
 
-    def get_config(self):
-        """Returns configuration values"""
-        self.c.execute('SELECT * FROM Config')
+    def get_settings(self):
+        """Returns setting values"""
+        self.c.execute('SELECT * FROM Settings')
         return self.c.fetchone()
 
     def set_takeoff(self, tim, level, altitude):
         """Set takeoff pressure level, time and altitude"""
-        sql = '''UPDATE Config Set takeoff_pressure_level=?,
+        sql = '''UPDATE Settings Set takeoff_pressure_level=?,
               takeoff_time=?, takeoff_altitude=?'''
         self.c.execute(sql, (level, tim, altitude))
 
     def set_start(self, tim):
         """Set start time"""
-        sql = "UPDATE Config Set start_time=?"
+        sql = "UPDATE Settings Set start_time=?"
         self.c.execute(sql, (tim,))
 
     def set_gps_dev(self, gps_dev):
         """Set GPS device string"""
-        sql = "UPDATE Config SET gps_device=?"
+        sql = "UPDATE Settings SET gps_device=?"
         self.c.execute(sql, (gps_dev,))
 
     def set_bugs(self, bugs):
         """Set bugs value"""
-        sql = "UPDATE Config SET bugs=?"
+        sql = "UPDATE Settings SET bugs=?"
         self.c.execute(sql, (bugs,))
 
     def set_ballast(self, ballast):
         """Set ballast value"""
-        sql = "UPDATE Config SET ballast=?"
+        sql = "UPDATE Settings SET ballast=?"
         self.c.execute(sql, (ballast,))
 
     def set_safety_height(self, safety_height):
         """Set safety height value"""
-        sql = "UPDATE Config SET safety_height=?"
+        sql = "UPDATE Settings SET safety_height=?"
         self.c.execute(sql, (safety_height,))
 
     def get_nearest_landable(self, xpos, ypos):

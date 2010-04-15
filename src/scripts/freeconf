@@ -25,17 +25,17 @@ class QneApp(AppBase):
         AppBase.__init__(self)
 
         self.db = freenav.freedb.Freedb()
-        config = self.db.get_config()
-        qne_date = datetime.date.fromtimestamp(config['qne_timestamp'])
+        settings = self.db.get_settings()
+        qne_date = datetime.date.fromtimestamp(settings['qne_timestamp'])
         if (qne_date == datetime.date.today()):
-            qne = int(round(self.db.get_config()['qne'] / FT_TO_M))
+            qne = int(round(self.db.get_settings()['qne'] / FT_TO_M))
         else:
             qne = 0
 
-        safety_height = round(config['safety_height'] / FT_TO_M)
-        bugs = 100 * (config['bugs'] - 1)
-        ballast = 100 * (config['ballast'] - 1)
-        gps_device = config['gps_device']
+        safety_height = round(settings['safety_height'] / FT_TO_M)
+        bugs = 100 * (settings['bugs'] - 1)
+        ballast = 100 * (settings['ballast'] - 1)
+        gps_device = settings['gps_device']
 
         # Create window and add event handlers
         if is_hildon_app:
