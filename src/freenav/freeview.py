@@ -554,7 +554,10 @@ class FreeView(AppBase):
             msgs.append("%s\n%s, %s" % info)
 
         if msgs:
-            msg = "\n\n".join(msgs)
+            if len(msgs) <= 2:
+                msg = "\n\n".join(msgs)
+            else:
+                msg = "\n".join(msgs)
             dialog = BigButtonDialog("Airspace",
                                      (gtk.STOCK_OK, gtk.RESPONSE_OK))
 
