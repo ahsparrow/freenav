@@ -576,8 +576,8 @@ class FreeView(AppBase):
 
     def task_start_dialog(self):
         """ Puts up a dialog to ask whether or not task to be started"""
-        dialog = BigButtonDialog("Start", (gtk.STOCK_NO, gtk.RESPONSE_NO,
-                                           gtk.STOCK_YES, gtk.RESPONSE_YES))
+        dialog = BigButtonDialog("Start", (gtk.STOCK_YES, gtk.RESPONSE_YES,
+                                           gtk.STOCK_NO, gtk.RESPONSE_NO))
         attr_list = pango.AttrList()
         attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 40, 0, 999))
 
