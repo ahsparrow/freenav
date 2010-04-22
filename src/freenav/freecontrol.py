@@ -13,6 +13,7 @@ try:
 except ImportError:
     is_hildon_app = False
 
+import flight
 import freedb
 
 OSSO_APPLICATION = "uk.org.freeflight.freenav"
@@ -37,9 +38,8 @@ MACCREADY_TIMEOUT = 3000
 MACCREADY_STEP = 0.5 * KTS_TO_MPS
 
 INFO_LEVEL = 0
-INFO_GLIDE = 1
-INFO_TASK = 2
-INFO_TIME = 3
+INFO_TASK = 1
+INFO_TIME = 2
 
 class FreeControl:
     def __init__(self, flight, view, config):
@@ -228,7 +228,6 @@ class FreeControl:
     def flight_update(self, flight):
         """Callback on flight model change"""
         self.display_level_info()
-        self.display_glide_info()
         self.display_task_info()
         self.display_time_info(flight.get_utc_secs())
         self.view.update_position(*flight.get_position())
@@ -287,12 +286,6 @@ class FreeControl:
                 s = 'FL%02d' % round((fl / FT_TO_M) / 100)
         self.view.info_label[INFO_LEVEL].set_text(s)
 
-    def display_glide_info(self):
-        """Update glide info label"""
-        s = "%0.1f" % (self.flight.thermal_calculator.thermal_average /
-                       KTS_TO_MPS)
-        self.view.info_label[INFO_GLIDE].set_text(s)
-
     def display_task_info(self):
         """Update task info label"""
         task_state = self.flight.get_state()
@@ -311,7 +304,7 @@ class FreeControl:
                 tim_str = time.strftime("%H:%M", time.gmtime(task_secs))
                 info_str = tim_str[1:]
         else:
-            info_str = task_state
+            info_str = flight.SHORT_NAMES[task_state]
         self.view.info_label[INFO_TASK].set_text(info_str)
 
     def display_time_info(self, secs):

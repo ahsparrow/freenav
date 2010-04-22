@@ -10,6 +10,17 @@ import thermal
 
 KTS_TO_MPS = 1852.0 / 3600
 
+SHORT_NAMES = {'Init':   'Init',
+               'Ground': 'Grnd',
+               'Air':    'Air',
+               'Launch': 'Lnch',
+               'Resume': 'Rsme',
+               'Start':  'Start',
+               'Sector': 'Sect',
+               'Line':   'Line',
+               'Task':   'Task',
+               'Divert': 'Dvrt'}
+
 class Flight:
     TAKEOFF_SPEED = 10
     STOPPED_SPEED = 2

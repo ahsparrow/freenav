@@ -26,15 +26,15 @@ SCALE = [6, 9, 12, 17, 25, 35, 50, 71, 100, 141, 200, 282, 400]
 DEFAULT_SCALE = SCALE[4]
 
 # Number and size of info boxes
-NUM_INFO_BOXES = 4
-INFO_BOX_SIZE = 150
+NUM_INFO_BOXES = 3
+INFO_BOX_SIZE = 90
 
 # Size of waypoint symbol
 WP_SIZE = 10
 
 # Size of final glide indicator
-FG_WIDTH = 40
-FG_INC = 20
+FG_WIDTH = 30
+FG_INC = 15
 
 def html_escape(html):
     """Escape HTML specific characters from pango markup string"""
@@ -120,15 +120,15 @@ class FreeView(AppBase):
             self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.window.add_events(gtk.gdk.KEY_PRESS_MASK)
 
-        # Horizontal box
-        hbox = gtk.HBox(homogeneous=False)
-        self.window.add(hbox)
+        # Top level box
+        topbox = gtk.VBox(homogeneous=False)
+        self.window.add(topbox)
 
         # Main drawing area
         self.drawing_area = gtk.DrawingArea()
         self.drawing_area.add_events(gtk.gdk.BUTTON_PRESS_MASK)
         self.drawing_area.connect('expose-event', self.area_expose)
-        hbox.pack_start(self.drawing_area, expand=True, fill=True)
+        topbox.pack_start(self.drawing_area, expand=True, fill=True)
 
         # Allocate some drawing colours
         cmap = self.drawing_area.get_colormap()
@@ -136,15 +136,16 @@ class FreeView(AppBase):
         self.bg_color = cmap.alloc_color("white")
         self.fg_color = cmap.alloc_color("black")
 
-        # Vertical box for info boxes
-        add_div(hbox)
-        vbox = gtk.VBox(homogeneous=False)
-        vbox.set_size_request(INFO_BOX_SIZE, -1)
-        hbox.pack_end(vbox, expand=False)
+        # Box for info boxes
+        add_div(topbox)
+        info_sizer = gtk.HBox(homogeneous=False)
+        info_sizer.set_size_request(-1, INFO_BOX_SIZE)
+        topbox.pack_end(info_sizer, expand=False)
 
         # Array of info boxes with event boxes to capture button presses
         self.info_box = []
         self.info_label = []
+        self.size_group = gtk.SizeGroup(gtk.SIZE_GROUP_HORIZONTAL)
         for i in range(NUM_INFO_BOXES):
             label = gtk.Label()
             attr_list = pango.AttrList()
@@ -162,11 +163,12 @@ class FreeView(AppBase):
                            ebox.get_colormap().alloc_color("white"))
             self.info_box.append(ebox)
             self.info_label.append(label)
+            self.size_group.add_widget(ebox)
 
-        vbox.pack_start(self.info_box[0])
+        info_sizer.pack_start(self.info_box[0])
         for ibox in self.info_box[1:]:
-            add_div(vbox)
-            vbox.pack_start(ibox)
+            add_div(info_sizer)
+            info_sizer.pack_start(ibox)
 
         # Pango layouts for text on map display
         attr_list = pango.AttrList()
@@ -197,7 +199,7 @@ class FreeView(AppBase):
         if fullscreen:
             self.window.fullscreen()
         else:
-            self.window.set_size_request(800, 480)
+            self.window.set_size_request(480, 700)
         self.window.show_all()
 
     def view_to_win(self, x, y):
@@ -601,7 +603,7 @@ class FreeView(AppBase):
 
     def get_button_region(self, x, y):
         win_width, win_height = self.drawing_area.window.get_size()
-        if x < 100:
+        if x < 75:
             if y < 100:
                 return 'divert'
             elif y > (win_height - 100):
