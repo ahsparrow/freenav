@@ -199,7 +199,7 @@ class FreeView(AppBase):
         if fullscreen:
             self.window.fullscreen()
         else:
-            self.window.set_size_request(480, 700)
+            self.window.set_size_request(480, 750)
         self.window.show_all()
 
     def view_to_win(self, x, y):
@@ -556,10 +556,7 @@ class FreeView(AppBase):
             msgs.append("%s\n%s, %s" % info)
 
         if msgs:
-            if len(msgs) <= 2:
-                msg = "\n\n".join(msgs)
-            else:
-                msg = "\n".join(msgs)
+            msg = "\n\n".join(msgs)
             dialog = BigButtonDialog("Airspace",
                                      (gtk.STOCK_OK, gtk.RESPONSE_OK))
 
