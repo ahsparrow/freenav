@@ -269,7 +269,7 @@ class FreeView(AppBase):
         self.draw_wind(gc, win, win_width, win_height)
 
         # Number of satellites
-        self.draw_satellites(gc, win, win_height)
+        self.draw_satellites(gc, win, win_width, win_height)
 
         return True
 
@@ -507,12 +507,12 @@ class FreeView(AppBase):
         win.draw_layout(gc, win_width - x - 2, win_height - y,
                         self.wind_layout, background=None)
 
-    def draw_satellites(self, gc, win, win_height):
+    def draw_satellites(self, gc, win, win_width, win_height):
         """Draw number of satellites in view"""
-        self.tp_layout.set_text('%d' % self.flight.get_num_satellites())
-        x, y = self.tp_layout.get_pixel_size()
-        win.draw_layout(gc, 2, win_height - (2 * y), self.tp_layout,
-                        background=None)
+        self.wind_layout.set_text('%d' % self.flight.get_num_satellites())
+        x, y = self.wind_layout.get_pixel_size()
+        win.draw_layout(gc, win_width - x - 2, win_height - (2 * y),
+                        self.wind_layout, background=None)
 
     # External methods - for use by controller
     def redraw(self):
