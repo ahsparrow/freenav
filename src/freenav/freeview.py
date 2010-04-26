@@ -277,7 +277,7 @@ class FreeView(AppBase):
         """Draw waypoints"""
         tps = [tp['id'] for tp in self.flight.task.tp_list]
         for wp in self.mapcache.wps:
-            if self.view_scale<=100 or wp['landable_flag'] or wp['id'] in tps:
+            if self.view_scale <= 71 or wp['landable_flag'] or wp['id'] in tps:
                 x, y = self.view_to_win(wp['x'], wp['y'])
                 delta = WP_SIZE / 2
                 win.draw_arc(gc, wp['landable_flag'],
