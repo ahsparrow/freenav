@@ -36,15 +36,6 @@ WP_SIZE = 10
 FG_WIDTH = 30
 FG_INC = 15
 
-def html_escape(html):
-    """Escape HTML specific characters from pango markup string"""
-    html = html.replace('&', '&amp;')
-    html = html.replace('"', '&quot;')
-    html = html.replace("'", '&#39;')
-    html = html.replace(">", '&gt;')
-    html = html.replace("<", '&lt;')
-    return html
-
 def add_div(box):
     """Add a dividing bar between box elements"""
     div = gtk.EventBox()
@@ -418,6 +409,10 @@ class FreeView(AppBase):
     def draw_glide(self, gc, win, win_height):
         """Draw final glide information"""
         glide = self.flight.task.get_glide()
+        glide_height = glide['height'] * M_TO_FT
+
+        if (glide_height < -5000) and not self.maccready_flag:
+            return
 
         # Draw origin
         y = win_height / 2
@@ -454,7 +449,7 @@ class FreeView(AppBase):
             fmt = '%d\n%s\n%.1f*'
         else:
             fmt = '%d\n%s\n%.1f'
-        self.fg_layout.set_text(fmt % (glide['height'] * M_TO_FT, ete_str,
+        self.fg_layout.set_text(fmt % (glide_height, ete_str,
                                        glide['maccready'] * MPS_TO_KTS))
         x, y = self.fg_layout.get_pixel_size()
         win.draw_layout(gc, FG_WIDTH + 5, (win_height / 2) - (2 * y / 3),
@@ -605,7 +600,7 @@ class FreeView(AppBase):
                 return 'divert'
             elif y > (win_height - 100):
                 return 'turnpoint'
-            elif abs(y - (win_height / 2)) < 50:
+            elif (abs(y - (win_height / 2)) < 50) and not self.maccready_flag:
                 return 'glide'
             else:
                 return 'background'
