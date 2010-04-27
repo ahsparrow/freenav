@@ -269,13 +269,13 @@ class FreeControl:
         if self.level_display_type[0] == 'height':
             height = self.flight.pressure_alt.get_pressure_height()
             if height is None:
-                s = '<u>----</u>'
+                s = '****G'
             else:
-                s = "<u>%03d</u>" % (height / FT_TO_M)
+                s = "%03dG" % (height / FT_TO_M)
         elif self.level_display_type[0] == 'altitude':
             altitude = self.flight.pressure_alt.get_pressure_altitude()
             if altitude is None:
-                s = "?%03d" % (self.flight.altitude / FT_TO_M)
+                s = "%03d*" % (self.flight.altitude / FT_TO_M)
             else:
                 s = "%03d" % (altitude / FT_TO_M)
         else:
@@ -283,10 +283,10 @@ class FreeControl:
             if fl is None:
                 s = 'FL**'
             elif fl < 0:
-                s = 'FL--'
+                s = 'FL<0'
             else:
                 s = 'FL%02d' % round((fl / FT_TO_M) / 100)
-        self.view.info_label[INFO_LEVEL].set_markup(s)
+        self.view.info_label[INFO_LEVEL].set_text(s)
 
     def display_task_info(self):
         """Update task info label"""
