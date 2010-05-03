@@ -21,6 +21,8 @@ SHORT_NAMES = {'Init':   'Init',
                'Task':   'Task',
                'Divert': 'Dvrt'}
 
+SPEED_CALC_TIME_DELTA = 1
+
 class Flight:
     TAKEOFF_SPEED = 10
     STOPPED_SPEED = 2
@@ -48,10 +50,6 @@ class Flight:
         self.ground_speed = 0
         self.track = 0
         self.num_satellites = 0
-
-        # TP navigation
-        self.tp_distance = 0
-        self.tp_bearing = 0
 
         # List of model observers
         self.subscriber_list = set()
@@ -137,8 +135,8 @@ class Flight:
     def get_nav(self):
         """Return navigation (to current TP) data"""
         return {'id': self.task.get_tp_id(),
-                'distance': self.tp_distance,
-                'bearing': self.tp_bearing}
+                'distance': self.task.tp_distance,
+                'bearing': self.task.tp_bearing}
 
     def get_velocity(self):
         """Return ground speed and track"""
@@ -204,7 +202,8 @@ class Flight:
     def do_resume(self):
         """Resume task after program re-start in air"""
         settings = self.db.get_settings()
-        self.task.start(settings["start_time"])
+        self.task.resume(settings["start_time"], self.utc_secs, self.x, self.y,
+                         self.altitude)
 
         self.notify_subscribers()
 
@@ -212,11 +211,25 @@ class Flight:
         """Update model with new position data"""
         self.thermal_calculator.update(self.x, self.y, self.altitude,
                                        self.utc_secs)
-        self.calc_nav()
+        self.task.calc_nav(self.x, self.y)
         self.task.calc_glide(self.x, self.y, self.altitude, self.get_wind())
 
         if notify:
             self.notify_subscribers()
+
+    def do_update_task_position(self):
+        """Update task"""
+        tim = self.utc_secs
+        task = self.task
+
+        self.thermal_calculator.update(self.x, self.y, self.altitude, tim)
+        task.calc_nav(self.x, self.y)
+        task.calc_glide(self.x, self.y, self.altitude, self.get_wind())
+
+        if (tim - task.speed_calc_time) >= SPEED_CALC_TIME_DELTA:
+            task.calc_speed(tim, self.x, self.y, self.altitude, self.get_wind())
+
+        self.notify_subscribers()
 
     def do_ground_pressure_level(self, level):
         """Average takeoff pressure level"""
@@ -249,7 +262,7 @@ class Flight:
 
     def do_line(self):
         """Crossing line - start task"""
-        self.task.start(self.utc_secs)
+        self.task.start(self.utc_secs, self.x, self.y, self.altitude)
 
         self.db.set_start(self.utc_secs)
         self.db.commit()
@@ -258,8 +271,8 @@ class Flight:
             s.flight_task_start(self)
 
     def do_task(self):
-        """Update task"""
-        self.calc_nav()
+        """Start (or re-start) task"""
+        self.task.calc_nav(self.x, self.y)
         self.task.calc_glide(self.x, self.y, self.altitude, self.get_wind())
         self.notify_subscribers()
 
@@ -270,7 +283,7 @@ class Flight:
 
     def do_divert(self):
         """Start a new diversion"""
-        self.calc_nav()
+        self.task.calc_nav(self.x, self.y)
         self.task.calc_glide(self.x, self.y, self.altitude, self.get_wind())
         self.notify_subscribers()
 
@@ -280,7 +293,7 @@ class Flight:
 
     def do_next_turnpoint(self):
         """Goto next turnpoint"""
-        self.task.next_turnpoint()
+        self.task.next_turnpoint(self.utc_secs, self.x, self.y, self.altitude)
 
     def do_prev_turnpoint(self):
         """Goto previous turnpoint"""
@@ -303,14 +316,6 @@ class Flight:
         """Send an update to all the subscribers"""
         for s in self.subscriber_list:
             s.flight_update(self)
-
-    def calc_nav(self):
-        """Calculate TP distance and bearing"""
-        tp = self.task.get_tp_xy()
-        dx = tp[0] - self.x
-        dy = tp[1] - self.y
-        self.tp_distance = math.sqrt(dx * dx + dy * dy)
-        self.tp_bearing = math.atan2(dx, dy)
 
 if __name__ == '__main__':
     f = Flight()

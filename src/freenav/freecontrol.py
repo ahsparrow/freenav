@@ -259,7 +259,7 @@ class FreeControl:
     def task_button_press(self):
         """Button press in the task info box"""
         if self.flight.get_state() == "Task":
-            # XXX self.task_display_type.rotate()
+            self.task_display_type.rotate()
             self.display_task_info()
         else:
             self.flight.cancel_divert()
@@ -298,13 +298,15 @@ class FreeControl:
                     "%H:%M", time.localtime(self.flight.task.start_time))
             elif self.task_display_type[0] == "task_speed":
                 # Task speed, limited to 999kph
-                speed = min(self.flight.get_task_speed(), 999)
-                info_str = ("%.0f" % (speed / KPH_TO_MPS))
+                speed = self.flight.task.task_air_speed / KPH_TO_MPS
+                speed = min(speed, 999)
+                info_str = ("%.0f" % speed)
             else:
                 # Task time, limited to 9:59
-                task_secs = min(self.flight.get_task_secs(), 35940)
-                tim_str = time.strftime("%H:%M", time.gmtime(task_secs))
-                info_str = tim_str[1:]
+                #task_secs = min(self.flight.get_task_secs(), 35940)
+                #tim_str = time.strftime("%H:%M", time.gmtime(task_secs))
+                #info_str = tim_str[1:]
+                info_str = "????"
         else:
             info_str = flight.SHORT_NAMES[task_state]
         self.view.info_label[INFO_TASK].set_text(info_str)

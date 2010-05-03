@@ -290,6 +290,18 @@ class FlightFSM_Task(FlightFSM_Default):
             fsm.setState(FlightFSM.Divert)
             fsm.getState().Entry(fsm)
 
+    def new_position(self, fsm):
+        ctxt = fsm.getOwner()
+        if fsm.getDebugFlag() == True:
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.Task.new_position()\n")
+
+        endState = fsm.getState()
+        fsm.clearState()
+        try:
+            ctxt.do_update_task_position()
+        finally:
+            fsm.setState(endState)
+
     def next_turnpoint(self, fsm):
         ctxt = fsm.getOwner()
         if fsm.getDebugFlag() == True:

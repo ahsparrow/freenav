@@ -1,5 +1,24 @@
 import math
 
+MIN_TASK_SPEED_TIME = 0
+
+def calc_ground_speed(air_speed, course, wind_speed, wind_direction):
+    """Return ground speed given air speed, course and wind"""
+    swc = wind_speed / air_speed * math.sin(wind_direction - course)
+
+    ground_speed = (air_speed * math.sqrt(1 - swc ** 2) +
+                    wind_speed * math.cos(wind_direction - course))
+
+    return ground_speed
+
+def calc_air_speed(ground_speed, course, wind_speed, wind_direction):
+    """Return air speed given ground speed, course and wind"""
+    a2 = (wind_speed ** 2 + ground_speed **2 -
+          2 * wind_speed * ground_speed * math.cos(course - wind_direction))
+    a2 = max(a2, 0)
+
+    return math.sqrt(a2)
+
 class Task:
     def __init__(self, tp_list, polar, settings):
         """Class initialisation"""
@@ -9,26 +28,46 @@ class Task:
         self.ballast = settings['ballast']
         self.safety_height = settings['safety_height']
 
+        self.tp_distance = 0
+        self.tp_bearing = 0
+
         self.tp_index = 0
         self.divert_wp = None
+        self.tp_times = [None] * len(tp_list)
 
         self.ete = 0
         self.arrival_height = 0
         self.glide_margin = 0
         self.set_maccready(0.0)
 
+        self.task_speed = 0
+        self.task_air_speed = 0
+        self.speed_calc_time = 0
+
     def reset(self):
         """Reset turnpoint index"""
         self.tp_index = 0
         self.divert_wp = None
 
-    def start(self, start_time):
+    def start(self, start_time, x, y, altitude):
         """Start task"""
         self.start_time = start_time
         self.tp_index = 1
+        self.tp_times[0] = {'x': x, 'y': y, 'alt': altitude,
+                            'tim': start_time}
 
-    def next_turnpoint(self):
+    def resume(self, start_time, resume_time, x, y, altitude):
+        """Resume task after program re-start"""
+        self.start_time = start_time
+        self.tp_index = 1
+        self.tp_times[0] = {'x': x, 'y': y, 'alt': altitude,
+                            'tim': resume_time}
+
+    def next_turnpoint(self, tp_time, x, y, altitude):
+        """Increment turnpoint"""
         if self.tp_index < (len(self.tp_list) - 1):
+            self.tp_times[self.tp_index] = {
+                'x': x, 'y': y, 'alt': altitude, 'tim': tp_time}
             self.tp_index += 1
 
     def prev_turnpoint(self):
@@ -58,7 +97,6 @@ class Task:
         """Increment Maccready setting"""
         self.set_maccready(self.maccready + incr)
 
-
     def decr_maccready(self, decr):
         """Decrement Maccready setting"""
         maccready = self.maccready - decr
@@ -72,14 +110,6 @@ class Task:
                 'height': self.arrival_height,
                 'ete': self.ete,
                 'maccready': self.maccready}
-
-    def get_tp_xy(self):
-        """Return XY coordinates of active TP"""
-        if self.divert_wp:
-            tp = self.divert_wp
-        else:
-            tp = self.tp_list[self.tp_index]
-        return self.tp_minxy(tp)
 
     def get_tp_id(self):
         """Return ID of active TP"""
@@ -106,6 +136,14 @@ class Task:
 
         return in_sector
 
+    def calc_nav(self, x, y):
+        """Calculate TP distance and bearing"""
+        tp = self.get_tp_xy()
+        dx = tp[0] - x
+        dy = tp[1] - y
+        self.tp_distance = math.sqrt(dx * dx + dy * dy)
+        self.tp_bearing = math.atan2(dx, dy)
+
     def calc_glide(self, x, y, altitude, wind):
         # Get coordinates of minimum remaining task
         if self.divert_wp:
@@ -127,6 +165,40 @@ class Task:
             self.arrival_height = 0
             self.glide_margin = 0
 
+    def calc_speed(self, tim, x, y, altitude, wind):
+        """Calcuate task speed from last TP"""
+        self.speed_calc_time = tim
+
+        # Deltas from last turnpoint
+        tp_ref = self.tp_times[self.tp_index - 1]
+        dt = tim - tp_ref['tim']
+        da = altitude - tp_ref['alt']
+        dx = x - tp_ref['x']
+        dy = y - tp_ref['y']
+
+        distance = math.sqrt(dx * dx + dy * dy)
+        course = math.atan2(dx, dy)
+
+        # Time to return/glide to last TP height
+        glide_time = da / self.vm_sink_rate
+
+        # Wind corrected Maccready ground speed
+        ground_speed = calc_ground_speed(self.vm, course, wind['speed'],
+                                         wind['direction'])
+
+        distance = distance + glide_time * ground_speed
+        dt = dt + glide_time
+        if dt <= MIN_TASK_SPEED_TIME:
+            # Don't update unless sufficient time has passed
+            return
+
+        # Task speed to glide corrected position
+        self.task_speed = distance / dt
+
+        # Wind corrected speed
+        self.task_air_speed = calc_air_speed(self.task_speed, course,
+                                             wind['speed'], wind['direction'])
+
     #-------------------------------------------------------------------------
     # Internal stuff
 
@@ -143,14 +215,12 @@ class Task:
             course = math.atan2(dx, dy)
 
             # Get ground speed (wind direction is direction it is blowing to)
-            swc = ((wind['speed'] / self.vm) *
-                   math.sin(wind['direction'] - course))
-            gspeed = (self.vm * math.sqrt(1 - swc ** 2) +
-                      wind['speed'] * math.cos(wind['direction'] - course))
+            ground_speed = calc_ground_speed(self.vm, course, wind['speed'],
+                                             wind['direction'])
 
             # Height loss and ETE from this leg plus all the rest
-            height_loss = dist * self.vm_sink_rate / gspeed
-            ete = dist / gspeed
+            height_loss = dist * self.vm_sink_rate / ground_speed
+            ete = dist / ground_speed
 
             height_loss += height_loss1
             ete += ete1
@@ -160,10 +230,17 @@ class Task:
 
         return (height_loss, ete)
 
+    def get_tp_xy(self):
+        """Return XY coordinates of active TP"""
+        if self.divert_wp:
+            tp = self.divert_wp
+        else:
+            tp = self.tp_list[self.tp_index]
+        return self.tp_minxy(tp)
+
     def tp_minxy(self, tp):
         if tp.has_key('mindistx'):
             xy = (tp['mindistx'], tp['mindisty'])
         else:
             xy = (tp['x'], tp['y'])
         return xy
-
