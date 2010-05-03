@@ -58,8 +58,9 @@ class ThermalCalculator:
 
     def thermal_start_stop(self, vec):
         """Test for thermal start and stop"""
-        if (self.thermal_start is None):
-            # Thermal "start" if we've turn 180 degrees
+        if ((self.thermal_start is None) or
+            (vec['tim'] - self.thermal_update_time) > THERMAL_TIMEOUT):
+            # Thermal "start" if we've turned 180 degrees
             if (self.turn_angle_acc > math.pi):
                 # Find position quarter of a turn ago and call that the start
                 acc = 0
@@ -69,9 +70,7 @@ class ThermalCalculator:
                         break
                 self.thermal_start = vec
                 self.thermal_update_time = vec['tim']
-        else:
-            # Thermal "stop" if nothings happened recently
-            if (vec['tim'] - self.thermal_update_time) > THERMAL_TIMEOUT:
+            else:
                 self.thermal_start = None
 
     def wind_calc(self):

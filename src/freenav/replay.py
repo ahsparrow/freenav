@@ -1,10 +1,14 @@
+#!/usr/bin/env python
 import datetime
+import fcntl
 import math
 import os
 import pty
 import sys
 import termios
 import time
+
+import projection
 
 KTS_TO_MPS = 1852.0 / 3600
 M_TO_FT = 1 / 0.3048
@@ -87,12 +91,18 @@ def igc_parse(rec):
 
     gps_alt = int(gps_alt_str)
     pressure_alt = int(pressure_alt_str)
-    gs = int(gs_str) * KTS_TO_MPS
-    trk = math.radians(int(trk_str))
 
-    return dt, lat, lon, gps_alt, pressure_alt, gs, trk
+    return dt, lat, lon, gps_alt, pressure_alt
 
 def main():
+    stdin_fd = sys.stdin.fileno()
+    oldterm = termios.tcgetattr(stdin_fd)
+    newattr = termios.tcgetattr(stdin_fd)
+    newattr[3] = newattr[3] & ~termios.ICANON & ~termios.ECHO
+    termios.tcsetattr(stdin_fd, termios.TCSANOW, newattr)
+    oldflags = fcntl.fcntl(stdin_fd, fcntl.F_GETFL)
+    fcntl.fcntl(stdin_fd, fcntl.F_SETFL, oldflags | os.O_NONBLOCK)
+
     master_fd, slave_fd = pty.openpty()
 
     slave_name = os.ttyname(slave_fd)
@@ -111,14 +121,47 @@ def main():
                       [iflag, oflag, cflag, lflag, ispeed, ospeed, cc])
 
     igc_file = open(sys.argv[1])
+    proj = projection.Lambert(math.radians(49), math.radians(55),
+                              math.radians(52), math.radians(0))
 
     for rec in igc_file:
         if rec[0] == 'B':
-            dt, lat, lon, gps_alt, pressure_alt, gs, trk = igc_parse(rec)
-            os.write(master_fd, gen_gprmc(lat, lon, gs, trk, dt))
-            os.write(master_fd, gen_gpgga(lat, lon, gps_alt, dt))
-            os.write(master_fd, gen_pgrmz(pressure_alt))
-            time.sleep(0.5)
+            break
+    dt1, lat1, lon1, gps_alt, pressure_alt = igc_parse(rec)
+    x1, y1 = proj.forward(lat1, lon1)
+
+    sleep_time = 1.0
+
+    try:
+        for rec in igc_file:
+            if rec[0] == 'B':
+                dt, lat, lon, gps_alt, pressure_alt = igc_parse(rec)
+                x, y = proj.forward(lat, lon)
+
+                tdelta = dt - dt1
+                dist = math.sqrt((x - x1) ** 2 + (y - y1) ** 2)
+                speed = dist / tdelta.seconds
+                track = math.atan2(x - x1, y - y1)
+
+                dt1, x1, y1 = dt, x, y
+
+                os.write(master_fd, gen_gprmc(lat, lon, speed, track, dt))
+                os.write(master_fd, gen_gpgga(lat, lon, gps_alt, dt))
+                os.write(master_fd, gen_pgrmz(pressure_alt))
+                time.sleep(sleep_time)
+
+            try:
+                c = sys.stdin.read(1)
+                if c == '+':
+                    sleep_time = sleep_time * 2
+                elif c == '-':
+                    sleep_time = sleep_time / 2
+                print "Sleep %.2f" % sleep_time
+            except IOError:
+                c = None
+    finally:
+        termios.tcsetattr(stdin_fd, termios.TCSAFLUSH, oldterm)
+        fcntl.fcntl(stdin_fd, fcntl.F_SETFL, oldflags)
 
 if __name__ == "__main__":
     main()
