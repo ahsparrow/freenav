@@ -1,6 +1,7 @@
 import math
 
-MIN_TASK_SPEED_TIME = 0
+MIN_TASK_SPEED_TIME = 15 * 60
+MIN_TASK_SPEED_DISTANCE = 5000
 
 def calc_ground_speed(air_speed, course, wind_speed, wind_direction):
     """Return ground speed given air speed, course and wind"""
@@ -13,7 +14,7 @@ def calc_ground_speed(air_speed, course, wind_speed, wind_direction):
 
 def calc_air_speed(ground_speed, course, wind_speed, wind_direction):
     """Return air speed given ground speed, course and wind"""
-    a2 = (wind_speed ** 2 + ground_speed **2 -
+    a2 = (wind_speed ** 2 + ground_speed ** 2 -
           2 * wind_speed * ground_speed * math.cos(course - wind_direction))
     a2 = max(a2, 0)
 
@@ -188,7 +189,7 @@ class Task:
 
         distance = distance + glide_time * ground_speed
         dt = dt + glide_time
-        if dt <= MIN_TASK_SPEED_TIME:
+        if (dt < MIN_TASK_SPEED_TIME) or (distance < MIN_TASK_SPEED_DISTANCE):
             # Don't update unless sufficient time has passed
             return
 

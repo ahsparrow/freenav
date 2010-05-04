@@ -21,7 +21,7 @@ SHORT_NAMES = {'Init':   'Init',
                'Task':   'Task',
                'Divert': 'Dvrt'}
 
-SPEED_CALC_TIME_DELTA = 1
+SPEED_CALC_TIME_DELTA = 30
 
 class Flight:
     TAKEOFF_SPEED = 10
