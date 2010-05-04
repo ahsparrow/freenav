@@ -195,8 +195,11 @@ class TaskListStore(gtk.ListStore):
                     x2, y2 = wp2['x'], wp2['y']
                     d2 = math.sqrt((x - x2)**2 + (y - y2)**2)
 
-                    dx = ((x1 - x) + ((x2 - x) * d1 / d2)) / 2
-                    dy = ((y1 - y) + ((y2 - y) * d1 / d2)) / 2
+                    if d2 == 0:
+                        dx = dy = 0
+                    else:
+                        dx = ((x1 - x) + ((x2 - x) * d1 / d2)) / 2
+                        dy = ((y1 - y) + ((y2 - y) * d1 / d2)) / 2
                 ang = math.atan2(dx, dy) % (2 * math.pi)
                 tp['angle12'] = math.degrees(ang)
 
