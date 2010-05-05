@@ -1,7 +1,7 @@
 import math
 
 MIN_TASK_SPEED_TIME = 15 * 60
-MIN_TASK_SPEED_DISTANCE = 5000
+MIN_TASK_SPEED_DISTANCE = 10000
 
 def calc_ground_speed(air_speed, course, wind_speed, wind_direction):
     """Return ground speed given air speed, course and wind"""

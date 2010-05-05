@@ -53,8 +53,9 @@ class FreeControl:
         self.divert_indicator_flag = False
         self.maccready_indicator_flag = False
         self.level_display_type = collections.deque(["flight_level",
+                                                     "height",
                                                      "altitude",
-                                                     "height"])
+                                                     "thermal_average"])
         self.task_display_type = collections.deque(["start_time",
                                                     "task_speed",
                                                     "task_time"])
@@ -242,7 +243,7 @@ class FreeControl:
 
     def level_button_press(self):
         """Button press in the level info box. Change between level displays"""
-        self.level_display_type.rotate()
+        self.level_display_type.rotate(-1)
         self.display_level_info()
 
     def time_button_press(self):
@@ -259,7 +260,7 @@ class FreeControl:
     def task_button_press(self):
         """Button press in the task info box"""
         if self.flight.get_state() == "Task":
-            self.task_display_type.rotate()
+            self.task_display_type.rotate(-1)
             self.display_task_info()
         else:
             self.flight.cancel_divert()
@@ -278,7 +279,7 @@ class FreeControl:
                 s = "%03d*" % (self.flight.altitude / FT_TO_M)
             else:
                 s = "%03d" % (altitude / FT_TO_M)
-        else:
+        elif self.level_display_type[0] == 'flight_level':
             fl = self.flight.pressure_alt.get_flight_level()
             if fl is None:
                 s = 'FL**'
@@ -286,6 +287,8 @@ class FreeControl:
                 s = 'FL<0'
             else:
                 s = 'FL%02d' % round((fl / FT_TO_M) / 100)
+        else:
+            s = "%.1f" % (self.flight.thermal.thermal_average / KTS_TO_MPS)
         self.view.info_label[INFO_LEVEL].set_text(s)
 
     def display_task_info(self):

@@ -35,7 +35,7 @@ class Flight:
 
         self.task = task.Task(self.db.get_task(), polar, settings)
         self.pressure_alt = altimetry.PressureAltimetry()
-        self.thermal_calculator = thermal.ThermalCalculator()
+        self.thermal = thermal.ThermalCalculator()
 
         # Get projection from database
         p = self.db.get_projection()
@@ -144,8 +144,8 @@ class Flight:
 
     def get_wind(self):
         """Return wind speed and direction"""
-        speed = self.thermal_calculator.wind_speed
-        dirn = self.thermal_calculator.wind_direction
+        speed = self.thermal.wind_speed
+        dirn = self.thermal.wind_direction
         return {'speed': speed, 'direction': dirn}
 
     def get_state(self):
@@ -209,7 +209,7 @@ class Flight:
 
     def do_update_position(self, notify=False):
         """Update model with new position data"""
-        self.thermal_calculator.update(self.x, self.y, self.altitude,
+        self.thermal.update(self.x, self.y, self.altitude,
                                        self.utc_secs)
         self.task.calc_nav(self.x, self.y)
         self.task.calc_glide(self.x, self.y, self.altitude, self.get_wind())
@@ -222,7 +222,7 @@ class Flight:
         tim = self.utc_secs
         task = self.task
 
-        self.thermal_calculator.update(self.x, self.y, self.altitude, tim)
+        self.thermal.update(self.x, self.y, self.altitude, tim)
         task.calc_nav(self.x, self.y)
         task.calc_glide(self.x, self.y, self.altitude, self.get_wind())
 
