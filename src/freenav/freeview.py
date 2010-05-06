@@ -140,7 +140,7 @@ class FreeView(AppBase):
         for i in range(NUM_INFO_BOXES):
             label = gtk.Label()
             attr_list = pango.AttrList()
-            attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 40,
+            attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 45,
                                                     0, 999))
             attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
             label.set_attributes(attr_list)
@@ -163,24 +163,24 @@ class FreeView(AppBase):
 
         # Pango layouts for text on map display
         attr_list = pango.AttrList()
-        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 25, 0, 999))
+        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 35, 0, 999))
         self.wp_layout = pango.Layout(self.drawing_area.create_pango_context())
         self.wp_layout.set_attributes(attr_list)
 
         attr_list = pango.AttrList()
-        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 40, 0, 999))
+        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 45, 0, 999))
         attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
         self.tp_layout = pango.Layout(self.drawing_area.create_pango_context())
         self.tp_layout.set_attributes(attr_list)
 
         attr_list = pango.AttrList()
-        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 35, 0, 999))
+        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 40, 0, 999))
         attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
         self.fg_layout = pango.Layout(self.drawing_area.create_pango_context())
         self.fg_layout.set_attributes(attr_list)
 
         attr_list = pango.AttrList()
-        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 35, 0, 999))
+        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 40, 0, 999))
         attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
         self.wind_layout = pango.Layout(
                 self.drawing_area.create_pango_context())
