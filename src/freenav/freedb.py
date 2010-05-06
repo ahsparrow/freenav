@@ -23,8 +23,7 @@ SCHEMA = {
 
     'Waypoints': [
         ('id', 'TEXT'), ('name', 'TEXT'), ('x', 'INTEGER'), ('y', 'INTEGER'),
-        ('altitude', 'INTEGER'), ('turnpoint', 'TEXT'),
-        ('landable_flag', 'INTEGER'), ('comment', 'TEXT')],
+        ('altitude', 'INTEGER'), ('turnpoint', 'TEXT'), ('comment', 'TEXT')],
 
     'Airspace': [
         ('id', 'TEXT'), ('name', 'TEXT'), ('base', 'TEXT'), ('top', 'TEXT'),
@@ -48,6 +47,10 @@ SCHEMA = {
         ('radius2', 'INTEGER'), ('angle2', 'REAL'),
         ('direction', 'TEXT'), ('angle12', 'REAL'),
         ('mindistx', 'INTEGER'), ('mindisty', 'INTEGER')],
+
+    'Landables': [
+        ('id', 'TEXT'), ('name', 'TEXT'),
+        ('x', 'INTEGER'), ('y', 'INTEGER'), ('altitude', 'INTEGER')],
 
     'Settings': [('task_id', 'INTEGER'),
                  ('qne', 'REAL'),
@@ -121,10 +124,9 @@ class Freedb:
                         landable_flag):
         """Add a new waypoint"""
         sql = '''INSERT INTO Waypoints
-              (name, id, x, y, altitude, turnpoint, comment, landable_flag)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)'''
-        self.c.execute(sql, (name, id, x, y, altitude, turnpoint, comment,
-                             landable_flag))
+              (name, id, x, y, altitude, turnpoint, comment)
+              VALUES (?, ?, ?, ?, ?, ?, ?)'''
+        self.c.execute(sql, (name, id, x, y, altitude, turnpoint, comment))
 
     def get_waypoint(self, id):
         """Return waypoint data"""
@@ -143,6 +145,28 @@ class Freedb:
         sql = 'SELECT * FROM Waypoints WHERE x>? AND x<? AND y>? AND y<?'
         self.c.execute(sql, (x - width/2, x + width/2,
                              y - height/2, y + height/2))
+        return self.c.fetchall()
+
+    def delete_landables(self):
+        """Delete all the landing fields"""
+        self.c.execute('DELETE FROM Landables')
+
+    def insert_landable(self, name, id, x, y, altitude):
+        """Add a new landing field"""
+        sql = '''INSERT INTO Landables (name, id, x, y, altitude)
+              VALUES (?, ?, ?, ?, ?)'''
+        self.c.execute(sql, (name, id, x, y, altitude))
+
+    def get_landable(self, id):
+        """Return landing field data"""
+        sql = 'SELECT * FROM Landable WHERE id=?'
+        self.c.execute(sql, (id,))
+        return self.c.fetchone()
+
+    def get_landable_list(self):
+        """Return a list of all landing fields"""
+        sql = 'SELECT * FROM Landables'
+        self.c.execute(sql)
         return self.c.fetchall()
 
     def get_area_airspace(self, x, y, width, height):
@@ -287,9 +311,9 @@ class Freedb:
         sql = "UPDATE Settings SET safety_height=?"
         self.c.execute(sql, (safety_height,))
 
-    def get_nearest_landable(self, xpos, ypos):
-        """Get list of landable waypoints sorted by distance"""
-        sql = 'SELECT * FROM Waypoints WHERE landable_flag != 0'
+    def get_nearest_landables(self, xpos, ypos):
+        """Get list of landing fields sorted by distance"""
+        sql = 'SELECT * FROM Landables'
         self.c.execute(sql)
         wps = self.c.fetchall()
 
@@ -305,5 +329,3 @@ class Freedb:
 
         wps.sort(dist_cmp)
         return wps
-
-

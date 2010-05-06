@@ -266,17 +266,24 @@ class FreeView(AppBase):
 
     def draw_waypoints(self, win, gc):
         """Draw waypoints"""
-        tps = [tp['id'] for tp in self.flight.task.tp_list]
-        for wp in self.mapcache.wps:
-            if self.view_scale <= 71 or wp['landable_flag'] or wp['id'] in tps:
-                x, y = self.view_to_win(wp['x'], wp['y'])
-                delta = WP_SIZE / 2
-                win.draw_arc(gc, wp['landable_flag'],
-                             x - delta, y - delta,
-                             WP_SIZE, WP_SIZE, 0, CIRCLE_LEN)
+        if self.divert_flag or self.flight.get_state() == 'Divert':
+            wps = self.flight.db.get_landable_list()
+            fill = True
+        else:
+            fill = False
+            wps = self.mapcache.wps
+            if self.view_scale > 71:
+                tps = [tp['id'] for tp in self.flight.task.tp_list]
+                wps = filter(lambda x: x['id'] in tps, wps)
 
-                self.wp_layout.set_text(wp['id'])
-                win.draw_layout(gc, x + delta, y + delta, self.wp_layout)
+        for wp in wps:
+            x, y = self.view_to_win(wp['x'], wp['y'])
+            delta = WP_SIZE / 2
+            win.draw_arc(gc, fill, x - delta, y - delta, WP_SIZE, WP_SIZE,
+                         0, CIRCLE_LEN)
+
+            self.wp_layout.set_text(wp['id'])
+            win.draw_layout(gc, x + delta, y + delta, self.wp_layout)
 
     def draw_airspace(self, gc, win):
         """Draw airspace boundary lines and arcs"""

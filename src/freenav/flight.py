@@ -113,9 +113,9 @@ class Flight:
         """Goto prev turnpoing"""
         self._fsm.prev_turnpoint()
 
-    def divert(self, waypoint_id):
+    def divert(self, divert):
         """Divert to specified waypoint"""
-        self._fsm.divert(waypoint_id)
+        self._fsm.divert(divert)
 
     def cancel_divert(self):
         """Cancel divert (and return to task)"""
@@ -179,11 +179,11 @@ class Flight:
 
     def do_init_ground(self):
         """Get and store airfield altitude"""
-        wps = self.db.get_nearest_landable(self.x, self.y)
-        self.pressure_alt.set_takeoff_altitude(wps[0]['altitude'])
+        landables = self.db.get_nearest_landables(self.x, self.y)
+        self.pressure_alt.set_takeoff_altitude(landables[0]['altitude'])
 
         # Temporary divert to takeoff WP
-        self.task.divert(wps[0])
+        self.task.divert(landables[0])
 
         self.notify_subscribers()
 
@@ -276,10 +276,9 @@ class Flight:
         self.task.calc_glide(self.x, self.y, self.altitude, self.get_wind())
         self.notify_subscribers()
 
-    def do_set_divert(self, waypoint_id):
+    def do_set_divert(self, divert):
         """Set divert to specified waypoint"""
-        divert_wp = self.db.get_waypoint(waypoint_id)
-        self.task.divert(divert_wp)
+        self.task.divert(divert)
 
     def do_divert(self):
         """Start a new diversion"""

@@ -148,8 +148,8 @@ class FreeControl:
             # Divert
             self.reset_divert()
             x, y = self.view.win_to_view(event.x, event.y)
-            landable = self.flight.db.get_nearest_landable(x, y)
-            self.flight.divert(landable[0]['id'])
+            landables = self.flight.db.get_nearest_landables(x, y)
+            self.flight.divert(landables[0])
         elif region == 'divert':
             if (not self.divert_indicator_flag and
                 (self.flight.get_state() in ('Task', 'Divert'))):
