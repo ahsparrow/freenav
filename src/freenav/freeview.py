@@ -163,7 +163,7 @@ class FreeView(AppBase):
 
         # Pango layouts for text on map display
         attr_list = pango.AttrList()
-        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 35, 0, 999))
+        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 30, 0, 999))
         self.wp_layout = pango.Layout(self.drawing_area.create_pango_context())
         self.wp_layout.set_attributes(attr_list)
 
