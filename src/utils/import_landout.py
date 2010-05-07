@@ -56,7 +56,7 @@ def import_landables(db, landouts_file, projection):
         x, y = projection.forward(math.radians(lat), math.radians(lon))
 
         db.insert_landable(landout['name'], landout['id'], int(x), int(y),
-                          int(landout['altitude'] * FT_TO_M))
+                          int(landout['elevation'] * FT_TO_M))
 
 def main():
     usage = "usage: %prog [options] file"

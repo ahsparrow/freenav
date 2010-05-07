@@ -157,12 +157,6 @@ class Freedb:
               VALUES (?, ?, ?, ?, ?)'''
         self.c.execute(sql, (name, id, x, y, altitude))
 
-    def get_landable(self, id):
-        """Return landing field data"""
-        sql = 'SELECT * FROM Landable WHERE id=?'
-        self.c.execute(sql, (id,))
-        return self.c.fetchone()
-
     def get_landable_list(self):
         """Return a list of all landing fields"""
         sql = 'SELECT * FROM Landables'
