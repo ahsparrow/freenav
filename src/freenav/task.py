@@ -120,22 +120,29 @@ class Task:
             tp = self.tp_list[self.tp_index]
         return tp["id"]
 
-    def in_start_sector(self, x, y):
-        """Return true if in start sector (2D only)"""
-        start = self.tp_list[0]
+    def in_sector(self, x, y, tp_index = 0):
+        """Return true if in sector for specified TP"""
+        tp = self.tp_list[tp_index]
 
-        dx = x - start['x']
-        dy = y - start['y']
-        dist = math.sqrt(dx ** 2 + dy ** 2)
+        dx = x - tp['x']
+        dy = y - tp['y']
+        dist = math.hypot(dx, dy)
 
-        in_sector = False
-        if dist < start['radius1']:
+        sector = False
+        if (dist < tp['radius1']):
             ang = math.atan2(dx, dy)
-            ang1 = (ang - math.radians(start['angle12'])) % (2 * math.pi)
-            if (ang1 > (math.pi / 2)) and (ang1 < (3 * math.pi / 2)):
-                in_sector = True
+            ang1 = (math.pi + ang - math.radians(tp['angle12'])) % (2 * math.pi)
+            if ang1 > math.pi:
+                ang1 = 2 * math.pi - ang1
 
-        return in_sector
+            if dist >= tp['radius2']:
+                if ang1 < (math.radians(tp['angle1']) / 2):
+                    sector = True
+            else:
+                if ang1 < (math.radians(tp['angle2']) / 2):
+                    sector = True
+
+        return sector
 
     def calc_nav(self, x, y):
         """Calculate TP distance and bearing"""

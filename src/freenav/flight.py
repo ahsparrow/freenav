@@ -306,7 +306,7 @@ class Flight:
         return (start_date == datetime.date.today())
 
     def in_start_sector(self):
-        return self.task.in_start_sector(self.x, self.y)
+        return self.task.in_sector(self.x, self.y, 0)
 
     #------------------------------------------------------------------------
     # Internal stuff
