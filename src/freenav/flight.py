@@ -222,10 +222,11 @@ class Flight:
 
     def do_update_position(self, notify=False):
         """Update model with new position data"""
-        self.thermal.update(self.x, self.y, self.altitude,
-                                       self.utc_secs)
+        if self.thermal.update(self.x, self.y, self.altitude, self.utc_secs):
+            self.task.set_wind(self.get_wind())
+
         self.task.calc_nav(self.x, self.y)
-        self.task.calc_glide(self.x, self.y, self.altitude, self.get_wind())
+        self.task.calc_glide(self.x, self.y, self.altitude)
 
         if notify:
             self.notify_subscribers(NEW_POSITION_EVT)
@@ -285,7 +286,7 @@ class Flight:
     def do_task(self):
         """Start (or re-start) task"""
         self.task.calc_nav(self.x, self.y)
-        self.task.calc_glide(self.x, self.y, self.altitude, self.get_wind())
+        self.task.calc_glide(self.x, self.y, self.altitude)
         self.notify_subscribers(TASK_EVT)
 
     def do_set_divert(self, divert):
@@ -295,7 +296,7 @@ class Flight:
     def do_divert(self):
         """Start a new diversion"""
         self.task.calc_nav(self.x, self.y)
-        self.task.calc_glide(self.x, self.y, self.altitude, self.get_wind())
+        self.task.calc_glide(self.x, self.y, self.altitude)
         self.notify_subscribers(DIVERT_EVT)
 
     def do_cancel_divert(self):

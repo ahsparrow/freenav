@@ -36,9 +36,14 @@ class Task:
         self.divert_wp = None
         self.tp_times = [None] * len(tp_list)
 
+        self.wind_speed = 0
+        self.wind_direction = 0
+
         self.ete = 0
         self.arrival_height = 0
         self.glide_margin = 0
+
+        # Set Maccready and do initial glide calculations
         self.set_maccready(0.0)
 
         self.task_speed = 0
@@ -80,6 +85,11 @@ class Task:
 
     def cancel_divert(self):
         self.divert_wp = None
+
+    def set_wind(self, wind):
+        """Set new wind vector"""
+        self.wind_speed = wind['speed']
+        self.wind_direction = wind['direction']
 
     def set_maccready(self, maccready):
         """Set new Maccready parameters"""
@@ -152,7 +162,7 @@ class Task:
         self.tp_distance = math.sqrt(dx * dx + dy * dy)
         self.tp_bearing = math.atan2(dx, dy)
 
-    def calc_glide(self, x, y, altitude, wind):
+    def calc_glide(self, x, y, altitude):
         # Get coordinates of minimum remaining task
         if self.divert_wp:
             tps = [self.divert_wp]
@@ -161,8 +171,8 @@ class Task:
         coords = [self.tp_minxy(tp) for tp in tps]
 
         # Get height loss and ETE around remainder of task
-        if self.vm > wind['speed']:
-            height_loss, ete = self.calc_height_loss_ete((x, y), coords, wind)
+        if self.vm > self.wind_speed:
+            height_loss, ete = self.calc_height_loss_ete((x, y), coords)
             self.ete = ete
             self.arrival_height = (altitude - height_loss -
                                    self.tp_list[-1]['altitude'])
@@ -173,7 +183,7 @@ class Task:
             self.arrival_height = 0
             self.glide_margin = 0
 
-    def calc_speed(self, tim, x, y, altitude, wind):
+    def calc_speed(self, tim, x, y, altitude):
         """Calcuate task speed from last TP"""
         self.speed_calc_time = tim
 
@@ -191,8 +201,8 @@ class Task:
         glide_time = da / self.vm_sink_rate
 
         # Wind corrected Maccready ground speed
-        ground_speed = calc_ground_speed(self.vm, course, wind['speed'],
-                                         wind['direction'])
+        ground_speed = calc_ground_speed(
+                self.vm, course, self.wind_speed, self.wind_direction)
 
         distance = distance + glide_time * ground_speed
         dt = dt + glide_time
@@ -204,18 +214,17 @@ class Task:
         self.task_speed = distance / dt
 
         # Wind corrected speed
-        self.task_air_speed = calc_air_speed(self.task_speed, course,
-                                             wind['speed'], wind['direction'])
+        self.task_air_speed = calc_air_speed(
+                self.task_speed, course, self.wind_speed, self.wind_direction)
 
     #-------------------------------------------------------------------------
     # Internal stuff
 
-    def calc_height_loss_ete(self, posn, tps, wind):
+    def calc_height_loss_ete(self, posn, tps):
         """Calculate final glide height loss and ETE"""
         if tps:
             next_tp = tps[0]
-            height_loss1, ete1 = self.calc_height_loss_ete(next_tp, tps[1:],
-                                                           wind)
+            height_loss1, ete1 = self.calc_height_loss_ete(next_tp, tps[1:])
             # Course and distance to next TP
             dx = next_tp[0] - posn[0]
             dy = next_tp[1] - posn[1]
@@ -223,8 +232,8 @@ class Task:
             course = math.atan2(dx, dy)
 
             # Get ground speed (wind direction is direction it is blowing to)
-            ground_speed = calc_ground_speed(self.vm, course, wind['speed'],
-                                             wind['direction'])
+            ground_speed = calc_ground_speed(
+                    self.vm, course, self.wind_speed, self.wind_direction)
 
             # Height loss and ETE from this leg plus all the rest
             height_loss = dist * self.vm_sink_rate / ground_speed
