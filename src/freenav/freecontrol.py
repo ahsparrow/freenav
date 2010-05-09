@@ -226,18 +226,16 @@ class FreeControl:
         """Callback from D-Bus on new pressure altitude"""
         self.flight.update_pressure_level(level * FT_TO_M)
 
-    def flight_update(self, flight):
+    def flight_update(self, event):
         """Callback on flight model change"""
+        if event == flight.Event.LINE_EVT:
+            while self.task_display_type[0] != "start_time":
+                self.task_display_type.rotate()
+
         self.display_level_info()
         self.display_task_info()
-        self.display_time_info(flight.get_utc_secs())
-        self.view.update_position(*flight.get_position())
-
-    def flight_task_start(self, flight):
-        """Call back on task start - reset task display type"""
-        while self.task_display_type[0] != "start_time":
-            self.task_display_type.rotate()
-        self.flight_update(flight)
+        self.display_time_info(self.flight.get_utc_secs())
+        self.view.update_position(*self.flight.get_position())
 
     #------------------------------------------------------------------
 
