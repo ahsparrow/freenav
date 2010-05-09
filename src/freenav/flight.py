@@ -23,19 +23,18 @@ SHORT_NAMES = {'Init':   'Init',
 
 SPEED_CALC_TIME_DELTA = 30
 
-class Event:
-    (INIT_GROUND_EVT,
-     INIT_AIR_EVT,
-     RESUME_EVT,
-     NEW_POSITION_EVT,
-     TAKEOFF_EVT,
-     LAUNCH_EVT,
-     START_EVT,
-     START_SECTOR_EVT,
-     LINE_EVT,
-     TASK_EVT,
-     DIVERT_EVT,
-     SECTOR_EVT) = range(12)
+INIT_GROUND_EVT, \
+INIT_AIR_EVT, \
+RESUME_EVT, \
+NEW_POSITION_EVT, \
+TAKEOFF_EVT, \
+LAUNCH_EVT, \
+START_EVT, \
+START_SECTOR_EVT, \
+LINE_EVT, \
+TASK_EVT, \
+DIVERT_EVT, \
+SECTOR_EVT = range(12)
 
 class Flight:
     TAKEOFF_SPEED = 10
@@ -199,7 +198,7 @@ class Flight:
         # Temporary divert to takeoff WP
         self.task.divert(landables[0])
 
-        self.notify_subscribers(Event.INIT_GROUND_EVT)
+        self.notify_subscribers(INIT_GROUND_EVT)
 
     def do_init_air(self):
         """In-air initialisation"""
@@ -211,7 +210,7 @@ class Flight:
                                             settings["takeoff_pressure_level"])
             self.pressure_alt.set_takeoff_altitude(settings["takeoff_altitude"])
 
-        self.notify_subscribers(Event.INIT_AIR_EVT)
+        self.notify_subscribers(INIT_AIR_EVT)
 
     def do_resume(self):
         """Resume task after program re-start in air"""
@@ -219,7 +218,7 @@ class Flight:
         self.task.resume(settings["start_time"], self.utc_secs, self.x, self.y,
                          self.altitude)
 
-        self.notify_subscribers(Event.RESUME_EVT)
+        self.notify_subscribers(RESUME_EVT)
 
     def do_update_position(self, notify=False):
         """Update model with new position data"""
@@ -229,7 +228,7 @@ class Flight:
         self.task.calc_glide(self.x, self.y, self.altitude, self.get_wind())
 
         if notify:
-            self.notify_subscribers(Event.NEW_POSITION_EVT)
+            self.notify_subscribers(NEW_POSITION_EVT)
 
     def do_update_task_position(self):
         """Update task"""
@@ -243,7 +242,7 @@ class Flight:
         if (tim - task.speed_calc_time) >= SPEED_CALC_TIME_DELTA:
             task.calc_speed(tim, self.x, self.y, self.altitude, self.get_wind())
 
-        self.notify_subscribers(Event.NEW_POSITION_EVT)
+        self.notify_subscribers(NEW_POSITION_EVT)
 
     def do_ground_pressure_level(self, level):
         """Average takeoff pressure level"""
@@ -259,20 +258,20 @@ class Flight:
                             self.pressure_alt.takeoff_altitude)
         self.db.commit()
 
-        self.notify_subscribers(Event.TAKEOFF_EVT)
+        self.notify_subscribers(TAKEOFF_EVT)
 
     def do_launch(self):
         """Off the ground"""
-        self.notify_subscribers(Event.LAUNCH_EVT)
+        self.notify_subscribers(LAUNCH_EVT)
 
     def do_start(self):
         """Begin start"""
         self.task.reset()
-        self.notify_subscribers(Event.START_EVT)
+        self.notify_subscribers(START_EVT)
 
     def do_start_sector(self):
         """Entered start sector"""
-        self.notify_subscribers(Event.START_SECTOR_EVT)
+        self.notify_subscribers(START_SECTOR_EVT)
 
     def do_line(self):
         """Crossing line - start task"""
@@ -281,13 +280,13 @@ class Flight:
         self.db.set_start(self.utc_secs)
         self.db.commit()
 
-        self.notify_subscribers(Event.LINE_EVT)
+        self.notify_subscribers(LINE_EVT)
 
     def do_task(self):
         """Start (or re-start) task"""
         self.task.calc_nav(self.x, self.y)
         self.task.calc_glide(self.x, self.y, self.altitude, self.get_wind())
-        self.notify_subscribers(Event.TASK_EVT)
+        self.notify_subscribers(TASK_EVT)
 
     def do_set_divert(self, divert):
         """Set divert to specified waypoint"""
@@ -297,7 +296,7 @@ class Flight:
         """Start a new diversion"""
         self.task.calc_nav(self.x, self.y)
         self.task.calc_glide(self.x, self.y, self.altitude, self.get_wind())
-        self.notify_subscribers(Event.DIVERT_EVT)
+        self.notify_subscribers(DIVERT_EVT)
 
     def do_cancel_divert(self):
         """Cancel waypoint diversion and return to saved task"""

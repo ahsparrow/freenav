@@ -1,10 +1,14 @@
 import collections
 import math
+import os
+import os.path
 import time
 
 import dbus, dbus.mainloop.glib
 import gobject
 import gtk
+
+import pygame.mixer
 
 try:
     import hildon
@@ -99,6 +103,12 @@ class FreeControl:
             self.osso_c = osso.Context(OSSO_APPLICATION, "0.0.1", False)
             self.osso_device = osso.DeviceState(self.osso_c)
             gobject.timeout_add(25000, self.blank_timeout)
+
+        # Initialise pygame sounds
+        pygame.mixer.init()
+        dir = os.path.join(os.getenv('HOME'), '.freeflight', 'sounds')
+        self.sector_sound = pygame.mixer.Sound(os.path.join(dir, 'sector.wav'))
+        self.line_sound = pygame.mixer.Sound(os.path.join(dir, 'line.wav'))
 
     def blank_timeout(self):
         """Stop the N810 display from blanking"""
@@ -228,9 +238,13 @@ class FreeControl:
 
     def flight_update(self, event):
         """Callback on flight model change"""
-        if event == flight.Event.LINE_EVT:
+        if event == flight.LINE_EVT:
+            self.line_sound.play()
             while self.task_display_type[0] != "start_time":
                 self.task_display_type.rotate()
+
+        if event == flight.START_SECTOR_EVT or event == flight.SECTOR_EVT:
+            self.sector_sound.play()
 
         self.display_level_info()
         self.display_task_info()
