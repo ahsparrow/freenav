@@ -21,8 +21,6 @@ SHORT_NAMES = {'Init':   'Init',
                'Task':   'Task',
                'Divert': 'Dvrt'}
 
-SPEED_CALC_TIME_DELTA = 30
-
 INIT_GROUND_EVT, \
 INIT_AIR_EVT, \
 RESUME_EVT, \

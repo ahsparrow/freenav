@@ -53,6 +53,7 @@ class Task:
         self.start_time = 0
         self.task_speed = 0
         self.task_air_speed = 0
+        self.speed_calc_time = 0
 
     def reset(self):
         """Reset turnpoint index"""
@@ -248,6 +249,12 @@ class Task:
 
     def calculate_leg_speed(self, x, y, altitude, tim):
         """Calcuate task speed from last TP"""
+        if (tim - self.speed_calc_time) < 30:
+            # Only calculate once every 30 seconds
+            return
+        else:
+            self.speed_calc_time = tim
+
         tp_ref = self.tp_log[self.tp_index - 1]
 
         # Deltas from last turnpoint
