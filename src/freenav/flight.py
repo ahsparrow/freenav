@@ -219,12 +219,11 @@ class Flight:
 
         self.notify_subscribers(RESUME_EVT)
 
-    def do_ground_position(self, notify=False):
+    def do_ground_position(self):
         """Update with new position data on the ground"""
         self.task.divert_position(self.x, self.y, self.altitude)
 
-        if notify:
-            self.notify_subscribers(NEW_POSITION_EVT)
+        self.notify_subscribers(NEW_POSITION_EVT)
 
     def do_divert_position(self):
         """Update diverted task with new position data"""
