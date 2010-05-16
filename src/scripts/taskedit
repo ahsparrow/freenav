@@ -117,6 +117,7 @@ class TaskApp(AppBase):
             self.window = hildon.Window()
         else:
             self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        self.window.set_name('freenav-taskedit')
         self.window.set_title('Task')
         self.window.set_border_width(3)
         self.window.connect('destroy', gtk.main_quit)
