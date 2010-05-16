@@ -49,6 +49,7 @@ def add_div(box):
 class BigButtonDialog(gtk.Window):
     def __init__(self, title=None, buttons=None):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
+        self.set_name('freenav-bigbuttondialog')
         self.set_modal(True)
         self.set_resizable(False)
         self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_DIALOG)
