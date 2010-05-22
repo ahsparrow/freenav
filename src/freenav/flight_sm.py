@@ -49,18 +49,6 @@ class FlightFSM_Default(FlightState):
             fsm.getDebugStream().write("TRANSITION   : FlightFSM.Default.Default()\n")
 
 
-    def new_position(self, fsm):
-        ctxt = fsm.getOwner()
-        if fsm.getDebugFlag() == True:
-            fsm.getDebugStream().write("TRANSITION   : FlightFSM.Default.new_position()\n")
-
-        endState = fsm.getState()
-        fsm.clearState()
-        try:
-            ctxt.do_update_position(True)
-        finally:
-            fsm.setState(endState)
-
 class FlightFSM_Init(FlightFSM_Default):
 
     def Entry(self, fsm):
@@ -74,23 +62,21 @@ class FlightFSM_Init(FlightFSM_Default):
 
         if (ctxt.ground_speed > ctxt.TAKEOFF_SPEED) :
             fsm.getState().Exit(fsm)
-            fsm.clearState()
-            try:
-                ctxt.do_update_position()
-            finally:
-                fsm.setState(FlightFSM.Air)
-                fsm.getState().Entry(fsm)
+            # No actions.
+            pass
+            fsm.setState(FlightFSM.Air)
+            fsm.getState().Entry(fsm)
         elif ctxt.ground_speed < ctxt.STOPPED_SPEED :
             fsm.getState().Exit(fsm)
-            fsm.clearState()
-            try:
-                ctxt.do_update_position()
-            finally:
-                fsm.setState(FlightFSM.Ground)
-                fsm.getState().Entry(fsm)
+            # No actions.
+            pass
+            fsm.setState(FlightFSM.Ground)
+            fsm.getState().Entry(fsm)
         else:
-            FlightFSM_Default.new_position(self, fsm)
-        
+            # No actions.
+            pass
+
+
 class FlightFSM_Ground(FlightFSM_Default):
 
     def Entry(self, fsm):
@@ -110,13 +96,19 @@ class FlightFSM_Ground(FlightFSM_Default):
             fsm.getState().Exit(fsm)
             fsm.clearState()
             try:
-                ctxt.do_update_position()
+                ctxt.do_divert_position()
             finally:
                 fsm.setState(FlightFSM.Launch)
                 fsm.getState().Entry(fsm)
         else:
-            FlightFSM_Default.new_position(self, fsm)
-        
+            endState = fsm.getState()
+            fsm.clearState()
+            try:
+                ctxt.do_ground_position()
+            finally:
+                fsm.setState(endState)
+
+
     def new_pressure_level(self, fsm, level):
         ctxt = fsm.getOwner()
         if fsm.getDebugFlag() == True:
@@ -144,7 +136,7 @@ class FlightFSM_Air(FlightFSM_Default):
             fsm.getState().Exit(fsm)
             fsm.clearState()
             try:
-                ctxt.do_update_position()
+                ctxt.do_divert_position()
             finally:
                 fsm.setState(FlightFSM.Launch)
                 fsm.getState().Entry(fsm)
@@ -152,7 +144,7 @@ class FlightFSM_Air(FlightFSM_Default):
             fsm.getState().Exit(fsm)
             fsm.clearState()
             try:
-                ctxt.do_update_position()
+                ctxt.do_divert_position()
             finally:
                 fsm.setState(FlightFSM.Resume)
                 fsm.getState().Entry(fsm)
@@ -164,6 +156,18 @@ class FlightFSM_Launch(FlightFSM_Default):
     def Entry(self, fsm):
         ctxt = fsm.getOwner()
         ctxt.do_launch()
+
+    def new_position(self, fsm):
+        ctxt = fsm.getOwner()
+        if fsm.getDebugFlag() == True:
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.Launch.new_position()\n")
+
+        endState = fsm.getState()
+        fsm.clearState()
+        try:
+            ctxt.do_divert_position()
+        finally:
+            fsm.setState(endState)
 
     def start_trigger(self, fsm):
         if fsm.getDebugFlag() == True:
@@ -188,13 +192,19 @@ class FlightFSM_Start(FlightFSM_Default):
             fsm.getState().Exit(fsm)
             fsm.clearState()
             try:
-                ctxt.do_update_position()
+                ctxt.do_task_position()
             finally:
                 fsm.setState(FlightFSM.Sector)
                 fsm.getState().Entry(fsm)
         else:
-            FlightFSM_Default.new_position(self, fsm)
-        
+            endState = fsm.getState()
+            fsm.clearState()
+            try:
+                ctxt.do_task_position()
+            finally:
+                fsm.setState(endState)
+
+
     def start_trigger(self, fsm):
         if fsm.getDebugFlag() == True:
             fsm.getDebugStream().write("TRANSITION   : FlightFSM.Start.start_trigger()\n")
@@ -218,13 +228,19 @@ class FlightFSM_Sector(FlightFSM_Default):
             fsm.getState().Exit(fsm)
             fsm.clearState()
             try:
-                ctxt.do_update_position()
+                ctxt.do_task_position()
             finally:
                 fsm.setState(FlightFSM.Line)
                 fsm.getState().Entry(fsm)
         else:
-            FlightFSM_Default.new_position(self, fsm)
-        
+            endState = fsm.getState()
+            fsm.clearState()
+            try:
+                ctxt.do_task_position()
+            finally:
+                fsm.setState(endState)
+
+
     def start_trigger(self, fsm):
         if fsm.getDebugFlag() == True:
             fsm.getDebugStream().write("TRANSITION   : FlightFSM.Sector.start_trigger()\n")
@@ -247,7 +263,7 @@ class FlightFSM_Line(FlightFSM_Default):
         fsm.getState().Exit(fsm)
         fsm.clearState()
         try:
-            ctxt.do_update_position()
+            ctxt.do_task_position()
         finally:
             fsm.setState(FlightFSM.Task)
             fsm.getState().Entry(fsm)
@@ -266,7 +282,7 @@ class FlightFSM_Resume(FlightFSM_Default):
         fsm.getState().Exit(fsm)
         fsm.clearState()
         try:
-            ctxt.do_update_position()
+            ctxt.do_task_position()
         finally:
             fsm.setState(FlightFSM.Task)
             fsm.getState().Entry(fsm)
@@ -298,7 +314,7 @@ class FlightFSM_Task(FlightFSM_Default):
         endState = fsm.getState()
         fsm.clearState()
         try:
-            ctxt.do_update_task_position()
+            ctxt.do_task_position()
         finally:
             fsm.setState(endState)
 
@@ -329,12 +345,17 @@ class FlightFSM_Task(FlightFSM_Default):
             fsm.getState().Entry(fsm)
 
     def start_trigger(self, fsm):
+        ctxt = fsm.getOwner()
         if fsm.getDebugFlag() == True:
             fsm.getDebugStream().write("TRANSITION   : FlightFSM.Task.start_trigger()\n")
 
         fsm.getState().Exit(fsm)
-        fsm.setState(FlightFSM.Start)
-        fsm.getState().Entry(fsm)
+        fsm.clearState()
+        try:
+            ctxt.do_restart()
+        finally:
+            fsm.setState(FlightFSM.Start)
+            fsm.getState().Entry(fsm)
 
 class FlightFSM_Divert(FlightFSM_Default):
 
@@ -343,17 +364,12 @@ class FlightFSM_Divert(FlightFSM_Default):
         ctxt.do_divert()
 
     def cancel_divert(self, fsm):
-        ctxt = fsm.getOwner()
         if fsm.getDebugFlag() == True:
             fsm.getDebugStream().write("TRANSITION   : FlightFSM.Divert.cancel_divert()\n")
 
         fsm.getState().Exit(fsm)
-        fsm.clearState()
-        try:
-            ctxt.do_cancel_divert()
-        finally:
-            fsm.setState(FlightFSM.Task)
-            fsm.getState().Entry(fsm)
+        fsm.setState(FlightFSM.Task)
+        fsm.getState().Entry(fsm)
 
     def divert(self, fsm, waypoint_id):
         ctxt = fsm.getOwner()
@@ -367,6 +383,18 @@ class FlightFSM_Divert(FlightFSM_Default):
         finally:
             fsm.setState(FlightFSM.Divert)
             fsm.getState().Entry(fsm)
+
+    def new_position(self, fsm):
+        ctxt = fsm.getOwner()
+        if fsm.getDebugFlag() == True:
+            fsm.getDebugStream().write("TRANSITION   : FlightFSM.Divert.new_position()\n")
+
+        endState = fsm.getState()
+        fsm.clearState()
+        try:
+            ctxt.do_divert_position()
+        finally:
+            fsm.setState(endState)
 
 class FlightFSM(object):
 

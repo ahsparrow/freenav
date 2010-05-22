@@ -117,6 +117,13 @@ class ThermalCalculator:
             self.wind_calc()
             self.thermal_calc(vec)
             self.reset_vector_store(turn_direction, vec)
+            new_wind = True
+        else:
+            new_wind = False
+
+        self.thermal_start_stop(vec)
+
+        return new_wind
 
     def update(self, x, y, z, utc_secs):
         """Main update function"""
@@ -144,11 +151,11 @@ class ThermalCalculator:
         if denom == 0:
             turn_angle = 0
         else:
-            cos_turn_angle = min(dot_prod/denom, 1.0)
+            cos_turn_angle = min(dot_prod / denom, 1.0)
             turn_angle = math.acos(cos_turn_angle)
 
         new_vec = {'x': x , 'y': y, 'z': z, 'dx': dx, 'dy': dy, 'mag': mag,
                    'turn_angle': turn_angle, 'tim': utc_secs}
 
-        self.drift_update(turn_direction, new_vec)
-        self.thermal_start_stop(new_vec)
+        new_wind = self.drift_update(turn_direction, new_vec)
+        return new_wind

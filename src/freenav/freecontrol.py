@@ -1,10 +1,14 @@
 import collections
 import math
+import os
+import os.path
 import time
 
 import dbus, dbus.mainloop.glib
 import gobject
 import gtk
+
+import pygame.mixer
 
 try:
     import hildon
@@ -99,6 +103,12 @@ class FreeControl:
             self.osso_c = osso.Context(OSSO_APPLICATION, "0.0.1", False)
             self.osso_device = osso.DeviceState(self.osso_c)
             gobject.timeout_add(25000, self.blank_timeout)
+
+        # Initialise pygame sounds
+        pygame.mixer.init()
+        dir = os.path.join(os.getenv('HOME'), '.freeflight', 'sounds')
+        self.sector_sound = pygame.mixer.Sound(os.path.join(dir, 'sector.wav'))
+        self.line_sound = pygame.mixer.Sound(os.path.join(dir, 'line.wav'))
 
     def blank_timeout(self):
         """Stop the N810 display from blanking"""
@@ -226,18 +236,20 @@ class FreeControl:
         """Callback from D-Bus on new pressure altitude"""
         self.flight.update_pressure_level(level * FT_TO_M)
 
-    def flight_update(self, flight):
+    def flight_update(self, event):
         """Callback on flight model change"""
+        if event == flight.LINE_EVT:
+            self.line_sound.play()
+            while self.task_display_type[0] != "start_time":
+                self.task_display_type.rotate()
+
+        if event == flight.START_SECTOR_EVT or event == flight.SECTOR_EVT:
+            self.sector_sound.play()
+
         self.display_level_info()
         self.display_task_info()
-        self.display_time_info(flight.get_utc_secs())
-        self.view.update_position(*flight.get_position())
-
-    def flight_task_start(self, flight):
-        """Call back on task start - reset task display type"""
-        while self.task_display_type[0] != "start_time":
-            self.task_display_type.rotate()
-        self.flight_update(flight)
+        self.display_time_info(self.flight.get_utc_secs())
+        self.view.update_position(*self.flight.get_position())
 
     #------------------------------------------------------------------
 
@@ -306,10 +318,9 @@ class FreeControl:
                 info_str = ("%.0f" % speed)
             else:
                 # Task time, limited to 9:59
-                #task_secs = min(self.flight.get_task_secs(), 35940)
-                #tim_str = time.strftime("%H:%M", time.gmtime(task_secs))
-                #info_str = tim_str[1:]
-                info_str = "????"
+                ete = min(self.flight.task.task_ete, 35940)
+                tim_str = time.strftime("%H:%M", time.gmtime(ete))
+                info_str = tim_str[1:]
         else:
             info_str = flight.SHORT_NAMES[task_state]
         self.view.info_label[INFO_TASK].set_text(info_str)

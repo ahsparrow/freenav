@@ -21,7 +21,18 @@ SHORT_NAMES = {'Init':   'Init',
                'Task':   'Task',
                'Divert': 'Dvrt'}
 
-SPEED_CALC_TIME_DELTA = 30
+INIT_GROUND_EVT, \
+INIT_AIR_EVT, \
+RESUME_EVT, \
+NEW_POSITION_EVT, \
+TAKEOFF_EVT, \
+LAUNCH_EVT, \
+START_EVT, \
+START_SECTOR_EVT, \
+LINE_EVT, \
+TASK_EVT, \
+DIVERT_EVT, \
+SECTOR_EVT = range(12)
 
 class Flight:
     TAKEOFF_SPEED = 10
@@ -86,11 +97,11 @@ class Flight:
 
     def incr_maccready(self, incr):
         """Increment the Maccready setting"""
-        self.task.incr_maccready(incr)
+        self.task.increment_maccready(incr)
 
     def decr_maccready(self, decr):
         """Decrement the Maccready setting"""
-        self.task.decr_maccready(decr)
+        self.task.decrement_maccready(decr)
 
     def update_pressure_level(self, level):
         """Update model with new pressure level data"""
@@ -134,7 +145,7 @@ class Flight:
 
     def get_nav(self):
         """Return navigation (to current TP) data"""
-        return {'id': self.task.get_tp_id(),
+        return {'id': self.task.get_turnpoint_id(),
                 'distance': self.task.tp_distance,
                 'bearing': self.task.tp_bearing}
 
@@ -182,13 +193,14 @@ class Flight:
         landables = self.db.get_nearest_landables(self.x, self.y)
         self.pressure_alt.set_takeoff_altitude(landables[0]['altitude'])
 
-        # Temporary divert to takeoff WP
-        self.task.divert(landables[0])
+        # Divert to takeoff WP
+        self.task.set_divert(landables[0])
 
-        self.notify_subscribers()
+        self.notify_subscribers(INIT_GROUND_EVT)
 
     def do_init_air(self):
         """In-air initialisation"""
+        self.task.set_divert(self.task.tp_list[0])
         settings = self.db.get_settings()
 
         takeoff_date = datetime.date.fromtimestamp(settings["takeoff_time"])
@@ -197,7 +209,7 @@ class Flight:
                                             settings["takeoff_pressure_level"])
             self.pressure_alt.set_takeoff_altitude(settings["takeoff_altitude"])
 
-        self.notify_subscribers()
+        self.notify_subscribers(INIT_AIR_EVT)
 
     def do_resume(self):
         """Resume task after program re-start in air"""
@@ -205,31 +217,34 @@ class Flight:
         self.task.resume(settings["start_time"], self.utc_secs, self.x, self.y,
                          self.altitude)
 
-        self.notify_subscribers()
+        self.notify_subscribers(RESUME_EVT)
 
-    def do_update_position(self, notify=False):
-        """Update model with new position data"""
-        self.thermal.update(self.x, self.y, self.altitude,
-                                       self.utc_secs)
-        self.task.calc_nav(self.x, self.y)
-        self.task.calc_glide(self.x, self.y, self.altitude, self.get_wind())
+    def do_ground_position(self):
+        """Update with new position data on the ground"""
+        self.task.divert_position(self.x, self.y, self.altitude)
 
-        if notify:
-            self.notify_subscribers()
+        self.notify_subscribers(NEW_POSITION_EVT)
 
-    def do_update_task_position(self):
-        """Update task"""
-        tim = self.utc_secs
-        task = self.task
+    def do_divert_position(self):
+        """Update diverted task with new position data"""
+        if self.thermal.update(self.x, self.y, self.altitude, self.utc_secs):
+            self.task.set_wind(self.get_wind())
 
-        self.thermal.update(self.x, self.y, self.altitude, tim)
-        task.calc_nav(self.x, self.y)
-        task.calc_glide(self.x, self.y, self.altitude, self.get_wind())
+        self.task.divert_position(self.x, self.y, self.altitude)
 
-        if (tim - task.speed_calc_time) >= SPEED_CALC_TIME_DELTA:
-            task.calc_speed(tim, self.x, self.y, self.altitude, self.get_wind())
+        self.notify_subscribers(NEW_POSITION_EVT)
 
-        self.notify_subscribers()
+    def do_task_position(self):
+        """Update task with new position data"""
+        if self.thermal.update(self.x, self.y, self.altitude, self.utc_secs):
+            self.task.set_wind(self.get_wind())
+
+        is_sector = self.task.task_position(self.x, self.y, self.altitude,
+                                            self.utc_secs)
+        if is_sector:
+            self.notify_subscribers(SECTOR_EVT)
+        else:
+            self.notify_subscribers(NEW_POSITION_EVT)
 
     def do_ground_pressure_level(self, level):
         """Average takeoff pressure level"""
@@ -245,20 +260,25 @@ class Flight:
                             self.pressure_alt.takeoff_altitude)
         self.db.commit()
 
-        self.notify_subscribers()
+        self.notify_subscribers(TAKEOFF_EVT)
 
     def do_launch(self):
         """Off the ground"""
-        self.notify_subscribers()
+        self.notify_subscribers(LAUNCH_EVT)
 
     def do_start(self):
         """Begin start"""
         self.task.reset()
-        self.notify_subscribers()
+        self.notify_subscribers(START_EVT)
+
+    def do_restart(self):
+        """Re-start task"""
+        self.db.set_start(0)
+        self.db.commit()
 
     def do_start_sector(self):
         """Entered start sector"""
-        self.notify_subscribers()
+        self.notify_subscribers(START_SECTOR_EVT)
 
     def do_line(self):
         """Crossing line - start task"""
@@ -267,36 +287,28 @@ class Flight:
         self.db.set_start(self.utc_secs)
         self.db.commit()
 
-        for s in self.subscriber_list:
-            s.flight_task_start(self)
+        self.notify_subscribers(LINE_EVT)
 
     def do_task(self):
         """Start (or re-start) task"""
-        self.task.calc_nav(self.x, self.y)
-        self.task.calc_glide(self.x, self.y, self.altitude, self.get_wind())
-        self.notify_subscribers()
+        self.notify_subscribers(TASK_EVT)
 
     def do_set_divert(self, divert):
         """Set divert to specified waypoint"""
-        self.task.divert(divert)
+        self.task.set_divert(divert)
 
     def do_divert(self):
         """Start a new diversion"""
-        self.task.calc_nav(self.x, self.y)
-        self.task.calc_glide(self.x, self.y, self.altitude, self.get_wind())
-        self.notify_subscribers()
-
-    def do_cancel_divert(self):
-        """Cancel waypoint diversion and return to saved task"""
-        self.task.cancel_divert()
+        self.task.divert_position(self.x, self.y, self.altitude)
+        self.notify_subscribers(DIVERT_EVT)
 
     def do_next_turnpoint(self):
         """Goto next turnpoint"""
-        self.task.next_turnpoint(self.utc_secs, self.x, self.y, self.altitude)
+        self.task.next_turnpoint(self.x, self.y, self.altitude, self.utc_secs)
 
     def do_prev_turnpoint(self):
         """Goto previous turnpoint"""
-        self.task.prev_turnpoint()
+        self.task.previous_turnpoint()
 
     def is_previous_start(self):
         """Return true if a start has already been made today"""
@@ -306,16 +318,12 @@ class Flight:
         return (start_date == datetime.date.today())
 
     def in_start_sector(self):
-        return self.task.in_start_sector(self.x, self.y)
+        return self.task.in_sector(self.x, self.y, 0)
 
     #------------------------------------------------------------------------
     # Internal stuff
 
-    def notify_subscribers(self):
+    def notify_subscribers(self, event):
         """Send an update to all the subscribers"""
         for s in self.subscriber_list:
-            s.flight_update(self)
-
-if __name__ == '__main__':
-    f = Flight()
-    f.force_start()
+            s.flight_update(event)
