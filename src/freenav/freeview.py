@@ -36,6 +36,9 @@ WP_SIZE = 10
 FG_WIDTH = 30
 FG_INC = 15
 
+# Threshold to display final glide indicator
+FG_THRESHOLD = -3000
+
 def add_div(box):
     """Add a dividing bar between box elements"""
     div = gtk.EventBox()
@@ -419,7 +422,7 @@ class FreeView(AppBase):
         glide = self.flight.task.get_glide()
         glide_height = glide['height'] * M_TO_FT
 
-        if (glide_height < -5000) and not self.maccready_flag:
+        if (glide_height < FG_THRESHOLD) and not self.maccready_flag:
             return
 
         # Draw origin
