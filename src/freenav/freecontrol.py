@@ -318,10 +318,9 @@ class FreeControl:
                 info_str = ("%.0f" % speed)
             else:
                 # Task time, limited to 9:59
-                #task_secs = min(self.flight.get_task_secs(), 35940)
-                #tim_str = time.strftime("%H:%M", time.gmtime(task_secs))
-                #info_str = tim_str[1:]
-                info_str = "????"
+                ete = min(self.flight.task.task_ete, 35940)
+                tim_str = time.strftime("%H:%M", time.gmtime(ete))
+                info_str = tim_str[1:]
         else:
             info_str = flight.SHORT_NAMES[task_state]
         self.view.info_label[INFO_TASK].set_text(info_str)
