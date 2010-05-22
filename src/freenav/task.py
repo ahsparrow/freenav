@@ -195,91 +195,6 @@ class Task:
     #-------------------------------------------------------------------------
     # Internal stuff
 
-    def calculate_ground_speed(self, air_speed, course):
-        """Return ground speed given air speed, course and wind"""
-        swc = self.wind_speed / air_speed * math.sin(self.wind_direction - course)
-
-        ground_speed = (air_speed * math.sqrt(1 - swc ** 2) +
-                        self.wind_speed * math.cos(self.wind_direction - course))
-
-        return ground_speed
-
-    def calculate_air_speed(self, ground_speed, course):
-        """Return air speed given ground speed, course and wind"""
-        a2 = (self.wind_speed ** 2 + ground_speed ** 2 -
-              2 * self.wind_speed * ground_speed * math.cos(course - self.wind_direction))
-        a2 = max(a2, 0)
-
-        if a2 > 0:
-            return math.sqrt(a2)
-        else:
-            return 0
-
-    def calculate_ete(self, x, y, height, tp_list):
-        """Recursively calculate time to complete the task"""
-        if not tp_list:
-            return 0
-
-        # Get distance, bearing and glide to next TP
-        tp = tp_list[0]
-        tpx, tpy = self.tp_minxy(tp)
-
-        tp_dist, tp_bearing = self.calculate_nav(x, y, tpx, tpy)
-        gs = self.calculate_ground_speed(self.task_air_speed, tp_bearing)
-
-        if height < tp['height_loss']:
-            # If height is less than need for glide at next TP then recurse rest of TPs
-            tim = (tp_dist / gs) + self.calculate_ete(tpx, tpy, height, tp_list[1:])
-            print 1, tim, (tp_dist / gs), gs
-        else:
-            # Calculate fraction of leg at task speed and remainder at glide speed
-            height_diff = height - tp['height_loss']
-            glide_height_loss, glide_time = self.calculate_glide(x, y, tpx, tpy)
-            height_ratio = height_diff / glide_height_loss
-
-            if height_ratio > 1:
-                # Above glide, so just do glide to finish
-                tim = glide_time + tp['glide_time']
-                print 2, tim, glide_time, tp['glide_time']
-            else:
-                # Below glide, so calculate part of time at task speed and part at glide
-                t_dist = tp_dist * (1 - height_ratio)
-                t_time = t_dist / gs
-
-                g_time = glide_time * height_ratio
-
-                tim = t_time + g_time + tp['glide_time']
-                print 3, tim, t_time, gs, self.wind_speed, self.task_air_speed
-
-        return tim
-
-    def check_sector(self, x, y, altitude, tim):
-        """Return True on sector entry, increment TP if barrel sector"""
-        if self.tp_sector_flag:
-            return False
-
-        # Don't check start or finish sector
-        tp_index = self.tp_index
-        if tp_index == 0 or tp_index == len(self.tp_list) - 1:
-            return False
-
-        if self.in_sector(x, y, tp_index):
-            if self.tp_list[tp_index]['radius1'] <= 500:
-                self.next_turnpoint(x, y, altitude, tim)
-            else:
-                self.tp_sector_flag = True
-            return True
-        else:
-            return False
-
-    def calculate_nav(self, x1, y1, x2, y2):
-        """Calculate distance and bearing to next TP"""
-        dx = x2 - x1
-        dy = y2 - y1
-        tp_distance = math.hypot(dx, dy)
-        tp_bearing = math.atan2(dx, dy)
-        return tp_distance, tp_bearing
-
     def set_task_speed(self, x, y, altitude, tim, tp_ref):
         """Calcuate task speed from last TP"""
         # Deltas from turnpoint
@@ -352,6 +267,14 @@ class Task:
             tp['height_loss'] = tp_height_loss
             tp['glide_time'] = tp_glide_time
 
+    def calculate_nav(self, x1, y1, x2, y2):
+        """Calculate distance and bearing to next TP"""
+        dx = x2 - x1
+        dy = y2 - y1
+        tp_distance = math.hypot(dx, dy)
+        tp_bearing = math.atan2(dx, dy)
+        return tp_distance, tp_bearing
+
     def calculate_glide(self, x1, y1, x2, y2):
         """Return wind corrected glide height loss and time"""
         dx = x2 - x1
@@ -368,6 +291,63 @@ class Task:
 
         return height_loss, tim
 
+    def calculate_ete(self, x, y, height, tp_list):
+        """Recursively calculate time to complete the task"""
+        if not tp_list:
+            return 0
+
+        # Get distance, bearing and glide to next TP
+        tp = tp_list[0]
+        tpx, tpy = self.tp_minxy(tp)
+
+        tp_dist, tp_bearing = self.calculate_nav(x, y, tpx, tpy)
+        gs = self.calculate_ground_speed(self.task_air_speed, tp_bearing)
+
+        if height < tp['height_loss']:
+            # If height is less than need for glide at next TP then recurse rest of TPs
+            tim = (tp_dist / gs) + self.calculate_ete(tpx, tpy, height, tp_list[1:])
+            print 1, tim, (tp_dist / gs), gs
+        else:
+            # Calculate fraction of leg at task speed and remainder at glide speed
+            height_diff = height - tp['height_loss']
+            glide_height_loss, glide_time = self.calculate_glide(x, y, tpx, tpy)
+            height_ratio = height_diff / glide_height_loss
+
+            if height_ratio > 1:
+                # Above glide, so just do glide to finish
+                tim = glide_time + tp['glide_time']
+                print 2, tim, glide_time, tp['glide_time']
+            else:
+                # Below glide, so calculate part of time at task speed and part at glide
+                t_dist = tp_dist * (1 - height_ratio)
+                t_time = t_dist / gs
+
+                g_time = glide_time * height_ratio
+
+                tim = t_time + g_time + tp['glide_time']
+                print 3, tim, t_time, gs, self.wind_speed, self.task_air_speed
+
+        return tim
+
+    def check_sector(self, x, y, altitude, tim):
+        """Return True on sector entry, increment TP if barrel sector"""
+        if self.tp_sector_flag:
+            return False
+
+        # Don't check start or finish sector
+        tp_index = self.tp_index
+        if tp_index == 0 or tp_index == len(self.tp_list) - 1:
+            return False
+
+        if self.in_sector(x, y, tp_index):
+            if self.tp_list[tp_index]['radius1'] <= 500:
+                self.next_turnpoint(x, y, altitude, tim)
+            else:
+                self.tp_sector_flag = True
+            return True
+        else:
+            return False
+
     def tp_minxy(self, tp):
         # Return turnpoint sector coordinates for min task distance
         if tp.has_key('mindistx'):
@@ -375,3 +355,23 @@ class Task:
         else:
             xy = (tp['x'], tp['y'])
         return xy
+
+    def calculate_ground_speed(self, air_speed, course):
+        """Return ground speed given air speed, course and wind"""
+        swc = self.wind_speed / air_speed * math.sin(self.wind_direction - course)
+
+        ground_speed = (air_speed * math.sqrt(1 - swc ** 2) +
+                        self.wind_speed * math.cos(self.wind_direction - course))
+
+        return ground_speed
+
+    def calculate_air_speed(self, ground_speed, course):
+        """Return air speed given ground speed, course and wind"""
+        a2 = (self.wind_speed ** 2 + ground_speed ** 2 -
+              2 * self.wind_speed * ground_speed * math.cos(course - self.wind_direction))
+        a2 = max(a2, 0)
+
+        if a2 > 0:
+            return math.sqrt(a2)
+        else:
+            return 0
