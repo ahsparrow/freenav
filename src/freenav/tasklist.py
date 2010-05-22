@@ -13,7 +13,7 @@ RAD1 = 500
 ANG1 = 360
 RAD2 = 0
 ANG2 = 0
-START_RAD = 3000
+START_RAD = 5000
 FINISH_RAD = 500
 
 def make_tp(wp_id, rad1=RAD1, ang1=ANG1, rad2=RAD2, ang2=ANG2, dirn='SYM',
