@@ -1,14 +1,10 @@
 import collections
 import math
-import os
-import os.path
 import time
 
 import dbus, dbus.mainloop.glib
 import gobject
 import gtk
-
-import pygame.mixer
 
 try:
     import hildon
@@ -19,6 +15,7 @@ except ImportError:
 
 import flight
 import freedb
+import freesound
 
 OSSO_APPLICATION = "uk.org.freeflight.freenav"
 
@@ -31,6 +28,7 @@ POSITION_INTERFACE = "org.freedesktop.Gypsy.Position"
 COURSE_INTERFACE = "org.freedesktop.Gypsy.Course"
 PRESSURE_LEVEL_INTERFACE = "org.freedesktop.Gypsy.PressureLevel"
 SATELLITE_INTERFACE = "org.freedesktop.Gypsy.Satellite"
+FLARM_INTERFACE = "org.freedesktop.Gypsy.Flarm"
 
 KTS_TO_MPS = 1852 / 3600.0
 KPH_TO_MPS = 1000 / 3600.0
@@ -52,6 +50,9 @@ class FreeControl:
         self.flight = flight
         self.flight.subscribe(self)
         db = freedb.Freedb()
+
+        # Sounds
+        self.sound = freesound.Sound()
 
         # Controller state variables
         self.divert_indicator_flag = False
@@ -81,11 +82,14 @@ class FreeControl:
         self.course_if = dbus.Interface(gps, dbus_interface=COURSE_INTERFACE)
         self.satellite_if = dbus.Interface(gps,
                                            dbus_interface=SATELLITE_INTERFACE)
+        flarm_if = dbus.Interface(gps, dbus_interface=FLARM_INTERFACE)
 
         # Signal handlers for position and pressure level changes
         posn_if.connect_to_signal("PositionChanged", self.position_changed)
         plevel_if.connect_to_signal("PressureLevelChanged",
                                     self.pressure_level_changed)
+        flarm_if.connect_to_signal("FlarmAlarm", self.flarm_alarm)
+
         # Start the GPS
         self.gps_dev_if.Start()
 
@@ -103,12 +107,6 @@ class FreeControl:
             self.osso_c = osso.Context(OSSO_APPLICATION, "0.0.1", False)
             self.osso_device = osso.DeviceState(self.osso_c)
             gobject.timeout_add(25000, self.blank_timeout)
-
-        # Initialise pygame sounds
-        pygame.mixer.init()
-        dir = os.path.join(os.getenv('HOME'), '.freeflight', 'sounds')
-        self.sector_sound = pygame.mixer.Sound(os.path.join(dir, 'sector.wav'))
-        self.line_sound = pygame.mixer.Sound(os.path.join(dir, 'line.wav'))
 
     def blank_timeout(self):
         """Stop the N810 display from blanking"""
@@ -236,15 +234,41 @@ class FreeControl:
         """Callback from D-Bus on new pressure altitude"""
         self.flight.update_pressure_level(level * FT_TO_M)
 
+    def flarm_alarm(self, alarm_level, alarm_type,
+                    bearing, distance, vertical_distance):
+        """Callback from D-Bus on FLARM alarm"""
+        if alarm_type < 2:
+            # Ignore traffic and silent aircraft alarms
+            return
+
+        if abs(bearing) < 15:
+            s = 'ahead'
+        elif abs(bearing) > 150:
+            s = 'behind'
+        elif bearing > 110:
+            s = 'right-back'
+        elif bearing > 45:
+            s = 'right'
+        elif bearing > 0:
+            s = 'right-front'
+        elif bearing < -110:
+            s = 'left-back'
+        elif bearing < -45:
+            s = 'left'
+        else:
+            s = 'left-front'
+
+        self.sound.play(s)
+
     def flight_update(self, event):
         """Callback on flight model change"""
         if event == flight.LINE_EVT:
-            self.line_sound.play()
+            self.sound.play('line')
             while self.task_display_type[0] != "start_time":
                 self.task_display_type.rotate()
 
         if event == flight.START_SECTOR_EVT or event == flight.SECTOR_EVT:
-            self.sector_sound.play()
+            self.sound.play('sector')
 
         self.display_level_info()
         self.display_task_info()
