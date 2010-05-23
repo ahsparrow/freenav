@@ -13,7 +13,14 @@ class Sound():
         self.sounds = {}
         for s in SOUNDS:
             snd_file = s + '.wav'
-            self.sounds[s] = pygame.mixer.Sound(os.path.join(dir, snd_file))
+            try:
+                self.sounds[s] = pygame.mixer.Sound(os.path.join(dir, snd_file))
+            except pygame.error:
+                print "Error loading sound", s
 
     def play(self, sound):
-        self.sounds[sound].play()
+        try:
+            self.sounds[sound].play()
+        except KeyError:
+            pass
+
