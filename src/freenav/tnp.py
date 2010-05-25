@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 """Extract airspace data from Tim Newport-Peace format file."""
 
-from simpleparse.parser import Parser
-from simpleparse.dispatchprocessor import *
+from simpleparse.dispatchprocessor import DispatchProcessor, dispatchList
 from latlon import Latitude, Longitude
 
 # EBNF grammar for TNP airspace format
-tnp_decl = r"""
+TNP_DECL = r"""
 tnp_file        := (exclude_block/include_yes/airspace/airtype/airclass/eol/
                     end)*
 airspace        := title,eol*,header,body,(sub_header,body)*
@@ -111,7 +110,9 @@ class CwArc(Arc):
 
 #------------------------------------------------------------------------------
 class FlightLevel:
+    """Flight level class"""
     def __init__(self, fl_str):
+        """Class initialisation"""
         self.level = int(fl_str[2:])
 
     def __str__(self):
@@ -121,14 +122,16 @@ class FlightLevel:
         return self.level * 100
 
 class Height:
+    """Height class"""
     def __init__(self, height_str):
-        if height_str=="SFC":
+        """Class initialisation"""
+        if height_str == "SFC":
             self.height = 0
         else:
             self.height = int(height_str[:-3])
 
     def __str__(self):
-        if self.height==0:
+        if self.height == 0:
             return "SFC"
         else:
             return "%dAGL" % self.height
@@ -137,6 +140,7 @@ class Height:
         return self.height
 
 class Altitude:
+    """Altitude class"""
     def __init__(self, altitude):
         self.altitude = int(altitude[:-3])
 
@@ -147,6 +151,7 @@ class Altitude:
         return self.altitude
 
 class Unlimited:
+    """Unlimited class"""
     def __str__(self):
         return "FL999"
 
@@ -155,26 +160,32 @@ class Unlimited:
 
 #-----------------------------------------------------------------------------
 class TnpProcessor(DispatchProcessor):
+    """TNP processor"""
     def __init__(self, output_processor):
+        """Class initialisation"""
         self.output_processor = output_processor
 
-    def _no_dispatch(self, (tag, begin, end, subtags), buffer):
+    def _no_dispatch(self, (tag, begin, end, subtags), buf):
+        """Do nothing"""
         pass
 
-    def _dispatch_list(self, (tag, begin, end, subtags), buffer):
-        dispatchList(self, subtags, buffer)
+    def _dispatch_list(self, (_tag, _begin, _end, subtags), buf):
+        """Dispatch a list"""
+        dispatchList(self, subtags, buf)
 
-    airspace = title = sub_header = airtype = airclass = radius = to =\
+    airspace = title = sub_header = airtype = airclass = radius = to = \
         level = _dispatch_list
     active = radio = width = awy = _no_dispatch
 
-    def header(self, (tag, begin, end, subtags), buffer):
+    def header(self, (_tag, _begin, _end, subtags), buf):
+        """Process header"""
         self._base = self._tops = None
-        dispatchList(self, subtags, buffer)
+        dispatchList(self, subtags, buf)
 
-    def body(self, (tag, begin, end, subtags), buffer):
+    def body(self, (_tag, _begin, _end, subtags), buf):
+        """Process body"""
         self._airlist = []
-        dispatchList(self, subtags, buffer)
+        dispatchList(self, subtags, buf)
 
         # ROC's airspace file uses "dummy" airspace (with TITLE=X) to define
         # airspace type/class
@@ -182,85 +193,80 @@ class TnpProcessor(DispatchProcessor):
             self.output_processor.add_airspace(self._title, self._airclass,
                 self._airtype, self._base, self._tops, self._airlist)
 
-    def tops(self, (tag, begin, end, subtags), buffer):
-        dispatchList(self, subtags, buffer)
+    def tops(self, (_tag, _begin, _end, subtags), buf):
+        """Process TOPS statement"""
+        dispatchList(self, subtags, buf)
         self._tops = self._level
 
-    def base(self, (tag, begin, end, subtags), buffer):
-        dispatchList(self, subtags, buffer)
+    def base(self, (_tag, _begin, _end, subtags), buf):
+        """Process BASE statement"""
+        dispatchList(self, subtags, buf)
         self._base = self._level
 
-    def centre(self, (tag, begin, end, subtags), buffer):
-        dispatchList(self, subtags, buffer)
+    def centre(self, (_tag, _begin, _end, subtags), buf):
+        """Process CENTRE statement"""
+        dispatchList(self, subtags, buf)
         self._clat = self._lat
         self._clon = self._lon
 
-    def point(self, (tag, begin, end, subtags), buffer):
-        dispatchList(self, subtags, buffer)
+    def point(self, (_tag, _begin, _end, subtags), buf):
+        """Process POINT statement"""
+        dispatchList(self, subtags, buf)
         self._airlist.append(Point(self._lat, self._lon))
 
-    def circle(self, (tag, begin, end, subtags), buffer):
-        dispatchList(self, subtags, buffer)
+    def circle(self, (_tag, _begin, _end, subtags), buf):
+        """Process CIRCLE statement"""
+        dispatchList(self, subtags, buf)
         self._airlist.append(Circle(self._lat, self._lon, self._radius))
 
-    def cw_arc(self, (tag, begin, end, subtags), buffer):
-        dispatchList(self, subtags, buffer)
+    def cw_arc(self, (_tag, _begin, _end, subtags), buf):
+        """Process CW_ARC statement"""
+        dispatchList(self, subtags, buf)
         self._airlist.append(
             CwArc(self._lat, self._lon, self._clat, self._clon, self._radius))
 
-    def ccw_arc(self, (tag, begin, end, subtags), buffer):
-        dispatchList(self, subtags, buffer)
+    def ccw_arc(self, (_tag, _begin, _end, subtags), buf):
+        """Process CCW_ARC statement"""
+        dispatchList(self, subtags, buf)
         self._airlist.append(
             CcwArc(self._lat, self._lon, self._clat, self._clon, self._radius))
 
-    def title_val(self, (tag, begin, end, subtags), buffer):
-        self._title = buffer[begin:end].strip()
+    def title_val(self, (_tag, begin, end, _subtags), buf):
+        """Process TITLE value"""
+        self._title = buf[begin:end].strip()
 
-    def airtype_val(self, (tag, begin, end, subtags), buffer):
+    def airtype_val(self, (_tag, _begin, _end, subtags), _buf):
+        """Process AIRTYPE value"""
         self._airtype = subtags[0][0]
 
-    def airclass_val(self, (tag, begin, end, subtags), buffer):
-        self._airclass = buffer[begin:end]
+    def airclass_val(self, (_tag, begin, end, _subtags), buf):
+        """Process AIRCLASS value"""
+        self._airclass = buf[begin:end]
 
-    def radius_val(self, (tag, begin, end, subtags), buffer):
-        self._radius = buffer[begin:end]
+    def radius_val(self, (_tag, begin, end, _subtags), buf):
+        """Process RADIUS value"""
+        self._radius = buf[begin:end]
 
-    def latitude_val(self, (tag, begin, end, subtags), buffer):
-        self._lat = Latitude(buffer[begin:end])
+    def latitude_val(self, (_tag, begin, end, _subtags), buf):
+        """Process LATITUDE value"""
+        self._lat = Latitude(buf[begin:end])
 
-    def longitude_val(self, (tag, begin, end, subtags), buffer):
-        self._lon = Longitude(buffer[begin:end])
+    def longitude_val(self, (_tag, begin, end, _subtags), buf):
+        """Process LONGITUDE value"""
+        self._lon = Longitude(buf[begin:end])
 
-    def fl_val(self, (tag, begin, end, subtags), buffer):
-        self._level = FlightLevel(buffer[begin:end])
+    def fl_val(self, (_tag, begin, end, _subtags), buf):
+        """Process FL value"""
+        self._level = FlightLevel(buf[begin:end])
 
-    def altitude_val(self, (tag, begin, end, subtags), buffer):
-        self._level = Altitude(buffer[begin:end])
+    def altitude_val(self, (_tag, begin, end, _subtags), buf):
+        """Process ALTITUDE value"""
+        self._level = Altitude(buf[begin:end])
 
-    def height_val(self, (tag, begin, end, subtags), buffer):
-        self._level = Height(buffer[begin:end])
+    def height_val(self, (_tag, begin, end, _subtags), buf):
+        """Process HEIGHT value"""
+        self._level = Height(buf[begin:end])
 
-    def unlimited_val(self, (tag, begin, end, subtags), buffer):
+    def unlimited_val(self, (_tag, _begin, _end, _subtags), _buf):
+        """Process UNLIMITED value"""
         self._level = FlightLevel('FL999')
-
-class TestProcessor:
-    def add_airspace(self, title, airclass, airtype, base, tops, airlist):
-        print "%s, %s, %s, %s, %s" % (title, airclass, airtype, base, tops)
-
-if __name__ == '__main__':
-    import sys
-    tnp_filename = sys.argv[1]
-
-    output_processor = TestProcessor()
-    tnp_processor = TnpProcessor(output_processor)
-
-    parser = Parser(tnp_decl, "tnp_file")
-    airdata = open(tnp_filename).read()
-    (success, parse_result, next_char) = parser.parse(airdata,
-                                                      processor=tnp_processor)
-
-    # Report any syntax errors
-    if not (success and next_char==len(airdata)):
-        print "%s: Syntax error at line %d" % \
-            (tnp_filename, len(airdata[:next_char].splitlines())+1)
-

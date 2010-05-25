@@ -1,6 +1,9 @@
+"""This module provides the altimetry functionality for freenav program"""
+
 import collections
 
 class PressureAltimetry:
+    """Class to handle altimetry related calculations for freenav"""
     def __init__(self):
         """Class initialisation"""
         self.takeoff_pressure_level = None

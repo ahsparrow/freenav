@@ -2,63 +2,72 @@
 import math
 
 class LatLon(object):
-    """Base class for Latitude and Longitude."""
+    """Base class for Latitude and Longitude"""
+    def __init__(self, val):
+        """Class initialiser"""
+        self.val = val
+
     def dms_split(self):
-        secs = int(round(abs(math.degrees(self.val))*3600))
-        sec = secs % 60
-        mins = secs/60
-        min = mins % 60
-        deg = mins/60
-        return deg, min, sec
+        """Return degrees, minutes, seconds tuple"""
+        total_seconds = int(round(abs(math.degrees(self.val)) * 3600))
+        seconds = total_seconds % 60
+        total_minutes = total_seconds / 60
+        minutes = total_minutes % 60
+        degress = minutes / 60
+        return degress, minutes, seconds
 
     def radians(self):
-        """Return value in radians."""
+        """Return value in radians"""
         return self.val
 
     def degrees(self):
-        """Return value in degrees."""
+        """Return value in degrees"""
         return math.degrees(self.val)
 
     def __float__(self):
         return self.val
 
 class Latitude(LatLon):
-    def __init__(self, a):
-        """Construct from a NDDMMSS string or a value in radians."""
-        if isinstance(a, str):
-            deg = int(a[1:3])
-            min = int(a[3:5])
-            sec = int(a[5:7])
-            val = math.radians(deg + min/60.0 + sec/3600.0)
-            if a[0] == "S":
+    """Latitute class"""
+    def __init__(self, ang):
+        """Construct from a NDDMMSS string or a value in radians"""
+        if isinstance(ang, str):
+            degress = int(ang[1:3])
+            minutes = int(ang[3:5])
+            seconds = int(ang[5:7])
+            val = math.radians(degress + minutes / 60.0 + seconds / 3600.0)
+            if ang[0] == "S":
                 val = -val
         else:
-            val = float(a)
-        self.val = val
+            val = float(ang)
+
+        LatLon.__init__(self, val)
 
     def dms(self):
-        """Return dict with deg, min, sec and ns."""
-        deg, min, sec = self.dms_split()
-        ns = 'N' if self.val>0 else 'S'
-        return {'deg': deg, 'min': min, 'sec': sec, 'ns': ns}
+        """Return dict with deg, min, sec and ns"""
+        degrees, minutes, seconds = self.dms_split()
+        hemi = 'N' if self.val > 0 else 'S'
+        return {'deg': degrees, 'min': minutes, 'sec': seconds, 'ns': hemi}
 
 class Longitude(LatLon):
-    def __init__(self, a):
-        """Construct from a EDDDMMSS string or a value in radians."""
-        if isinstance(a, str):
-            deg = int(a[1:4])
-            min = int(a[4:6])
-            sec = int(a[6:8])
-            val = math.radians(deg + min/60.0 + sec/3600.0)
-            if a[0] == "W":
+    """Longitude class"""
+    def __init__(self, ang):
+        """Construct from a EDDDMMSS string or a value in radians"""
+        if isinstance(ang, str):
+            degrees = int(ang[1:4])
+            minutes = int(ang[4:6])
+            seconds = int(ang[6:8])
+            val = math.radians(degrees + minutes / 60.0 + seconds / 3600.0)
+            if ang[0] == "W":
                 val = -val
         else:
-            val = float(a)
-        self.val = val
+            val = float(ang)
+
+        LatLon.__init__(self, val)
 
     def dms(self):
-        """Return dict with deg, min, sec and ew."""
-        deg, min, sec = self.dms_split()
-        ew = 'E' if self.val>0 else 'W'
-        return {'deg': deg, 'min': min, 'sec': sec, 'ew': ew}
+        """Return dict with deg, min, sec and ew"""
+        degrees, minutes, seconds = self.dms_split()
+        hemi = 'E' if self.val > 0 else 'W'
+        return {'deg': degrees, 'min': minutes, 'sec': seconds, 'ew': hemi}
 

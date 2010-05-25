@@ -3,6 +3,7 @@
 import math
 import optparse
 import os
+import random
 import time
 import pty
 import serial
@@ -39,7 +40,7 @@ class NmeaGen:
         self.lambert = projection.Lambert(
             p['parallel1'], p['parallel2'], p['latitude'], p['longitude'])
 
-        wp = self.db.get_waypoint('HUS')
+        wp = self.db.get_waypoint('LAS')
         self.x = wp['x']
         self.y = wp['y']
         self.time = time.time()
@@ -116,6 +117,12 @@ class NmeaGen:
 
         level = (self.altitude / FT_TO_METERS) - ((self.qnh - 1013) * 30)
         data = '$PGRMZ,%d,F,2' % level
+        data = self.add_checksum(data)
+        stream.write(data)
+
+        alarm_level = random.randrange(4)
+        bearing = random.randrange(-180, 180)
+        data = '$PFLAU,1,1,2,1,%d,%d,2,0,0' % (alarm_level, bearing)
         data = self.add_checksum(data)
         stream.write(data)
 

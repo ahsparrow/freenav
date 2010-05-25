@@ -1,6 +1,7 @@
+"""This module provides thermal/wind calculations for the freenav program"""
+
 import collections
 import math
-import time
 
 MAX_CIRCLE_TIME = 35
 MAX_DRIFT_TIME = 90
@@ -20,6 +21,7 @@ class ThermalCalculator:
         self.wind_direction = 0
 
         self.thermal_start = None
+        self.thermal_update_time = 0
         self.thermal_average = 0
 
     def reset_vector_store(self, turn_direction, vec):
@@ -38,8 +40,8 @@ class ThermalCalculator:
 
         drop = False
         while (vec['tim'] - self.vector_store[0]['tim']) > MAX_CIRCLE_TIME:
-            p = self.vector_store.popleft()
-            self.turn_angle_acc -= p['turn_angle']
+            dropped_vec = self.vector_store.popleft()
+            self.turn_angle_acc -= dropped_vec['turn_angle']
             drop = True
 
         return drop
@@ -77,10 +79,10 @@ class ThermalCalculator:
         """Calculated wind speed and direction from drift values"""
         # Calculate average position/time of vector store
         xacc = yacc = tacc = 0
-        for v in self.vector_store:
-            xacc += v['x']
-            yacc += v['y']
-            tacc += v['tim']
+        for vec in self.vector_store:
+            xacc += vec['x']
+            yacc += vec['y']
+            tacc += vec['tim']
 
         vlen = len(self.vector_store)
         xavg = xacc / vlen
@@ -92,11 +94,11 @@ class ThermalCalculator:
 
         # If we have two or more drift measurements then update the wind calc
         if len(self.drift_store) > 1:
-            d = self.drift_store[0]
-            dx = xavg - d['x']
-            dy = yavg - d['y']
-            dt = tavg - d['tim']
-            self.wind_speed = math.sqrt(dx ** 2 + dy ** 2) / dt
+            drift = self.drift_store[0]
+            dx = xavg - drift['x']
+            dy = yavg - drift['y']
+            dt = tavg - drift['tim']
+            self.wind_speed = math.hypot(dx, dy) / dt
             self.wind_direction = math.atan2(dx, dy)
 
     def drift_update(self, turn_direction, vec):
@@ -132,22 +134,22 @@ class ThermalCalculator:
         z = float(z)
 
         # Calculate vector from previous point
-        v = self.vector_store[-1]
-        dx = x - v['x']
-        dy = y - v['y']
-        mag = math.sqrt(dx * dx + dy * dy)
+        vec = self.vector_store[-1]
+        dx = x - vec['x']
+        dy = y - vec['y']
+        mag = math.hypot(dx, dy)
 
         # Sign of cross product between this and previous vector gives turn
         # direction
-        cross_prod = (v['dx'] * dy) - (dx * v['dy'])
+        cross_prod = (vec['dx'] * dy) - (dx * vec['dy'])
         if cross_prod > 0:
             turn_direction = 1
         else:
             turn_direction = -1
 
         # Calculate external angle between this and previous vector
-        dot_prod = (v['dx'] * dx + v['dy'] * dy)
-        denom = mag * v['mag']
+        dot_prod = (vec['dx'] * dx + vec['dy'] * dy)
+        denom = mag * vec['mag']
         if denom == 0:
             turn_angle = 0
         else:

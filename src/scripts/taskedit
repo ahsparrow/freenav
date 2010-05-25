@@ -1,4 +1,6 @@
 #!/usr/bin/python2.5
+"""Task editing program"""
+
 import gtk
 import gobject
 
@@ -21,6 +23,7 @@ FINISH_TP_DIRNS = ['PREV', 'FIX']
 class OzDialog(gtk.Dialog):
     """Observation zone parameter dialog box"""
     def __init__(self, parent, tp, tp_type):
+        """Class initialisation"""
         self.tp = tp
         title = 'Obs. Zone - ' + self.tp['waypoint_id']
         gtk.Dialog.__init__(self, title, parent,
@@ -50,9 +53,9 @@ class OzDialog(gtk.Dialog):
         self.ang2_spin = gtk.SpinButton(ang2_adj, 0, 1)
         self.ang12_spin = gtk.SpinButton(ang12_adj, 0.5, 1)
 
-        for s in [self.rad1_spin, self.ang1_spin, self.rad2_spin,
-                  self.ang2_spin, self.ang12_spin]:
-            s.set_numeric(True)
+        for spin in [self.rad1_spin, self.ang1_spin, self.rad2_spin,
+                     self.ang2_spin, self.ang12_spin]:
+            spin.set_numeric(True)
         self.ang12_spin.set_wrap(True)
 
         table.attach(self.rad1_spin, 1, 2, 0, 1)
@@ -68,8 +71,8 @@ class OzDialog(gtk.Dialog):
             tp_dirns = FINISH_TP_DIRNS
         else:
             tp_dirns = TP_DIRNS
-        for d in tp_dirns:
-            self.dirn_combobox.append_text(d)
+        for dirn in tp_dirns:
+            self.dirn_combobox.append_text(dirn)
         self.dirn_combobox.set_active(tp_dirns.index(self.tp['direction']))
         table.attach(self.dirn_combobox, 1, 2, 4, 5)
         self.dirn_combobox.connect('changed', self.on_dirn_select)
@@ -107,10 +110,14 @@ else:
 SELECTION_FORMAT_STR = 8
 
 class TaskApp(AppBase):
+    """Main task application class"""
     def __init__(self):
+        """Class initialisation"""
         AppBase.__init__(self)
 
         self.task_db = freenav.freedb.Freedb()
+
+        self.window_in_fullscreen = False
 
         # Create window and add event handlers
         if is_hildon_app:
@@ -226,16 +233,16 @@ class TaskApp(AppBase):
         self.task_view.connect('drag-data-received',
                                self.on_drag_data_received)
 
-    def tp_cell(self, col, cell, model, iter):
+    def tp_cell(self, _col, cell, model, model_iter):
         """Task list cell data function"""
-        x = model.get_value(iter, 0)
+        x = model.get_value(model_iter, 0)
         cell.set_property('text', x['waypoint_id'])
 
-    def on_task_change(self, widget):
+    def on_task_change(self, _widget):
         """Callback on task list model change"""
         self.update_distance()
 
-    def on_quit(self, widget, event, data=None):
+    def on_quit(self, _widget, _event, _data=None):
         """Callback on application quit"""
         if not self.task_saved:
             dialog = gtk.MessageDialog(buttons=gtk.BUTTONS_YES_NO,
@@ -245,14 +252,14 @@ class TaskApp(AppBase):
             dialog.destroy()
             return (ret == gtk.RESPONSE_NO)
 
-    def on_window_state_change(self, widget, event, *args):
+    def on_window_state_change(self, _widget, event, *_args):
         """Callback on window state change"""
         if event.new_window_state & gtk.gdk.WINDOW_STATE_FULLSCREEN:
             self.window_in_fullscreen = True
         else:
             self.window_in_fullscreen = False
 
-    def on_keypress(self, widget, event, *args):
+    def on_keypress(self, _widget, event, *_args):
         """Callback on keypress"""
         if event.keyval == gtk.keysyms.F6:
             if self.window_in_fullscreen:
@@ -260,38 +267,38 @@ class TaskApp(AppBase):
             else:
                 self.window.fullscreen()
 
-    def on_save(self, button):
+    def on_save(self, _button):
         """Callback on save button pressed"""
         self.task_store.save()
         self.task_store.commit()
         self.task_saved = True
 
-    def on_wp_activated(self, treeview, path, column, model):
+    def on_wp_activated(self, _treeview, path, _column, model):
         """Callback on double click on waypoint"""
-        id = model[path][0]
-        self.tp_dialog(id)
+        wp_id = model[path][0]
+        self.tp_dialog(wp_id)
 
-    def on_tp_activated(self, treeview, path, column, model):
+    def on_tp_activated(self, _treeview, path, _column, model):
         """Callback on double click on turnpoint"""
-        id = model[path][0]['waypoint_id']
-        self.tp_dialog(id)
+        wp_id = model[path][0]['waypoint_id']
+        self.tp_dialog(wp_id)
 
-    def tp_dialog(self, id):
+    def tp_dialog(self, wp_id):
         """Display waypoint info"""
-        wp = self.task_db.get_waypoint(id)
-        msg = "%s\n%s\n%s\n%s" % (id, wp['name'], wp['turnpoint'],
+        wp = self.task_db.get_waypoint(wp_id)
+        msg = "%s\n%s\n%s\n%s" % (wp_id, wp['name'], wp['turnpoint'],
                                   wp['comment'])
-        md = gtk.MessageDialog(None, gtk.DIALOG_MODAL, gtk.MESSAGE_INFO, 
-                               gtk.BUTTONS_CLOSE, msg)
-        md.run()
-        md.destroy()
+        dialog = gtk.MessageDialog(None, gtk.DIALOG_MODAL, gtk.MESSAGE_INFO, 
+                                   gtk.BUTTONS_CLOSE, msg)
+        dialog.run()
+        dialog.destroy()
 
-    def on_tp_delete(self, button):
+    def on_tp_delete(self, _button):
         """Callback on turnpoint delete button press"""
         selection = self.task_view.get_selection()
-        model, iter = selection.get_selected()
-        if iter:
-            path = model.get_path(iter)
+        model, model_iter = selection.get_selected()
+        if model_iter:
+            path = model.get_path(model_iter)
             self.task_store.delete_tp(path[0])
 
             n = len(model)
@@ -303,12 +310,12 @@ class TaskApp(AppBase):
 
         self.task_saved = False
 
-    def on_oz_set(self, button):
+    def on_oz_set(self, _button):
         """Pop up OZ setting dialog and get some new settings"""
         selection = self.task_view.get_selection()
-        model, iter = selection.get_selected()
-        if iter:
-            tp_index = model.get_path(iter)[0]
+        model, model_iter = selection.get_selected()
+        if model_iter:
+            tp_index = model.get_path(model_iter)[0]
             tp = model[tp_index][0]
             if tp_index == 0:
                 tp_type = 'start'
@@ -333,22 +340,22 @@ class TaskApp(AppBase):
         self.task_store.load(task_id)
         self.task_saved = False
 
-    def on_wp_drag_data_get(self, view, context, selection, info, etime):
+    def on_wp_drag_data_get(self, view, _context, selection, _info, _etime):
         """Drag starting from waypoint list"""
         sel = view.get_selection()
-        model, iter = sel.get_selected()
-        id = model.get_value(iter, 0)
-        selection.set('WP_DATA', SELECTION_FORMAT_STR, id)
+        model, model_iter = sel.get_selected()
+        wp_id = model.get_value(model_iter, 0)
+        selection.set('WP_DATA', SELECTION_FORMAT_STR, wp_id)
 
-    def on_task_drag_data_get(self, view, context, selection, info, etime):
+    def on_task_drag_data_get(self, view, _context, selection, _info, _etime):
         """Drag starting from turnpoint list"""
         sel = view.get_selection()
-        model, paths = sel.get_selected_rows()
+        _model, paths = sel.get_selected_rows()
         row = paths[0][0]
         selection.set('TASK_DATA', SELECTION_FORMAT_STR, str(row))
 
-    def on_drag_data_received(self, view, context, x, y, selection, info,
-                              etime):
+    def on_drag_data_received(self, view, _context, x, y, selection, _info,
+                              _etime):
         """Drag finishing in turnpoint list"""
         model = view.get_model()
         drop_info = view.get_dest_row_at_pos(x, y)
@@ -376,9 +383,14 @@ class TaskApp(AppBase):
         self.dist_label.set_text('%.1fkm' % (dist / 1000))
 
     def run(self):
+        """Run the main loop"""
         self.window.show_all()
         gtk.main()
 
-if __name__ == '__main__':
+def main():
+    """Main program"""
     task_app = TaskApp()
     task_app.run()
+
+if __name__ == '__main__':
+    main()

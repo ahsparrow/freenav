@@ -1,16 +1,18 @@
+"""This module provides the view for the freenav program"""
+
 import math
-import time
 
-import gtk, gobject, pango
+import gtk
 import gtk.gdk
+import pango
 
-is_hildon_app = True
+IS_HILDON_APP = True
 try:
     import hildon
-    AppBase = hildon.Program
+    APP_BASE = hildon.Program
 except ImportError:
-    is_hildon_app = False
-    AppBase = object
+    IS_HILDON_APP = False
+    APP_BASE = object
 
 import mapcache
 
@@ -50,6 +52,7 @@ def add_div(box):
     box.pack_start(div, expand=False)
 
 class BigButtonDialog(gtk.Window):
+    """Dialog box with unusually big buttons"""
     def __init__(self, title=None, buttons=None):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
         self.set_name('freenav-bigbuttondialog')
@@ -66,31 +69,37 @@ class BigButtonDialog(gtk.Window):
 
         button_box = gtk.HBox(homogeneous=True, spacing=10)
         button_box.set_size_request(300, 150)
-        for (b, resp) in zip(buttons[::2], buttons[1::2]):
-            button = gtk.Button(stock=b)
+        for but, resp in zip(buttons[::2], buttons[1::2]):
+            button = gtk.Button(stock=but)
             button.connect("clicked", self.callback, resp)
             button_box.pack_start(button)
 
         self.vbox.pack_end(button_box)
 
     def set_label(self, widget):
+        """Set dialog box label"""
         self.vbox.pack_start(widget)
 
-    def callback(self, widget, data):
+    def callback(self, _widget, data):
+        """Button press callback"""
         self.response = data
         gtk.main_quit()
 
-    def delete_event(self, widget, event):
+    def delete_event(self, _widget, _event):
+        """Delete event callback"""
         self.response = gtk.RESPONSE_DELETE_EVENT
         gtk.main_quit()
 
     def run(self):
+        """Start the dialog box and return button press response"""
         gtk.main()
         return self.response
 
-class FreeView(AppBase):
+class FreeView(APP_BASE):
+    """Main view class"""
     def __init__(self, flight, fullscreen):
-        AppBase.__init__(self)
+        """Class initialisation"""
+        APP_BASE.__init__(self)
 
         self.flight = flight
 
@@ -109,7 +118,7 @@ class FreeView(AppBase):
         self.maccready_flag = False
 
         # Create top level window
-        if is_hildon_app:
+        if IS_HILDON_APP:
             self.window = hildon.Window()
         else:
             self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -141,7 +150,7 @@ class FreeView(AppBase):
         self.info_box = []
         self.info_label = []
         self.size_group = gtk.SizeGroup(gtk.SIZE_GROUP_HORIZONTAL)
-        for i in range(NUM_INFO_BOXES):
+        for _dummy in range(NUM_INFO_BOXES):
             label = gtk.Label()
             attr_list = pango.AttrList()
             attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 45,
@@ -224,7 +233,7 @@ class FreeView(AppBase):
         height = win_height * self.view_scale
         return width, height
 
-    def area_expose(self, area, event):
+    def area_expose(self, area, _event):
         """Repaint the display"""
         win = area.window
         win_width, win_height = win.get_size()
@@ -292,15 +301,15 @@ class FreeView(AppBase):
     def draw_airspace(self, gc, win):
         """Draw airspace boundary lines and arcs"""
         # Airspace lines
-        for id in self.mapcache.airspace_lines:
-            for line in self.mapcache.airspace_lines[id]:
+        for as_id in self.mapcache.airspace_lines:
+            for line in self.mapcache.airspace_lines[as_id]:
                 x1, y1 = self.view_to_win(line['x1'], line['y1'])
                 x2, y2 = self.view_to_win(line['x2'], line['y2'])
                 win.draw_line(gc, x1, y1, x2, y2)
 
         # Airspace arcs & circles
-        for id in self.mapcache.airspace_arcs:
-            for arc in self.mapcache.airspace_arcs[id]:
+        for as_id in self.mapcache.airspace_arcs:
+            for arc in self.mapcache.airspace_arcs[as_id]:
                 radius = arc['radius']
                 x, y = self.view_to_win(arc['x'] - radius, arc['y'] + radius)
                 width = 2 * arc['radius'] / self.view_scale
@@ -381,12 +390,12 @@ class FreeView(AppBase):
 
     def draw_radial(self, gc, win, x, y, angle, radius1, radius2):
         """Draw a radial line"""
-        a = math.radians(angle)
-        ca = math.cos(a)
-        sa = math.sin(a)
+        ang = math.radians(angle)
+        cos_ang = math.cos(ang)
+        sin_ang = math.sin(ang)
 
-        x1, y1 = self.view_to_win(x + radius1 * sa, y + radius1 * ca)
-        x2, y2 = self.view_to_win(x + radius2 * sa, y + radius2 * ca)
+        x1, y1 = self.view_to_win(x + radius1 * sin_ang, y + radius1 * cos_ang)
+        x2, y2 = self.view_to_win(x + radius2 * sin_ang, y + radius2 * cos_ang)
         win.draw_line(gc, x1, y1, x2, y2)
 
     def draw_turnpoint(self, gc, win, win_height):
@@ -402,17 +411,18 @@ class FreeView(AppBase):
                         background=self.bg_color)
 
         # Draw arrow for relative bearing to TP
-        rb = nav['bearing'] - self.flight.get_velocity()['track']
-        x, y = math.sin(rb), -math.cos(rb)
+        rel = nav['bearing'] - self.flight.get_velocity()['track']
+        x, y = math.sin(rel), -math.cos(rel)
 
-        xc = 40
-        yc = 40
-        a, b, c = 30, 10, 20
+        x_cent = 40
+        y_cent = 40
+        a_front, a_back, a_side = 30, 10, 20
 
-        x0, y0 = x * a, y * a
-        xp = [x0, -x0 - y * c, -x * b, -x0 + y * c]
-        yp = [y0, -y0 + x * c, -y * b, -y0 - x * c]
-        poly = [(int(x + xc + 0.5), int(y + yc + 0.5)) for x, y in zip(xp, yp)]
+        x1, y1 = x * a_front, y * a_front
+        x_poly = [x1, -x1 - y * a_side, -x * a_back, -x1 + y * a_side]
+        y_poly = [y1, -y1 + x * a_side, -y * a_back, -y1 - x * a_side]
+        poly = [(int(x + x_cent + 0.5), int(y + y_cent + 0.5))
+                for x, y in zip(x_poly, y_poly)]
 
         filled = (self.divert_flag == False)
         win.draw_polygon(gc, filled, poly)
@@ -437,7 +447,7 @@ class FreeView(AppBase):
             yinc =  FG_INC
         y = y - yinc / 2
 
-        for i in range(min(num_arrows, 5)):
+        for _dummy in range(min(num_arrows, 5)):
             y =  y + yinc
             win.draw_lines(gc, [(1, y), ((FG_WIDTH / 2) + 1, y + yinc),
                                 (FG_WIDTH + 1, y)])
@@ -462,40 +472,46 @@ class FreeView(AppBase):
             fmt = '%d\n%s\n%.1f'
         self.fg_layout.set_text(fmt % (glide_height, ete_str,
                                        glide['maccready'] * MPS_TO_KTS))
-        x, y = self.fg_layout.get_pixel_size()
+        _unused, y = self.fg_layout.get_pixel_size()
         win.draw_layout(gc, FG_WIDTH + 5, (win_height / 2) - (2 * y / 3),
                         self.fg_layout, background=None)
 
     def draw_heading(self, gc, win, win_height, win_width):
         """Draw heading glider symbol"""
-        xc = win_width / 2
-        yc = win_height / 2
+        x_cent = win_width / 2
+        y_cent = win_height / 2
 
         vel = self.flight.get_velocity()
         x = math.sin(vel['track'])
         y = -math.cos(vel['track'])
-        a, b, c, d = 15, 30, 45, 15
-        cf = [x * a, y * a, -x * b, -y * b]
-        cw = [y * c, -x * c, -y * c, x * c]
-        ct = [-x * b + y * d, -y * b - x * d, -x * b - y * d, -y * b + x * d]
+        fuse_front, fuse_back, wing_width, tail_width = 15, 30, 45, 15
+        c_fuse = [x * fuse_front, y * fuse_front,
+                  -x * fuse_back, -y * fuse_back]
+        c_wing = [y * wing_width, -x * wing_width,
+                  -y * wing_width, x * wing_width]
+        c_tail = [-x * fuse_back + y * tail_width,
+                  -y * fuse_back - x * tail_width,
+                  -x * fuse_back - y * tail_width,
+                  -y * fuse_back + x * tail_width]
 
-        for x1, y1, x2, y2 in (cf, cw, ct):
-            win.draw_line(gc, int(xc + x1 + 0.5), int(yc + y1 + 0.5),
-                              int(xc + x2 + 0.5), int(yc + y2 + 0.5))
+        for x1, y1, x2, y2 in (c_fuse, c_wing, c_tail):
+            win.draw_line(gc, int(x_cent + x1 + 0.5), int(y_cent + y1 + 0.5),
+                              int(x_cent + x2 + 0.5), int(y_cent + y2 + 0.5))
 
     def draw_wind(self, gc, win, win_width, win_height):
         """Draw wind speed/direction"""
         wind = self.flight.get_wind()
         x = math.sin(wind['direction'])
         y = -math.cos(wind['direction'])
-        xc = win_width - 40 
-        yc = 40
-        a, b, c = 30, 6, 14
+        x_cent = win_width - 40 
+        y_cent = 40
+        a_front, a_back, a_side = 30, 6, 14
 
-        x0, y0 = x * a, y * a
-        xp = [x0, -x0 - y * c, -x * b, -x0 + y * c]
-        yp = [y0, -y0 + x * c, -y * b, -y0 - x * c]
-        poly = [(int(x + xc + 0.5), int(y + yc + 0.5)) for x, y in zip(xp, yp)]
+        x1, y1 = x * a_front, y * a_front
+        x_poly = [x1, -x1 - y * a_side, -x * a_back, -x1 + y * a_side]
+        y_poly = [y1, -y1 + x * a_side, -y * a_back, -y1 - x * a_side]
+        poly = [(int(x + x_cent + 0.5), int(y + y_cent + 0.5))
+                for x, y in zip(x_poly, y_poly)]
 
         win.draw_polygon(gc, False, poly)
 
@@ -503,7 +519,7 @@ class FreeView(AppBase):
         self.wind_layout.set_text(str(int(speed)))
         x, y = self.wind_layout.get_pixel_size()
 
-        win.draw_layout(gc, xc - x - 40, yc - y / 2, self.wind_layout,
+        win.draw_layout(gc, x_cent - x - 40, y_cent - y / 2, self.wind_layout,
                         background=None)
 
         ground_speed = self.flight.get_velocity()['speed'] * MPS_TO_KTS
@@ -595,17 +611,18 @@ class FreeView(AppBase):
         return ret
 
     def set_divert_indicator(self, flag):
-        # Set indicator showing divert select is active
+        """Set indicator showing divert select is active"""
         self.divert_flag = flag
         self.redraw()
 
     def set_maccready_indicator(self, flag):
-        # Set indicator showing Maccready is active
+        """Set indicator showing Maccready is active"""
         self.maccready_flag = flag
         self.redraw()
 
     def get_button_region(self, x, y):
-        win_width, win_height = self.drawing_area.window.get_size()
+        """Return "button" id of drawing area"""
+        _win_width, win_height = self.drawing_area.window.get_size()
         if x < 75:
             if y < 100:
                 return 'divert'

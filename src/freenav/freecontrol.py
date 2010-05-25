@@ -1,3 +1,5 @@
+"""This model provides the controller for the freenav program"""
+
 import collections
 import math
 import time
@@ -7,11 +9,10 @@ import gobject
 import gtk
 
 try:
-    import hildon
     import osso
-    is_hildon_app = True
+    IS_HILDON_APP = True
 except ImportError:
-    is_hildon_app = False
+    IS_HILDON_APP = False
 
 import flight
 import freedb
@@ -44,10 +45,12 @@ INFO_TASK = 1
 INFO_TIME = 2
 
 class FreeControl:
-    def __init__(self, flight, view, config):
+    """Controller class for freenav program"""
+    def __init__(self, flight_model, view, config):
+        """Class initialisation"""
         # Links to view and model
         self.view = view
-        self.flight = flight
+        self.flight = flight_model
         self.flight.subscribe(self)
         db = freedb.Freedb()
 
@@ -101,31 +104,33 @@ class FreeControl:
             ibox.connect("button_press_event", self.info_button_press, i)
         view.window.connect('window-state-event', self.on_window_state_change)
 
-        if is_hildon_app:
-            """Add timeout callback to keep the N810 display on. Need to make
-               osso_c object variable otherwise program core dumps"""
+        if IS_HILDON_APP:
+            # Add timeout callback to keep the N810 display on. Need to make
+            # osso_c object variable otherwise program core dumps"""
             self.osso_c = osso.Context(OSSO_APPLICATION, "0.0.1", False)
             self.osso_device = osso.DeviceState(self.osso_c)
             gobject.timeout_add(25000, self.blank_timeout)
+
+        self.window_in_fullscreen = False
 
     def blank_timeout(self):
         """Stop the N810 display from blanking"""
         self.osso_device.display_blanking_pause()
         return True
 
-    def destroy(self, widget):
+    def destroy(self, _widget):
         """Stop input devices and quit"""
         self.gps_dev_if.Stop()
         gtk.main_quit()
 
-    def on_window_state_change(self, widget, event, *args):
+    def on_window_state_change(self, _widget, event, *_args):
         """Callback on window state change"""
         if event.new_window_state & gtk.gdk.WINDOW_STATE_FULLSCREEN:
             self.window_in_fullscreen = True
         else:
             self.window_in_fullscreen = False
 
-    def info_button_press(self, widget, event, *args):
+    def info_button_press(self, _widget, event, *args):
         """Handle button press in info box"""
         if event.type != gtk.gdk.BUTTON_PRESS:
             # Ignore double press
@@ -141,7 +146,7 @@ class FreeControl:
 
         return True
 
-    def button_press(self, widget, event, *args):
+    def button_press(self, _widget, event, *_args):
         """Handle button press (mouse click/screen touch)"""
         region = self.view.get_button_region(event.x, event.y)
 
@@ -180,7 +185,7 @@ class FreeControl:
 
         return True
 
-    def key_press(self, widget, event, *args):
+    def key_press(self, _widget, event, *_args):
         """Handle key(board) press"""
         keyname = gtk.gdk.keyval_name(event.keyval)
         if keyname in ('q', 'Q'):
@@ -212,7 +217,7 @@ class FreeControl:
         return True
 
     def position_changed(self,
-                         field_set, timestamp, latitude, longitude, altitude):
+                         _field_set, timestamp, latitude, longitude, altitude):
         """Callback from D-Bus on new GPS position"""
         secs = timestamp
         latitude = math.radians(latitude)
@@ -220,7 +225,7 @@ class FreeControl:
         altitude = int(altitude)
 
         # Get course parameters
-        field_set, timestamp, speed, track, climb = self.course_if.GetCourse()
+        _field_set, timestamp, speed, track, _climb = self.course_if.GetCourse()
         speed = speed * KTS_TO_MPS
         track = math.radians(track)
 
@@ -234,31 +239,31 @@ class FreeControl:
         """Callback from D-Bus on new pressure altitude"""
         self.flight.update_pressure_level(level * FT_TO_M)
 
-    def flarm_alarm(self, alarm_level, alarm_type,
-                    bearing, distance, vertical_distance):
+    def flarm_alarm(self, _alarm_level, alarm_type,
+                    bearing, _distance, _vertical_distance):
         """Callback from D-Bus on FLARM alarm"""
         if alarm_type < 2:
             # Ignore traffic and silent aircraft alarms
             return
 
         if abs(bearing) < 15:
-            s = 'ahead'
+            sound = 'ahead'
         elif abs(bearing) > 150:
-            s = 'behind'
+            sound = 'behind'
         elif bearing > 110:
-            s = 'right-back'
+            sound = 'right-back'
         elif bearing > 45:
-            s = 'right'
+            sound = 'right'
         elif bearing > 0:
-            s = 'right-front'
+            sound = 'right-front'
         elif bearing < -110:
-            s = 'left-back'
+            sound = 'left-back'
         elif bearing < -45:
-            s = 'left'
+            sound = 'left'
         else:
-            s = 'left-front'
+            sound = 'left-front'
 
-        self.sound.play(s)
+        self.sound.play(sound)
 
     def flight_update(self, event):
         """Callback on flight model change"""
@@ -306,26 +311,27 @@ class FreeControl:
         if self.level_display_type[0] == 'height':
             height = self.flight.pressure_alt.get_pressure_height()
             if height is None:
-                s = '****G'
+                info = '****G'
             else:
-                s = "%03dG" % (height / FT_TO_M)
+                info = "%03dG" % (height / FT_TO_M)
         elif self.level_display_type[0] == 'altitude':
             altitude = self.flight.pressure_alt.get_pressure_altitude()
             if altitude is None:
-                s = "%03d*" % (self.flight.altitude / FT_TO_M)
+                info = "%03d*" % (self.flight.altitude / FT_TO_M)
             else:
-                s = "%03d" % (altitude / FT_TO_M)
+                info = "%03d" % (altitude / FT_TO_M)
         elif self.level_display_type[0] == 'flight_level':
-            fl = self.flight.pressure_alt.get_flight_level()
-            if fl is None:
-                s = 'FL**'
-            elif fl < 0:
-                s = 'FL<0'
+            flight_level = self.flight.pressure_alt.get_flight_level()
+            if flight_level is None:
+                info = 'FL**'
+            elif flight_level < 0:
+                info = 'FL<0'
             else:
-                s = 'FL%02d' % round((fl / FT_TO_M) / 100)
+                info = 'FL%02d' % round((flight_level / FT_TO_M) / 100)
         else:
-            s = "%.1f" % (self.flight.thermal.thermal_average / KTS_TO_MPS)
-        self.view.info_label[INFO_LEVEL].set_text(s)
+            info = "%.1f" % (self.flight.thermal.thermal_average / KTS_TO_MPS)
+
+        self.view.info_label[INFO_LEVEL].set_text(info)
 
     def display_task_info(self):
         """Update task info label"""
@@ -351,28 +357,33 @@ class FreeControl:
 
     def display_time_info(self, secs):
         """Update time info label"""
-        s = time.strftime('%H:%M', time.localtime(secs))
-        self.view.info_label[INFO_TIME].set_text(s)
+        info = time.strftime('%H:%M', time.localtime(secs))
+        self.view.info_label[INFO_TIME].set_text(info)
 
     def divert_timeout(self):
+        """Timeout callback for end of divert"""
         self.divert_indicator_flag = False
         self.view.set_divert_indicator(False)
         return False
 
     def reset_divert(self):
+        """Reset the divert indicator"""
         self.divert_indicator_flag = False
         self.view.set_divert_indicator(False)
         gobject.source_remove(self.divert_timeout_id)
 
     def maccready_timeout(self):
+        """Callback for the end of MacCready adjustment period"""
         self.maccready_indicator_flag = False
         self.view.set_maccready_indicator(False)
         return False
 
     def restart_maccready_timeout(self):
+        """Restart the MacCready adjustment timeout"""
         gobject.source_remove(self.maccready_timeout_id)
         self.maccready_timeout_id = gobject.timeout_add(MACCREADY_TIMEOUT,
                                                         self.maccready_timeout)
 
     def main(self):
+        """Main program entry"""
         gtk.main()

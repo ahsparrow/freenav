@@ -1,5 +1,6 @@
+"""This module provides the flight model for the freenav program"""
+
 import datetime
-import math
 
 import altimetry
 import flight_sm
@@ -35,10 +36,12 @@ DIVERT_EVT, \
 SECTOR_EVT = range(12)
 
 class Flight:
+    """Flight model class"""
     TAKEOFF_SPEED = 10
     STOPPED_SPEED = 2
 
     def __init__(self, polar):
+        """Class initialisation"""
         self._fsm = flight_sm.Flight_sm(self)
 
         self.db = freedb.Freedb()
@@ -49,9 +52,10 @@ class Flight:
         self.thermal = thermal.ThermalCalculator()
 
         # Get projection from database
-        p = self.db.get_projection()
+        lambert = self.db.get_projection()
         self.projection = projection.Lambert(
-                p['parallel1'], p['parallel2'], p['latitude'], p['longitude'])
+                lambert['parallel1'], lambert['parallel2'],
+                lambert['latitude'], lambert['longitude'])
 
         # Position, etc
         self.x = 0
@@ -318,6 +322,7 @@ class Flight:
         return (start_date == datetime.date.today())
 
     def in_start_sector(self):
+        """Return true if in start sector"""
         return self.task.in_sector(self.x, self.y, 0)
 
     #------------------------------------------------------------------------
@@ -325,5 +330,5 @@ class Flight:
 
     def notify_subscribers(self, event):
         """Send an update to all the subscribers"""
-        for s in self.subscriber_list:
-            s.flight_update(event)
+        for subscriber in self.subscriber_list:
+            subscriber.flight_update(event)

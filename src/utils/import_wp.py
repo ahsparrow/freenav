@@ -35,7 +35,7 @@ def importwp(db, csv_file, projection):
 
         db.insert_waypoint(wp['Name'], wp['ID'], int(x), int(y),
                            int(int(wp['Elevation [Feet]'])*FT_TO_M),
-                           wp['Turnpoint'], wp['Comments'], landable_flag)
+                           wp['Turnpoint'], wp['Comments'])
 
 def usage():
     print 'usage: import_wp [options] input_file'

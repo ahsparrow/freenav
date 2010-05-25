@@ -1,3 +1,6 @@
+"""This module provides a cache store of waypoing and airspace for the freenav
+program"""
+
 import math
 
 class MapCache():
@@ -12,8 +15,8 @@ class MapCache():
 
         self.wps = []
         self.airspace = []
-        self.airspace_lines = []
-        self.airspace_arcs = []
+        self.airspace_lines = {}
+        self.airspace_arcs = {}
 
     def update(self, x, y, width, height):
         """Reload cache if there has been significant movement"""
@@ -36,10 +39,11 @@ class MapCache():
         self.airspace = self.flight.db.get_area_airspace(x, y, width, height)
         self.airspace_lines = {}
         self.airspace_arcs = {}
-        for a in self.airspace:
-            id = a['id']
-            self.airspace_lines[id] = self.flight.db.get_airspace_lines(id)
-            self.airspace_arcs[id] = self.flight.db.get_airspace_arcs(id)
+        db = self.flight.db
+        for airspace in self.airspace:
+            as_id = airspace['id']
+            self.airspace_lines[as_id] = db.get_airspace_lines(as_id)
+            self.airspace_arcs[as_id] = db.get_airspace_arcs(as_id)
 
     def get_airspace_info(self, x, y):
         """Returns list of airspace info at the given x,y position.
@@ -48,34 +52,40 @@ class MapCache():
            position cross the boundary. If it's odd then point is inside."""
         airspace_info = []
         for airspace in self.airspace:
-            odd_node = False
-
-            # Count boundary line crossings
-            for line in self.airspace_lines[airspace['id']]:
-                x1, y1 = (line['x1'], line['y1'])
-                x2, y2 = (line['x2'], line['y2'])
-                if (y1 < y and y2 >= y) or (y2 < y and y1 >= y):
-                    if (x1 + (y - y1) / (y2 - y1) * (x2 -x1)) < x:
-                        odd_node = not odd_node
-
-            # Count boundary arc (and circle) crossings
-            for arc in self.airspace_arcs[airspace['id']]:
-                xc, yc, radius = (arc['x'], arc['y'], arc['radius'])
-                start, len = (arc['start'], arc['length'])
-                if y >= (yc - radius) and y < (yc + radius):
-                    # Each arc has potentially two crossings
-                    ang1 = math.degrees(math.asin((y - yc) / radius)) * 64
-                    ang2 = 180 * 64 - ang1
-
-                    for ang in (ang1, ang2):
-                        if ((len > 0 and ((ang - start) % (360 * 64)) < len) or
-                            (len < 0 and ((start - ang) % (360 * 64)) < -len)):
-                            xp = xc + radius * math.cos(math.radians(ang/64.0)) 
-                            if xp < x:
-                                odd_node = not odd_node
-
+            odd_node = count_crossings(x, y, airspace['id'],
+                                       self.airspace_lines, self.airspace_arcs)
             if odd_node:
                 airspace_info.append((airspace['name'], airspace['base'],
                                       airspace['top']))
 
         return airspace_info
+
+def count_crossings(x, y, as_id, airspace_lines, airspace_arcs):
+    """Count boundary crossings"""
+    odd_node = False
+
+    # Count boundary line crossings
+    for line in airspace_lines[as_id]:
+        x1, y1 = (line['x1'], line['y1'])
+        x2, y2 = (line['x2'], line['y2'])
+        if (y1 < y and y2 >= y) or (y2 < y and y1 >= y):
+            if (x1 + (y - y1) / (y2 - y1) * (x2 -x1)) < x:
+                odd_node = not odd_node
+
+    # Count boundary arc (and circle) crossings
+    for arc in airspace_arcs[as_id]:
+        x_cent, y_cent, radius = (arc['x'], arc['y'], arc['radius'])
+        start, arc_len = (arc['start'], arc['length'])
+        if y >= (y_cent - radius) and y < (y_cent + radius):
+            # Each arc has potentially two crossings
+            ang1 = math.degrees(math.asin((y - y_cent) / radius)) * 64
+            ang2 = 180 * 64 - ang1
+
+            for ang in (ang1, ang2):
+                if ((arc_len > 0 and ((ang - start) % (360 * 64)) < arc_len) or
+                    (arc_len < 0 and ((start - ang) % (360 * 64)) < -arc_len)):
+                    x1 = x_cent + radius * math.cos(math.radians(ang / 64.0)) 
+                    if x1 < x:
+                        odd_node = not odd_node
+
+    return odd_node

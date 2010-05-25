@@ -1,10 +1,11 @@
 #!/usr/bin/python2.5
+"""Program to configure settings for freenav program"""
+
 import ConfigParser
 import datetime
 import os.path
 
 import gtk
-import gobject
 
 is_hildon_app = True
 try:
@@ -23,6 +24,7 @@ else:
     AppBase = object
 
 class SettingsApp(AppBase):
+    """Settings application class"""
     def __init__(self, config):
         AppBase.__init__(self)
 
@@ -39,6 +41,8 @@ class SettingsApp(AppBase):
         bugs = 100 * (settings['bugs'] - 1)
         ballast = 100 * (settings['ballast'] - 1)
         gps_device = settings['gps_device']
+
+        self.window_in_fullscreen = False
 
         # Create window and add event handlers
         if is_hildon_app:
@@ -137,11 +141,11 @@ class SettingsApp(AppBase):
 
         self.window.show_all()
 
-    def on_cancel_button(self, widget):
+    def on_cancel_button(self, _widget):
         """Cancel button pressed"""
         gtk.main_quit()
 
-    def on_ok_button(self, widget):
+    def on_ok_button(self, _widget):
         """OK button pressed"""
         self.db.set_gps_dev(self.gps_combo.get_active_text())
         self.db.set_qne(self.qne_spin.get_value_as_int() * FT_TO_M)
@@ -151,20 +155,20 @@ class SettingsApp(AppBase):
         self.db.commit()
         gtk.main_quit()
 
-    def on_clear_button(self, widget):
+    def on_clear_button(self, _widget):
         """Clear button pressed"""
         self.db.clear_qne()
         self.db.commit()
         self.qne_spin.get_adjustment().set_value(0)
 
-    def on_window_state_change(self, widget, event, *args):
+    def on_window_state_change(self, _widget, event, *_args):
         """Callback on window state change"""
         if event.new_window_state & gtk.gdk.WINDOW_STATE_FULLSCREEN:
             self.window_in_fullscreen = True
         else:
             self.window_in_fullscreen = False
 
-    def on_keypress(self, widget, event, *args):
+    def on_keypress(self, _widget, event, *_args):
         """Callback on keypress"""
         if event.keyval == gtk.keysyms.F6:
             if self.window_in_fullscreen:
@@ -173,10 +177,12 @@ class SettingsApp(AppBase):
                 self.window.fullscreen()
 
     def run(self):
+        """Start the main loop"""
         self.window.show_all()
         gtk.main()
 
-if __name__ == '__main__':
+def main():
+    """Main program"""
     # Create config parser (with case preserved keys)
     config = ConfigParser.ConfigParser()
     config.optionxform = str
@@ -185,3 +191,6 @@ if __name__ == '__main__':
 
     settings_app = SettingsApp(config)
     settings_app.run()
+
+if __name__ == '__main__':
+    main()

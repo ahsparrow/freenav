@@ -1,3 +1,5 @@
+"""This module provides the backing store for the task list in freetask"""
+
 import math
 
 import gobject
@@ -31,7 +33,7 @@ def make_start_tp(wp_id, rad1=START_RAD, ang1=180, dirn='NEXT', ang12=0):
 
 def make_finish_tp(wp_id, rad1=FINISH_RAD, ang1=0, dirn='PREV', ang12=0):
     """Generate a default finish point"""
-    return make_tp(wp_id, rad1=rad1, ang1=0, dirn=dirn, ang12=ang12)
+    return make_tp(wp_id, rad1=rad1, ang1=ang1, dirn=dirn, ang12=ang12)
 
 class TaskListStore(gtk.ListStore):
     """Model for the task list"""
@@ -39,9 +41,10 @@ class TaskListStore(gtk.ListStore):
         gtk.ListStore.__init__(self, object)
         self.db = db
 
-        p = self.db.get_projection()
+        proj = self.db.get_projection()
         self.projection = freenav.projection.Lambert(
-            p['parallel1'], p['parallel2'], p['latitude'], p['longitude'])
+            proj['parallel1'], proj['parallel2'],
+            proj['latitude'], proj['longitude'])
 
         gobject.signal_new("task_changed", TaskListStore,
                            gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, ())
@@ -141,21 +144,24 @@ class TaskListStore(gtk.ListStore):
         self.emit("task_changed")
 
     def set_tp(self, index, vals):
+        """Set turnpoint values"""
         tp = self[index][0]
         for k in vals:
             tp[k] = vals[k]
         self.emit("task_changed")
 
     def get_task_len(self):
+        """Returns task length, in m"""
         tp_list = [tp[0]['waypoint_id'] for tp in self]
         if len(tp_list) == 0:
             dist = 0
         else:
             wp = self.db.get_waypoint(tp_list[0])
-            dist= self.calc_distance(wp, tp_list[1:])
+            dist = self.calc_distance(wp, tp_list[1:])
         return dist
 
     def calc_distance(self, wp, tp_list):
+        """Recursive task length calculation"""
         if len(tp_list) == 0:
             dist = 0
         else:
@@ -179,7 +185,7 @@ class TaskListStore(gtk.ListStore):
 
                 x, y = wp['x'], wp['y']
                 if tp['direction'] == 'NEXT':
-                    wp1= wps[n + 1]
+                    wp1 = wps[n + 1]
                     x1, y1 = wp1['x'], wp1['y']
                     dx, dy = x1 - x, y1 - y
                 elif tp['direction'] == 'PREV':
@@ -189,17 +195,17 @@ class TaskListStore(gtk.ListStore):
                 elif tp['direction'] == 'SYM':
                     wp1 = wps[n - 1]
                     x1, y1 = wp1['x'], wp1['y']
-                    d1 = math.sqrt((x - x1)**2 + (y - y1)**2)
+                    dist1 = math.hypot((x - x1), (y - y1))
 
                     wp2 = wps[n + 1]
                     x2, y2 = wp2['x'], wp2['y']
-                    d2 = math.sqrt((x - x2)**2 + (y - y2)**2)
+                    dist2 = math.hypot((x - x2), (y - y2))
 
-                    if d2 == 0:
+                    if dist2 == 0:
                         dx = dy = 0
                     else:
-                        dx = ((x1 - x) + ((x2 - x) * d1 / d2)) / 2
-                        dy = ((y1 - y) + ((y2 - y) * d1 / d2)) / 2
+                        dx = ((x1 - x) + ((x2 - x) * dist1 / dist2)) / 2
+                        dy = ((y1 - y) + ((y2 - y) * dist1 / dist2)) / 2
                 ang = math.atan2(dx, dy) % (2 * math.pi)
                 tp['angle12'] = math.degrees(ang)
 
