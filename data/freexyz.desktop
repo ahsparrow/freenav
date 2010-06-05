@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Encoding=UTF-8
+Name=FreeXYZ
+Exec=/usr/bin/freexyz
+Icon=qgn_list_cntlpane
+Type=Application
+X-Osso-Service=uk.org.freeflight.freexyz
+X-Osso-Type=application/x-executable
