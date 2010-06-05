@@ -121,6 +121,10 @@ class SettingsApp(AppBase):
         table.attach(label, 0, 1, 4, 5)
         table.attach(align, 1, 2, 4, 5)
 
+        # Version label
+        label = gtk.Label('Version 0.0.1')
+        table.attach(label, 0, 2, 5, 6)
+
         # Buttons
         button_box = gtk.HButtonBox()
         button_box.set_layout(gtk.BUTTONBOX_SPREAD)
