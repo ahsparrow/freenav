@@ -1,4 +1,3 @@
-#!/usr/bin/python2.5
 """Task editing program"""
 
 import gtk
@@ -401,11 +400,3 @@ class TaskApp(AppBase):
         """Run the main loop"""
         self.window.show_all()
         gtk.main()
-
-def main():
-    """Main program"""
-    task_app = TaskApp()
-    task_app.run()
-
-if __name__ == '__main__':
-    main()
