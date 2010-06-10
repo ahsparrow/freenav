@@ -1,3 +1,9 @@
+freenav (0.0.2-1) unstable; urgency=low
+
+  * Add FLARM declaration
+
+ -- Alan Sparrow <alan@freeflight.org.uk>  Thu, 10 Jun 2010 17:54:00 +0100
+
 freenav (0.0.1-1) unstable; urgency=low
 
   * Initial release (Closes: #nnnn)  <nnnn is the bug number of your ITP>
