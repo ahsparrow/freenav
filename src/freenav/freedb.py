@@ -23,7 +23,8 @@ SCHEMA = {
 
     'Waypoints': [
         ('id', 'TEXT'), ('name', 'TEXT'), ('x', 'INTEGER'), ('y', 'INTEGER'),
-        ('altitude', 'INTEGER'), ('turnpoint', 'TEXT'), ('comment', 'TEXT')],
+        ('latitude', 'REAL'), ('longitude', 'REAL'), ('altitude', 'INTEGER'),
+        ('turnpoint', 'TEXT'), ('comment', 'TEXT')],
 
     'Airspace': [
         ('id', 'TEXT'), ('name', 'TEXT'), ('base', 'TEXT'), ('top', 'TEXT'),
@@ -124,13 +125,14 @@ class Freedb:
         """Delete all the waypoints"""
         self.cursor.execute('DELETE FROM Waypoints')
 
-    def insert_waypoint(self, name, wp_id, x, y, altitude, turnpoint, comment):
+    def insert_waypoint(self, name, wp_id, x, y, latitude, longitude, altitude,
+                        turnpoint, comment):
         """Add a new waypoint"""
         sql = '''INSERT INTO Waypoints
-              (name, id, x, y, altitude, turnpoint, comment)
-              VALUES (?, ?, ?, ?, ?, ?, ?)'''
-        self.cursor.execute(sql, (name, wp_id, x, y, altitude, turnpoint,
-                                  comment))
+            (name, id, x, y, latitude, longitude, altitude, turnpoint, comment)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'''
+        self.cursor.execute(sql, (name, wp_id, x, y, latitude, longitude,
+                                  altitude, turnpoint, comment))
 
     def get_waypoint(self, wp_id):
         """Return waypoint data"""

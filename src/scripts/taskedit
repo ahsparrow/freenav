@@ -195,6 +195,10 @@ class TaskApp(AppBase):
         combobox.set_active(self.task_store.task_id)
         combobox.connect('changed', self.on_task_select)
 
+        # Write declaration to flarmcfg.txt
+        declare_button = gtk.Button('Declare')
+        declare_button.connect('clicked', self.on_declare)
+
         # Task save
         save_button = gtk.Button('Save')
         save_button.connect('clicked', self.on_save)
@@ -208,6 +212,7 @@ class TaskApp(AppBase):
         vbox.pack_start(oz_button, expand=False)
         vbox.pack_start(gtk.HSeparator(), expand=False)
         vbox.pack_end(save_button, expand=False)
+        vbox.pack_end(declare_button, expand=False)
         vbox.pack_end(combobox, expand=False)
 
         hbox = gtk.HBox()
@@ -266,6 +271,16 @@ class TaskApp(AppBase):
                 self.window.unfullscreen()
             else:
                 self.window.fullscreen()
+
+    def on_declare(self, _button):
+        """Callback on declare button pressed"""
+        stat = self.task_store.declare()
+        if not stat:
+            dialog = gtk.MessageDialog(
+                None, gtk.DIALOG_MODAL, gtk.MESSAGE_ERROR, gtk.BUTTONS_CLOSE,
+                "Can't write flarmcfg.txt file")
+            dialog.run()
+            dialog.destroy()
 
     def on_save(self, _button):
         """Callback on save button pressed"""

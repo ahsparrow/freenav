@@ -18,14 +18,14 @@ def importwp(db, csv_file, projection):
 
     for fields in reader:
         wp = dict(zip(header, fields))
-        lat = float(wp['Latitude [degrees]']) +\
-            float(wp['Latitude [decimal minutes]']) / 60
-        lon = float(wp['Longitude [degrees]']) +\
-            float(wp['Longitude [decimal minutes]']) / 60
+        lat = math.radians(float(wp['Latitude [degrees]']) +
+                           float(wp['Latitude [decimal minutes]']) / 60)
+        lon = math.radians(float(wp['Longitude [degrees]']) +
+                           float(wp['Longitude [decimal minutes]']) / 60)
         if wp['East/West'] == 'W':
             lon = -lon
 
-        x, y = projection.forward(math.radians(lat), math.radians(lon))
+        x, y = projection.forward(lat, lon)
 
         control_p = wp['Control P']
         if set(control_p).intersection("ADHLYyZz"):
@@ -34,7 +34,8 @@ def importwp(db, csv_file, projection):
             landable_flag = 0
 
         db.insert_waypoint(wp['Name'], wp['ID'], int(x), int(y),
-                           int(int(wp['Elevation [Feet]'])*FT_TO_M),
+                           lat, lon ,
+                           int(int(wp['Elevation [Feet]']) * FT_TO_M),
                            wp['Turnpoint'], wp['Comments'])
 
 def usage():

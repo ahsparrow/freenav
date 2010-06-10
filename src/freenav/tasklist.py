@@ -35,6 +35,15 @@ def make_finish_tp(wp_id, rad1=FINISH_RAD, ang1=0, dirn='PREV', ang12=0):
     """Generate a default finish point"""
     return make_tp(wp_id, rad1=rad1, ang1=ang1, dirn=dirn, ang12=ang12)
 
+def dmm(ang, hemis):
+    """Splits lat/lon, in radians, into degrees, minutes and decimal minutes"""
+    dec_min = int(round(math.degrees(abs(ang)) * 60000))
+    min, dec_min = divmod(dec_min, 1000)
+    deg, min = divmod(min, 60)
+
+    return (deg, min, dec_min, hemis[1] if ang < 0 else hemis[0])
+
+
 class TaskListStore(gtk.ListStore):
     """Model for the task list"""
     def __init__(self, db):
@@ -67,6 +76,26 @@ class TaskListStore(gtk.ListStore):
                 t[k] = tp[k]
             self.append([t])
         self.emit("task_changed")
+
+    def declare(self):
+        """Save FLARM declaration to flarmcfg.txt"""
+        try:
+            f = open('/media/mmc1/flarmcfg.txt', 'w')
+            f.write("$PFLAC,S,NEWTASK,My Task\n")
+            f.write("$PFLAC,S,ADDWP,0000000N,00000000W,Takeoff\n")
+
+            for tp in self:
+                wp = self.db.get_waypoint(tp[0]['waypoint_id'])
+                lat = "%02d%02d%03d%s" % dmm(wp['latitude'], 'NS')
+                lon = "%03d%02d%03d%s" % dmm(wp['longitude'], 'EW')
+                str = "$PFLAC,S,ADDWP,%s,%s,%s\n" % (lat, lon, wp['id'])
+                f.write(str)
+            f.write("$PFLAC,S,ADDWP,0000000N,00000000W,Land\n")
+            f.close()
+        except IOError:
+            return False
+
+        return True
 
     def save(self):
         """Save task to database"""
