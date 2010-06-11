@@ -110,7 +110,7 @@ def main():
     db.delete_airspace()
 
     # Initialise parser
-    parser = Parser(tnp.tnp_decl, 'tnp_file')
+    parser = Parser(tnp.TNP_DECL, 'tnp_file')
     p = db.get_projection()
     proj = freenav.projection.Lambert(p['parallel1'], p['parallel2'],
                                       p['latitude'], p['longitude'])
