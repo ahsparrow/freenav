@@ -4,6 +4,8 @@ import math
 MIN_TASK_SPEED_TIME = 15 * 60
 MIN_TASK_SPEED_DISTANCE = 10000
 
+DEFAULT_MACCREADY = 1 * 1852 / 3600.0
+
 def tp_minxy(tp):
     """Return turnpoint sector coordinates for min task distance"""
     if tp.has_key('mindistx'):
@@ -45,7 +47,7 @@ class Task:
         self.tp_sector_flag = False
 
         # Set Maccready (and do initial glide calculations)
-        self.set_maccready(0.0)
+        self.set_maccready(DEFAULT_MACCREADY)
         self.glide_ete = 0
         self.glide_arrival_height = 0
         self.glide_margin = 0
