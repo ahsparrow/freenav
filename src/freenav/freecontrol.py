@@ -275,10 +275,12 @@ class FreeControl:
         if event == flight.START_SECTOR_EVT or event == flight.SECTOR_EVT:
             self.sound.play('sector')
 
-        self.display_level_info()
         self.display_task_info()
-        self.display_time_info(self.flight.get_utc_secs())
-        self.view.update_position(*self.flight.get_position())
+
+        if event != flight.INIT_POSITION_EVT:
+            self.display_level_info()
+            self.display_time_info(self.flight.get_utc_secs())
+            self.view.update_position(*self.flight.get_position())
 
     #------------------------------------------------------------------
 
@@ -351,6 +353,8 @@ class FreeControl:
                 ete = min(self.flight.task.task_ete, 35940)
                 tim_str = time.strftime("%H:%M", time.gmtime(ete))
                 info_str = tim_str[1:]
+        elif task_state == "Init":
+            info_str = "Init-%d" % self.flight.init_count
         else:
             info_str = flight.SHORT_NAMES[task_state]
         self.view.info_label[INFO_TASK].set_text(info_str)

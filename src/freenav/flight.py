@@ -11,6 +11,8 @@ import thermal
 
 KTS_TO_MPS = 1852.0 / 3600
 
+INIT_COUNT = 5
+
 SHORT_NAMES = {'Init':   'Init',
                'Ground': 'Grnd',
                'Air':    'Air',
@@ -22,6 +24,7 @@ SHORT_NAMES = {'Init':   'Init',
                'Task':   'Task',
                'Divert': 'Dvrt'}
 
+INIT_POSITION_EVT, \
 INIT_GROUND_EVT, \
 INIT_AIR_EVT, \
 RESUME_EVT, \
@@ -33,7 +36,7 @@ START_SECTOR_EVT, \
 LINE_EVT, \
 TASK_EVT, \
 DIVERT_EVT, \
-SECTOR_EVT = range(12)
+SECTOR_EVT = range(13)
 
 class Flight:
     """Flight model class"""
@@ -180,6 +183,7 @@ class Flight:
 
     def do_init(self):
         """Initialisation"""
+        self.init_count = INIT_COUNT
         self.task.reset()
 
         # Get QNE value - use None if it wasn't set today
@@ -191,6 +195,15 @@ class Flight:
         else:
             qne = None
         self.pressure_alt.set_qne(qne)
+
+    def do_init_position(self):
+        """Count number of position updates before transitioning from init"""
+        self.notify_subscribers(INIT_POSITION_EVT)
+        self.init_count -= 1
+
+    def is_initialised(self):
+        """Return if enough position updates have been received"""
+        return (self.init_count == 0)
 
     def do_init_ground(self):
         """Get and store airfield altitude"""

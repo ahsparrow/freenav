@@ -2,7 +2,7 @@ SM_SOURCES=     flight.sm
 SOURCES=        $(SM_SOURCES:%.sm=%_sm.py)
 
 # Uncomment to turn on debug message generation.
-TRACE=          -g
+# TRACE=          -g
 
 # Uncomment to turn on reflection.
 # REFLECT=        -reflect

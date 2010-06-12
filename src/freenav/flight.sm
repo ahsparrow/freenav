@@ -10,13 +10,13 @@ Init
     Entry {do_init();}
 {
     // Restart in air after task start
-    new_position [(ctxt.ground_speed > ctxt.TAKEOFF_SPEED)]
+    new_position [ctxt.is_initialised() and (ctxt.ground_speed > ctxt.TAKEOFF_SPEED)]
         Air
         {
         }
 
     // Start on grid
-    new_position [ctxt.ground_speed < ctxt.STOPPED_SPEED]
+    new_position [ctxt.is_initialised() and (ctxt.ground_speed < ctxt.STOPPED_SPEED)]
         Ground
         {
         }
@@ -24,6 +24,7 @@ Init
     new_position
         nil
         {
+            do_init_position();
         }
 }
 
