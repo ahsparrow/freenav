@@ -1,3 +1,9 @@
+freenav (0.0.3-1) unstable; urgency=low
+
+  * Add initialisation delay and set default Maccready to 1.0
+
+ -- Alan Sparrow <alan@freeflight.org.uk>  Thu, 17 Jun 2010 21:00:00 +0100
+
 freenav (0.0.2-1) unstable; urgency=low
 
   * Add FLARM declaration
