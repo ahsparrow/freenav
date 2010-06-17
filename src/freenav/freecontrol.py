@@ -4,7 +4,6 @@ import collections
 import math
 import time
 
-import dbus, dbus.mainloop.glib
 import gobject
 import gtk
 
@@ -17,19 +16,9 @@ except ImportError:
 import flight
 import freedb
 import freesound
+import freenmea
 
 OSSO_APPLICATION = "uk.org.freeflight.freenav"
-
-DBUS_SERVICE = "org.freedesktop.Gypsy"
-DBUS_PATH = "/org/freedesktop/Gypsy"
-
-CONTROL_INTERFACE = "org.freedesktop.Gypsy.Server"
-DEVICE_INTERFACE = "org.freedesktop.Gypsy.Device"
-POSITION_INTERFACE = "org.freedesktop.Gypsy.Position"
-COURSE_INTERFACE = "org.freedesktop.Gypsy.Course"
-PRESSURE_LEVEL_INTERFACE = "org.freedesktop.Gypsy.PressureLevel"
-SATELLITE_INTERFACE = "org.freedesktop.Gypsy.Satellite"
-FLARM_INTERFACE = "org.freedesktop.Gypsy.Flarm"
 
 KTS_TO_MPS = 1852 / 3600.0
 KPH_TO_MPS = 1000 / 3600.0
@@ -67,34 +56,23 @@ class FreeControl:
         self.task_display_type = collections.deque(["start_time",
                                                     "task_speed",
                                                     "task_time"])
-        # Set-up all the D-Bus stuff
-        dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
-        bus = dbus.SystemBus()
-        control = bus.get_object(DBUS_SERVICE, DBUS_PATH)
+        # Get GPS device
+        dev_name = config.get('Device-Names', db.get_settings()['gps_device'])
+        dev = config.get(dev_name, 'Device')
+        if config.has_option(dev_name, 'Baud'):
+            baud_rate = config.getint(dev_name, 'Baud')
+        else:
+            baud_rate = None
 
-        # GPS device
-        gps_dev_path = config.get('Devices', db.get_settings()['gps_device'])
-        path = control.Create(gps_dev_path, dbus_interface=CONTROL_INTERFACE)
-        gps = bus.get_object(DBUS_SERVICE, path)
+        print dev, baud_rate
 
-        # Various interfaces
-        self.gps_dev_if = dbus.Interface(gps, dbus_interface=DEVICE_INTERFACE)
-        posn_if = dbus.Interface(gps, dbus_interface=POSITION_INTERFACE)
-        plevel_if = dbus.Interface(gps, dbus_interface=PRESSURE_LEVEL_INTERFACE)
-        self.course_if = dbus.Interface(gps, dbus_interface=COURSE_INTERFACE)
-        self.satellite_if = dbus.Interface(gps,
-                                           dbus_interface=SATELLITE_INTERFACE)
-        flarm_if = dbus.Interface(gps, dbus_interface=FLARM_INTERFACE)
-
-        # Signal handlers for position and pressure level changes
-        posn_if.connect_to_signal("PositionChanged", self.position_changed)
-        plevel_if.connect_to_signal("PressureLevelChanged",
-                                    self.pressure_level_changed)
-        flarm_if.connect_to_signal("FlarmAlarm", self.flarm_alarm)
-
-        # Start the GPS
-        self.gps_dev_if.Start()
+        # Open NMEA device and connect signals
+        self.nmea_dev = freenmea.FreeNmea()
+        self.nmea_dev.open(dev, baud_rate)
+        self.nmea_dev.connect('new-position', self.position_changed)
+        self.nmea_dev.connect('new-pressure', self.pressure_level_changed)
+        self.nmea_dev.connect('flarm-alarm', self.flarm_alarm)
 
         # Handle user interface events
         view.drawing_area.connect('button_press_event', self.button_press)
@@ -120,7 +98,7 @@ class FreeControl:
 
     def destroy(self, _widget):
         """Stop input devices and quit"""
-        self.gps_dev_if.Stop()
+        self.nmea_dev.close()
         gtk.main_quit()
 
     def on_window_state_change(self, _widget, event, *_args):
@@ -216,36 +194,24 @@ class FreeControl:
 
         return True
 
-    def position_changed(self,
-                         _field_set, timestamp, latitude, longitude, altitude):
-        """Callback from D-Bus on new GPS position"""
-        secs = timestamp
-        latitude = math.radians(latitude)
-        longitude = math.radians(longitude)
-        altitude = int(altitude)
-
-        # Get course parameters
-        _field_set, timestamp, speed, track, _climb = self.course_if.GetCourse()
-        speed = speed * KTS_TO_MPS
-        track = math.radians(track)
-
-        num_satellites = self.satellite_if.GetNumSatellites()
-
+    def position_changed(self, nmea):
+        """Callback for new GPS position"""
         # Update model with new position
-        self.flight.update_position(secs, latitude, longitude, altitude,
-                                    speed, track, num_satellites)
+        self.flight.update_position(nmea.time, nmea.latitude, nmea.longitude,
+                                    nmea.gps_altitude, nmea.speed, nmea.track,
+                                    nmea.num_satellites)
 
-    def pressure_level_changed(self, level):
-        """Callback from D-Bus on new pressure altitude"""
-        self.flight.update_pressure_level(level * FT_TO_M)
+    def pressure_level_changed(self, nmea):
+        """Callback for new pressure altitude"""
+        self.flight.update_pressure_level(nmea.pressure_alt)
 
-    def flarm_alarm(self, _alarm_level, alarm_type,
-                    bearing, _distance, _vertical_distance):
-        """Callback from D-Bus on FLARM alarm"""
-        if alarm_type < 2:
+    def flarm_alarm(self, nmea):
+        """Callback for FLARM alarm"""
+        if nmea.flarm_alarm_type < 2:
             # Ignore traffic and silent aircraft alarms
             return
 
+        bearing = nmea.flarm_relative_bearing
         if abs(bearing) < 15:
             sound = 'ahead'
         elif abs(bearing) > 150:

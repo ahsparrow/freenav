@@ -62,15 +62,17 @@ class SettingsApp(AppBase):
         table.set_row_spacings(5)
 
         # Serial device select
-        devices = config.items('Devices')
         label = gtk.Label('GPS:')
         label.set_alignment(1, 0.5)
         self.gps_combo = gtk.combo_box_new_text()
-        for dev in devices:
-            self.gps_combo.append_text(dev[0])
+
+        dev_names = config.options('Device-Names')
+        for d in dev_names:
+            self.gps_combo.append_text(d)
+
         try:
-            idx = [d[0] for d in devices].index(gps_device)
-        except ValueError:
+            idx = dev_names.index(gps_device)
+        except:
             idx = -1
         self.gps_combo.set_active(idx)
 
