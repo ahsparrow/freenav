@@ -1,7 +1,5 @@
 from distutils.core import setup
 
-import freenav
-
 setup(name='freenav',
       version="0.0.4",
       description='FreeNav task and navigation programs',
