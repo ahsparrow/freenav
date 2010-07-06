@@ -1,7 +1,9 @@
 from distutils.core import setup
 
+import freenav
+
 setup(name='freenav',
-      version='0.0.2',
+      version=freenav.__version__,
       description='FreeNav task and navigation programs',
       author='Alan Sparrow',
       scripts=['src/scripts/taskedit', 'src/scripts/freenav',

@@ -13,12 +13,11 @@ try:
 except ImportError:
     is_hildon_app = False
 
+import freenav
 import freenav.freedb
 import freenav.tasklist
 
 FT_TO_M = 0.3048
-
-VERSION_STRING = 'Version 0.0.3'
 
 if is_hildon_app:
     AppBase = hildon.Program
@@ -124,7 +123,7 @@ class SettingsApp(AppBase):
         table.attach(align, 1, 2, 4, 5)
 
         # Version label
-        label = gtk.Label(VERSION_STRING)
+        label = gtk.Label("Version " + freenav.__version__)
         table.attach(label, 0, 2, 5, 6)
 
         # Buttons

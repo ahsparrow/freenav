@@ -9,6 +9,7 @@ try:
 except ImportError:
     is_hildon_app = False
 
+import freenav
 import freenav.freedb
 import freenav.tasklist
 
@@ -122,7 +123,7 @@ class TaskApp(AppBase):
 
         # Create window and add event handlers
         if is_hildon_app:
-            self.osso_c = osso.Context(OSSO_APPLICATION, "0.0.1", False)
+            self.osso_c = osso.Context(OSSO_APPLICATION, freenav.__version__)
             self.window = hildon.Window()
         else:
             self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
