@@ -62,7 +62,7 @@ class SettingsApp(AppBase):
         table.set_row_spacings(5)
 
         # Serial device select
-        devices = config.items('Devices')
+        devices = config.items('Device-Names')
         label = gtk.Label('GPS:')
         label.set_alignment(1, 0.5)
         self.gps_combo = gtk.combo_box_new_text()

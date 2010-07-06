@@ -74,7 +74,8 @@ class FreeControl:
         control = bus.get_object(DBUS_SERVICE, DBUS_PATH)
 
         # GPS device
-        gps_dev_path = config.get('Devices', db.get_settings()['gps_device'])
+        gps_dev = config.get('Device-Names', db.get_settings()['gps_device'])
+        gps_dev_path = config.get(gps_dev, 'Device')
         path = control.Create(gps_dev_path, dbus_interface=CONTROL_INTERFACE)
         gps = bus.get_object(DBUS_SERVICE, path)
 
