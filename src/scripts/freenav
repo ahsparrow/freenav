@@ -2,6 +2,8 @@
 """Main freenav program"""
 
 import ConfigParser
+import logging
+import logging.handlers
 import optparse
 import os.path
 
@@ -9,18 +11,58 @@ import freenav.flight
 import freenav.freeview
 import freenav.freecontrol
 
-# Log file location
-LOG_DIR = "/media/card/igc"
+# IGC Log file location
+IGC_DIR = "/media/card/igc"
+
+# Debug log file
+LOG_FILENAME = 'freenav.log'
+
+LEVELS = {'debug': logging.DEBUG,
+          'info': logging.INFO,
+          'warning': logging.WARNING,
+          'error': logging.ERROR,
+          'critical': logging.CRITICAL}
 
 def main():
     """Main function"""
+    # Command line parsing
     parser = optparse.OptionParser()
-    parser.add_option("-l", "--logdir", dest="logdir", default=LOG_DIR,
+    parser.add_option("-i", "--igcdir", dest="igcdir", default=IGC_DIR,
                       help="write IGC log file in DIR", metavar="DIR")
     parser.add_option("-w", "--window",
                       action="store_false", dest="fullscreen", default=True,
                       help="run application in window mode")
+    parser.add_option("-l", "--loglevel", default="warning",
+                      help="Logging LEVEL (debug|info|warning|error|critical)",
+                      metavar="LEVEL")
+    parser.add_option("-e", "--logstderr",
+                      action="store_true", default=False,
+                      help="Send log messages to stderr")
     (opts, _args) = parser.parse_args()
+
+    # Logging
+    formatter = logging.Formatter("%(asctime)s %(levelname)-8s %(message)s",
+                                  "%H:%M:%S")
+    if opts.logstderr:
+        # Log to stderr
+        handler = logging.StreamHandler()
+    else:
+        # Log to rotating file (rotate file once per run)
+
+        log_file = os.path.join(os.path.expanduser('~'), '.freeflight',
+                                LOG_FILENAME)
+        handler = logging.handlers.RotatingFileHandler(log_file, backupCount=5)
+        handler.doRollover()
+    handler.setFormatter(formatter)
+
+    freelog = logging.getLogger('freelog')
+    freelog.addHandler(handler)
+
+    try:
+        level = LEVELS[opts.loglevel]
+    except:
+        parser.error("Illegal logging level")
+    freelog.setLevel(level)
 
     # Program configuration
     config = ConfigParser.ConfigParser()

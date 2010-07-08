@@ -65,8 +65,6 @@ class FreeControl:
         else:
             baud_rate = None
 
-        print dev, baud_rate
-
         # Open NMEA device and connect signals
         self.nmea_dev = freenmea.FreeNmea()
         self.nmea_dev.open(dev, baud_rate)

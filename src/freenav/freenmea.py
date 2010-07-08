@@ -1,6 +1,6 @@
 """NMEA interface module"""
-# XXX Deal with errors
 
+import logging
 import math
 import time
 
@@ -23,6 +23,12 @@ RMC_TIME = 1
 RMC_STATUS = 2
 RMC_SPEED = 7
 RMC_TRACK = 8
+
+GRMZ_ALTITUDE = 1
+
+FLAU_ALARM_LEVEL = 5
+FLAU_ALARM_TYPE = 7
+FLAU_ALARM_BEARING = 6
 
 KTS_TO_MPS = 1852 / 3600.0
 FT_TO_M = 12 * 25.4 / 1000
@@ -48,6 +54,8 @@ def check_checksum(data_str, checksum_str=None):
 class FreeNmea(gobject.GObject):
     def __init__(self):
         gobject.GObject.__init__(self)
+
+        self.logger = logging.getLogger('freelog')
 
         # Buffer for NMEA data
         self.buf = ''
@@ -100,7 +108,7 @@ class FreeNmea(gobject.GObject):
         gobject.io_add_watch(ser.fileno(), gobject.IO_IN, self.io_callback)
 
     def close(self):
-        # Close input stream
+        """Close input stream"""
         self.stream.close()
 
     def io_callback(self, *args):
@@ -112,25 +120,24 @@ class FreeNmea(gobject.GObject):
         return True
 
     def parse_nmea(self, buf):
-        """Extract NMEA data from data buffer"""
+        """Extract NMEA data from data buffer. Return any unparsed data"""
         # Split data buffer at first newline
         sentence, separator, remainder = buf.partition("\r\n")
 
         if separator:
-            print sentence
-
             if sentence[0] == '$':
                 # Split sentence into message body and checksum
                 body_checksum = sentence[1:].split('*')
 
                 if check_checksum(*body_checksum):
+                    self.logger.debug(sentence)
                     # Split body into comma separated fields and process
                     fields = body_checksum[0].split(',')
                     self.proc_funcs.get(fields[0], self.proc_unknown)(fields)
                 else:
-                    print "Checksum error"
+                    self.logger.warning("Checksum error: " + sentence)
             else:
-                print "Incorrect sentence header"
+                self.logger.warning("Incorrect sentence header: " + sentence)
 
             # Recurse function to process remaining data in buffer
             return self.parse_nmea(remainder)
@@ -164,7 +171,7 @@ class FreeNmea(gobject.GObject):
             # Altitude above MSL
             self.gps_altitude = float(fields[GGA_ALTITUDE])
         except ValueError:
-            print "Error processing GGA"
+            self.logger.error("Error processing: " + ','.join(fields))
             return
 
         if gga_time == self.time:
@@ -187,7 +194,7 @@ class FreeNmea(gobject.GObject):
 
             self.track = math.radians(float(fields[RMC_TRACK]))
         except ValueError:
-            print "Error processing RMC"
+            self.logger.error("Error processing: " + ','.join(fields))
             return
 
         if rmc_time == self.time:
@@ -198,9 +205,9 @@ class FreeNmea(gobject.GObject):
     def proc_grmz(self, fields):
         """Process pressure altitude data"""
         try:
-            self.pressure_alt = int(fields[1]) * FT_TO_M
+            self.pressure_alt = int(fields[GRMZ_ALTITUDE]) * FT_TO_M
         except ValueError:
-            print "Error processing GRMZ"
+            self.logger.error("Error processing: " + ','.join(fields))
             return
 
         self.emit('new-pressure')
@@ -210,11 +217,11 @@ class FreeNmea(gobject.GObject):
         old_alarm_level = self.flarm_alarm_level
 
         try:
-            self.flarm_alarm_level = int(fields[5])
-            self.flarm_relative_bearing = int(fields[6])
-            self.flarm_alarm_type = int(fields[7])
+            self.flarm_alarm_level = int(fields[FLAU_ALARM_LEVEL])
+            self.flarm_relative_bearing = int(fields[FLAU_ALARM_BEARING])
+            self.flarm_alarm_type = int(fields[FLAU_ALARM_TYPE])
         except ValueError:
-            print "Error processing FLAU"
+            self.logger.error("Error processing: " + ','.join(fields))
             return
 
         # Emit signal if alarm level has increased
@@ -224,16 +231,3 @@ class FreeNmea(gobject.GObject):
     def proc_unknown(self, fields):
         """Do nothing for unknown sentence"""
         pass
-
-def flarm_cb(gps):
-    print "flarm", gps.flarm_alarm_direction
-
-def posn_cb(gps):
-    print "posn", gps.num_satellites
-
-if __name__ == '__main__':
-    gps = Gps()
-    gps.open_serial('/tmp/gps')
-    #gps.connect("flarm-alarm", flarm_cb)
-    gps.connect('new-position', posn_cb)
-    gtk.main()

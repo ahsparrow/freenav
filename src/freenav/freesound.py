@@ -1,5 +1,6 @@
 """This module encapsulates sound handling for the freenav program"""
 
+import logging
 import os.path
 
 import pygame.mixer
@@ -11,16 +12,19 @@ class Sound():
     """Sound encapsulation class"""
     def __init__(self):
         """Initialise pygame sounds"""
+        self.logger = logging.getLogger('freelog')
+
         pygame.mixer.init()
         dir_path = os.path.join(os.getenv('HOME'), '.freeflight', 'sounds')
         self.sounds = {}
         for sound in SOUNDS:
             snd_file = sound + '.wav'
             try:
+                print snd_file
                 self.sounds[sound] = pygame.mixer.Sound(
                         os.path.join(dir_path, snd_file))
             except pygame.error:
-                print "Error loading sound", sound
+                self.logger.warning("Error loading sound %s" % sound)
 
     def play(self, sound):
         """Play the sound"""
