@@ -20,7 +20,6 @@ class Sound():
         for sound in SOUNDS:
             snd_file = sound + '.wav'
             try:
-                print snd_file
                 self.sounds[sound] = pygame.mixer.Sound(
                         os.path.join(dir_path, snd_file))
             except pygame.error:
