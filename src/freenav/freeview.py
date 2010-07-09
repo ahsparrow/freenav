@@ -628,7 +628,7 @@ class FreeView(APP_BASE):
                 return 'divert'
             elif y > (win_height - 100):
                 return 'turnpoint'
-            elif (abs(y - (win_height / 2)) < 50) and not self.maccready_flag:
+            elif (abs(y - (win_height / 2)) < 50):
                 return 'glide'
             else:
                 return 'background'

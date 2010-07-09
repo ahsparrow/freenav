@@ -124,7 +124,7 @@ class NmeaGen:
         bearing = random.randrange(-180, 180)
         data = '$PFLAU,1,1,2,1,%d,%d,2,0,0' % (alarm_level, bearing)
         data = self.add_checksum(data)
-        #stream.write(data)
+        stream.write(data)
 
     def add_checksum(self, data):
         checksum = 0;

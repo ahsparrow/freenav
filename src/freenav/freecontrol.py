@@ -46,6 +46,9 @@ class FreeControl:
         # Sounds
         self.sound = freesound.Sound()
 
+        # FLARM audio control
+        self.flarm_mute = False
+
         # Controller state variables
         self.divert_indicator_flag = False
         self.maccready_indicator_flag = False
@@ -153,6 +156,13 @@ class FreeControl:
                 self.view.set_maccready_indicator(True)
                 self.maccready_timeout_id = gobject.timeout_add(
                                     MACCREADY_TIMEOUT, self.maccready_timeout)
+            else:
+                # Toggle FLARM mute (and cancel Maccready)
+                self.flarm_mute = not self.flarm_mute
+
+                self.maccready_indicator_flag = False
+                self.view.set_maccready_indicator(False)
+                gobject.source_remove(self.maccready_timeout_id)
         else:
             # Display airspace info
             x, y = self.view.win_to_view(event.x, event.y)
@@ -205,7 +215,7 @@ class FreeControl:
 
     def flarm_alarm(self, nmea):
         """Callback for FLARM alarm"""
-        if nmea.flarm_alarm_type < 2:
+        if self.flarm_mute or nmea.flarm_alarm_type < 2:
             # Ignore traffic and silent aircraft alarms
             return
 
