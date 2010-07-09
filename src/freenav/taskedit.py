@@ -6,6 +6,7 @@ import gobject
 is_hildon_app = True
 try:
     import hildon
+    import osso
 except ImportError:
     is_hildon_app = False
 
