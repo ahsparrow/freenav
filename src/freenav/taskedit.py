@@ -124,7 +124,8 @@ class TaskApp(AppBase):
 
         # Create window and add event handlers
         if is_hildon_app:
-            self.osso_c = osso.Context(OSSO_APPLICATION, freenav.__version__)
+            self.osso_c = osso.Context(OSSO_APPLICATION, freenav.__version__,
+                                       False)
             self.window = hildon.Window()
         else:
             self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
