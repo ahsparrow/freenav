@@ -29,21 +29,20 @@ def main():
     parser = optparse.OptionParser()
     parser.add_option("-i", "--igcdir", dest="igcdir", default=IGC_DIR,
                       help="write IGC log file in DIR", metavar="DIR")
-    parser.add_option("-w", "--window",
-                      action="store_false", dest="fullscreen", default=True,
-                      help="run application in window mode")
     parser.add_option("-l", "--loglevel", default="warning",
                       help="Logging LEVEL (debug|info|warning|error|critical)",
                       metavar="LEVEL")
-    parser.add_option("-e", "--logstderr",
-                      action="store_true", default=False,
-                      help="Send log messages to stderr")
+    parser.add_option("-p", "--printlog", action="store_true", default=False,
+                      help="Print log messages on stderr")
+    parser.add_option("-w", "--window",
+                      action="store_false", dest="fullscreen", default=True,
+                      help="run application in window mode")
     (opts, _args) = parser.parse_args()
 
     # Logging
     formatter = logging.Formatter("%(asctime)s %(levelname)-8s %(message)s",
                                   "%H:%M:%S")
-    if opts.logstderr:
+    if opts.printlog:
         # Log to stderr
         handler = logging.StreamHandler()
     else:
