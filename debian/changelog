@@ -1,3 +1,9 @@
+freenav (0.0.5-1) unstable; urgency=low
+
+  * Reference version before changing away from gypsy GPS
+
+ -- Alan Sparrow <alan@freeflight.org.uk>  Sat, 10 Jul 2010 11:47:00 +0100
+
 freenav (0.0.4-1) unstable; urgency=low
 
   * New ini file format
