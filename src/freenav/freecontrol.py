@@ -13,6 +13,7 @@ try:
 except ImportError:
     IS_HILDON_APP = False
 
+import freenav
 import flight
 import freedb
 import freesound
@@ -86,7 +87,8 @@ class FreeControl:
         if IS_HILDON_APP:
             # Add timeout callback to keep the N810 display on. Need to make
             # osso_c object variable otherwise program core dumps"""
-            self.osso_c = osso.Context(OSSO_APPLICATION, "0.0.1", False)
+            self.osso_c = osso.Context(OSSO_APPLICATION, freenav.__version__,
+                                       False)
             self.osso_device = osso.DeviceState(self.osso_c)
             gobject.timeout_add(25000, self.blank_timeout)
 

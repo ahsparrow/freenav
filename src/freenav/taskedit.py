@@ -6,11 +6,15 @@ import gobject
 is_hildon_app = True
 try:
     import hildon
+    import osso
 except ImportError:
     is_hildon_app = False
 
+import freenav
 import freenav.freedb
 import freenav.tasklist
+
+OSSO_APPLICATION = "uk.org.freeflight.taskedit"
 
 # List of task names
 TASKS = 'ABCDEFGH'
@@ -120,6 +124,8 @@ class TaskApp(AppBase):
 
         # Create window and add event handlers
         if is_hildon_app:
+            self.osso_c = osso.Context(OSSO_APPLICATION, freenav.__version__,
+                                       False)
             self.window = hildon.Window()
         else:
             self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
