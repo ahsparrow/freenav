@@ -1,3 +1,9 @@
+freenav (0.1.0-1) unstable; urgency=low
+
+  * First version including local NMEA interface
+
+ -- Alan Sparrow <alan@freeflight.org.uk>  Sat, 10 Jul 2010 16:27:00 +0100
+
 freenav (0.0.2-1) unstable; urgency=low
 
   * Add FLARM declaration
