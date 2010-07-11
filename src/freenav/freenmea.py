@@ -5,7 +5,6 @@ import math
 import time
 
 import bluetooth
-import gio
 import gobject
 import gtk
 import serial
@@ -86,12 +85,12 @@ class FreeNmea(gobject.GObject):
 
     def open_bt(self, addr):
         """Open a bluetooth connection"""
-        self.bt_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-        self.bt_sock.connect((addr, RF_COMM_CHANNEL))
+        bt_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+        bt_sock.connect((addr, RF_COMM_CHANNEL))
 
-        # Create input stream and add I/O watch
-        self.stream = gio.unix.InputStream(self.bt_sock, True)
-        gobject.io.io_add_watch(self.bt_sock, gobject.IO_IN, self.io_callback)
+        # Add I/O watch
+        gobject.io_add_watch(bt_sock, gobject.IO_IN, self.bt_io_callback)
+        self.nmea_dev = bt_sock
 
     def open_serial(self, dev_path, baudrate=None):
         """Open serial device"""
@@ -103,21 +102,32 @@ class FreeNmea(gobject.GObject):
         # Flush stale data
         ser.flushInput()
 
-        # Create input stream and add I/O watch
-        self.stream = gio.unix.InputStream(ser.fileno(), True)
-        gobject.io_add_watch(ser.fileno(), gobject.IO_IN, self.io_callback)
+        # Add I/O watch
+        gobject.io_add_watch(ser, gobject.IO_IN, self.ser_io_callback)
+        self.nmea_dev = ser
 
     def close(self):
-        """Close input stream"""
-        self.stream.close()
+        """Close input device"""
+        self.nmea_dev.close()
 
-    def io_callback(self, *args):
-        """Callback on NMEA input data"""
-        # Prepend new data to old and parse NMEA data
-        buf = ''.join([self.buf, self.stream.read()])
-        self.buf = self.parse_nmea(buf)
+    def ser_io_callback(self, *args):
+        """Callback on NMEA serial input data"""
+        data = self.nmea_dev.read()
+        self.add_nmea_data(data)
 
         return True
+
+    def bt_io_callback(self, *args):
+        """Callback on NMEA bluetooth input data"""
+        data = self.nmea_dev.recv(4096)
+        self.add_nmea_data(data)
+
+        return True
+
+    def add_nmea_data(self, data):
+        """Prepend new NMEA data and parse new data"""
+        buf = ''.join([self.buf, data])
+        self.buf = self.parse_nmea(buf)
 
     def parse_nmea(self, buf):
         """Extract NMEA data from data buffer. Return any unparsed data"""
