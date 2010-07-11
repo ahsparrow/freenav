@@ -1,3 +1,9 @@
+freenav (0.1.1-1) unstable; urgency=low
+
+  * Remove gio streaming (not supported by N810)
+
+ -- Alan Sparrow <alan@freeflight.org.uk>  Sun, 11 Jul 2010 15:11:00 +0100
+
 freenav (0.1.0-1) unstable; urgency=low
 
   * First version including local NMEA interface
