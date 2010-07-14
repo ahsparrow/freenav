@@ -7,8 +7,6 @@ import logging.handlers
 import optparse
 import os.path
 
-import freenav.gtkexcepthook
-
 import freenav.flight
 import freenav.freeview
 import freenav.freecontrol
