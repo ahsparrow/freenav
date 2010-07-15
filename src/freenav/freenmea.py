@@ -20,6 +20,10 @@ GGA_ALTITUDE = 9
 
 RMC_TIME = 1
 RMC_STATUS = 2
+RMC_LATITUDE = 3
+RMC_NS = 4
+RMC_LONGITUDE = 5
+RMC_EW = 6
 RMC_SPEED = 7
 RMC_TRACK = 8
 
@@ -75,6 +79,13 @@ class FreeNmea(gobject.GObject):
         # Initialise a few variables
         self.flarm_alarm_level = 0
         self.time = -1
+        self.speed = 0
+        self.track = 0
+        self.num_satellites = 0
+        self.gps_altitude = 0
+
+        self.gga_is_difftime = True
+        self.rmc_is_difftime = True
 
     def open(self, dev, baud_rate):
         """Open NMEA device"""
@@ -184,10 +195,12 @@ class FreeNmea(gobject.GObject):
             self.logger.error("Error processing: " + ','.join(fields))
             return
 
-        if gga_time == self.time:
+        self.gga_is_difftime = (gga_time != self.time)
+        self.time = gga_time
+
+        # Send new-position unless RMC occurs at the same time
+        if self.rmc_is_difftime:
             self.emit('new-position')
-        else:
-            self.time = gga_time
 
     def proc_rmc(self, fields):
         """Process RMC GPS data. Time, speed and track"""
@@ -197,20 +210,31 @@ class FreeNmea(gobject.GObject):
             return
 
         try:
-            tim = fields[GGA_TIME]
+            tim = fields[RMC_TIME]
             rmc_time = int(tim[:2]) * 3600 + int(tim[2:4]) * 60 + int(tim[4:6])
 
-            self.speed = float(fields[RMC_SPEED]) * KTS_TO_MPS
+            # Latitude and longitude
+            lat = fields[RMC_LATITUDE]
+            self.latitude = math.radians(int(lat[:2]) + float(lat[2:]) / 60)
 
+            lon = fields[RMC_LONGITUDE]
+            self.longitude = math.radians(int(lon[:3]) + float(lon[3:]) / 60)
+            if fields[RMC_EW] == 'W':
+                self.longitude = -self.longitude
+
+            # Speed and track
+            self.speed = float(fields[RMC_SPEED]) * KTS_TO_MPS
             self.track = math.radians(float(fields[RMC_TRACK]))
         except ValueError:
             self.logger.error("Error processing: " + ','.join(fields))
             return
 
-        if rmc_time == self.time:
+        self.rmc_is_difftime = (rmc_time != self.time)
+        self.time = rmc_time
+
+        # Send new-position unless GGA occurs at the same time
+        if self.gga_is_difftime:
             self.emit('new-position')
-        else:
-            self.time = rmc_time
 
     def proc_grmz(self, fields):
         """Process pressure altitude data"""
