@@ -76,6 +76,9 @@ class FreeControl:
         self.nmea_dev.connect('new-pressure', self.pressure_level_changed)
         self.nmea_dev.connect('flarm-alarm', self.flarm_alarm)
 
+        # Write task declaration to FLARM
+        self.nmea_dev.declare_task(self.flight.task.tp_list)
+
         # Handle user interface events
         view.drawing_area.connect('button_press_event', self.button_press)
         view.window.connect('key_press_event', self.key_press)

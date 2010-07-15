@@ -54,6 +54,14 @@ def check_checksum(data_str, checksum_str=None):
         # No checksum, so pass anyway
         return True
 
+def dmm(ang, hemis):
+    """Splits lat/lon, in radians, into degrees, minutes and decimal minutes"""
+    dec_min = int(round(math.degrees(abs(ang)) * 60000))
+    min, dec_min = divmod(dec_min, 1000)
+    deg, min = divmod(min, 60)
+
+    return (deg, min, dec_min, hemis[1] if ang < 0 else hemis[0])
+
 class FreeNmea(gobject.GObject):
     def __init__(self):
         gobject.GObject.__init__(self)
@@ -99,9 +107,11 @@ class FreeNmea(gobject.GObject):
         bt_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
         bt_sock.connect((addr, RF_COMM_CHANNEL))
 
-        # Add I/O watch
+        # Add I/O watch and write method
         gobject.io_add_watch(bt_sock, gobject.IO_IN, self.bt_io_callback)
+
         self.nmea_dev = bt_sock
+        self.write = bt_sock.send
 
     def open_serial(self, dev_path, baudrate=None):
         """Open serial device"""
@@ -113,9 +123,11 @@ class FreeNmea(gobject.GObject):
         # Flush stale data
         ser.flushInput()
 
-        # Add I/O watch
+        # Add I/O watch and write method
         gobject.io_add_watch(ser, gobject.IO_IN, self.ser_io_callback)
+
         self.nmea_dev = ser
+        self.write = ser.write
 
     def close(self):
         """Close input device"""
@@ -130,7 +142,7 @@ class FreeNmea(gobject.GObject):
 
     def bt_io_callback(self, *args):
         """Callback on NMEA bluetooth input data"""
-        data = self.nmea_dev.recv(4096)
+        data = self.nmea_dev.recv(1024)
         self.add_nmea_data(data)
 
         return True
@@ -265,3 +277,17 @@ class FreeNmea(gobject.GObject):
     def proc_unknown(self, fields):
         """Do nothing for unknown sentence"""
         pass
+
+    def declare_task(self, tp_list):
+        """Send task declaration"""
+        self.write("$PFLAC,S,NEWTASK,My Task\n")
+        self.write("$PFLAC,S,ADDWP,0000000N,00000000W,Takeoff\n")
+
+        for tp in tp_list:
+            wp = str(tp['waypoint_id'])
+            lat = "%02d%02d%03d%s" % dmm(tp['latitude'], 'NS')
+            lon = "%03d%02d%03d%s" % dmm(tp['longitude'], 'EW')
+            nmea = "$PFLAC,S,ADDWP,%s,%s,%s\n" % (lat, lon, wp)
+            self.write(nmea)
+
+        self.write("$PFLAC,S,ADDWP,0000000N,00000000W,Land\n")
