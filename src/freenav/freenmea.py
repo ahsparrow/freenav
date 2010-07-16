@@ -33,6 +33,8 @@ FLAU_ALARM_LEVEL = 5
 FLAU_ALARM_TYPE = 7
 FLAU_ALARM_BEARING = 6
 
+GCS_ALTITUDE = 3
+
 KTS_TO_MPS = 1852 / 3600.0
 FT_TO_M = 12 * 25.4 / 1000
 
@@ -74,7 +76,8 @@ class FreeNmea(gobject.GObject):
         self.proc_funcs = {'GPRMC': self.proc_rmc,
                            'GPGGA': self.proc_gga,
                            'PGRMZ': self.proc_grmz,
-                           'PFLAU': self.proc_flau}
+                           'PFLAU': self.proc_flau,
+                           'PGCS': self.proc_gcs}
 
         # Initialise a few variables
         self.flarm_alarm_level = 0
@@ -261,6 +264,19 @@ class FreeNmea(gobject.GObject):
         # Emit signal if alarm level has increased
         if self.flarm_alarm_level > old_alarm_level:
             self.emit("flarm-alarm")
+
+    def proc_gcs(self, fields):
+        """Process Volkslogger pressure altitude"""
+        try:
+            # Convert hex string to signed int
+            self.pressure_alt = int(fields[GCS_ALTITUDE])
+            if self.pressure_alt & 0x8000:
+                self.pressure_alt -= 0x10000
+        except ValueError:
+            self.logger.error("Error processing: " + ','.join(fields))
+            return
+
+        self.emit('new-pressure')
 
     def proc_unknown(self, fields):
         """Do nothing for unknown sentence"""
