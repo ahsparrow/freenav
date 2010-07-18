@@ -35,6 +35,9 @@ FLAU_ALARM_BEARING = 6
 
 GCS_ALTITUDE = 3
 
+FLAC_QUERY_TYPE = 1
+FLAC_KEY = 2
+
 KTS_TO_MPS = 1852 / 3600.0
 FT_TO_M = 12 * 25.4 / 1000
 
@@ -86,7 +89,8 @@ class FreeNmea(gobject.GObject):
                            'GPGGA': self.proc_gga,
                            'PGRMZ': self.proc_grmz,
                            'PFLAU': self.proc_flau,
-                           'PGCS': self.proc_gcs}
+                           'PGCS': self.proc_gcs,
+                           'PFLAC': self.proc_flac}
 
         # Initialise a few variables
         self.flarm_alarm_level = 0
@@ -98,6 +102,8 @@ class FreeNmea(gobject.GObject):
 
         self.gga_is_difftime = True
         self.rmc_is_difftime = True
+
+        self.task_declaration = []
 
     def open(self, dev, baud_rate):
         """Open NMEA device"""
@@ -302,20 +308,35 @@ class FreeNmea(gobject.GObject):
 
         self.emit('new-pressure')
 
+    def proc_flac(self, fields):
+        """Process FLARM ack - Send the next TP in the task declaration"""
+        if fields[FLAC_QUERY_TYPE] != 'A':
+            # Ignore everything except FLARM answers
+            return
+
+        # Write next TP (if any) from declaration
+        if fields[FLAC_KEY] in ('NEWTASK', 'ADDWP') and self.task_declaration:
+            self.write(self.task_declaration.pop())
+
     def proc_unknown(self, fields):
         """Do nothing for unknown sentence"""
         pass
 
     def declare_task(self, tp_list):
-        """Send task declaration"""
-        self.write("$PFLAC,S,NEWTASK,My Task\n")
-        self.write("$PFLAC,S,ADDWP,0000000N,00000000W,Takeoff\n")
-
+        """Create task declaration and send to FLARM"""
+        # Create list of NMEA waypoints
+        declaration = ["$PFLAC,S,ADDWP,0000000N,00000000W,Takeoff\r\n"]
         for tp in tp_list:
             wp = str(tp['waypoint_id'])
             lat = "%02d%02d%03d%s" % dmm(tp['latitude'], 'NS')
             lon = "%03d%02d%03d%s" % dmm(tp['longitude'], 'EW')
-            nmea = "$PFLAC,S,ADDWP,%s,%s,%s\n" % (lat, lon, wp)
-            self.write(nmea)
+            nmea = "$PFLAC,S,ADDWP,%s,%s,%s\r\n" % (lat, lon, wp)
+            declaration.append(nmea)
+        declaration.append("$PFLAC,S,ADDWP,0000000N,00000000W,Land\r\n")
 
-        self.write("$PFLAC,S,ADDWP,0000000N,00000000W,Land\n")
+        # Reverse and store
+        declaration.reverse()
+        self.task_declaration = declaration
+
+        # Write start of task to FLARM
+        self.write("$PFLAC,S,NEWTASK,Task\r\n")
