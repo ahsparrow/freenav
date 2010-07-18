@@ -40,21 +40,22 @@ FT_TO_M = 12 * 25.4 / 1000
 
 RF_COMM_CHANNEL = 1
 
-def check_checksum(data_str, checksum_str=None):
+def check_checksum(data_str, checksum_str):
     """Return True if calculated checksum matches given checksum"""
-    if checksum_str:
-        # Checksum is XOR of all characters in the data
-        sum = 0
-        for d in data_str:
-            sum = sum ^ ord(d)
+    try:
+        checksum = int(checksum_str, 16)
+    except ValueError:
+        return False
 
-        if sum == int(checksum_str, 16):
-            return True
-        else:
-            return False
-    else:
-        # No checksum, so pass anyway
+    # Checksum is XOR of all characters in the data
+    sum = 0
+    for d in data_str:
+        sum = sum ^ ord(d)
+
+    if sum == checksum:
         return True
+    else:
+        return False
 
 class FreeNmea(gobject.GObject):
     def __init__(self):
@@ -133,7 +134,7 @@ class FreeNmea(gobject.GObject):
 
     def bt_io_callback(self, *args):
         """Callback on NMEA bluetooth input data"""
-        data = self.nmea_dev.recv(4096)
+        data = self.nmea_dev.recv(1024)
         self.add_nmea_data(data)
 
         return True
@@ -149,14 +150,14 @@ class FreeNmea(gobject.GObject):
         sentence, separator, remainder = buf.partition("\r\n")
 
         if separator:
-            if sentence[0] == '$':
+            if sentence[0:1] == '$':
                 # Split sentence into message body and checksum
-                body_checksum = sentence[1:].split('*')
+                body, _sep, checksum = sentence[1:].partition('*')
 
-                if check_checksum(*body_checksum):
+                if check_checksum(body, checksum):
                     self.logger.debug(sentence)
                     # Split body into comma separated fields and process
-                    fields = body_checksum[0].split(',')
+                    fields = body.split(',')
                     self.proc_funcs.get(fields[0], self.proc_unknown)(fields)
                 else:
                     self.logger.warning("Checksum error: " + sentence)
@@ -226,8 +227,13 @@ class FreeNmea(gobject.GObject):
                 self.longitude = -self.longitude
 
             # Speed and track
-            self.speed = float(fields[RMC_SPEED]) * KTS_TO_MPS
-            self.track = math.radians(float(fields[RMC_TRACK]))
+            speed_str = fields[RMC_SPEED]
+            if speed_str:
+                self.speed = float(speed_str) * KTS_TO_MPS
+
+            track_str = fields[RMC_TRACK]
+            if track_str:
+                self.track = math.radians(float(track_str))
         except ValueError:
             self.logger.error("Error processing: " + ','.join(fields))
             return
@@ -255,8 +261,14 @@ class FreeNmea(gobject.GObject):
 
         try:
             self.flarm_alarm_level = int(fields[FLAU_ALARM_LEVEL])
-            self.flarm_relative_bearing = int(fields[FLAU_ALARM_BEARING])
-            self.flarm_alarm_type = int(fields[FLAU_ALARM_TYPE])
+
+            bearing_str = fields[FLAU_ALARM_BEARING]
+            if bearing_str:
+                self.flarm_relative_bearing = int(bearing_str)
+
+            alarm_type_str = fields[FLAU_ALARM_TYPE]
+            if alarm_type_str:
+                self.flarm_alarm_type = int(alarm_type_str)
         except ValueError:
             self.logger.error("Error processing: " + ','.join(fields))
             return
@@ -269,7 +281,7 @@ class FreeNmea(gobject.GObject):
         """Process Volkslogger pressure altitude"""
         try:
             # Convert hex string to signed int
-            self.pressure_alt = int(fields[GCS_ALTITUDE])
+            self.pressure_alt = int(fields[GCS_ALTITUDE], 16)
             if self.pressure_alt & 0x8000:
                 self.pressure_alt -= 0x10000
         except ValueError:
