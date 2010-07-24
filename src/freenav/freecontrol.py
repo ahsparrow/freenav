@@ -18,6 +18,7 @@ import flight
 import freedb
 import freesound
 import freenmea
+import nmeaparser
 
 OSSO_APPLICATION = "uk.org.freeflight.freenav"
 
@@ -70,7 +71,8 @@ class FreeControl:
             baud_rate = None
 
         # Open NMEA device and connect signals
-        self.nmea_dev = freenmea.FreeNmea()
+        self.nmea_parser = nmeaparser.NmeaParser()
+        self.nmea_dev = freenmea.FreeNmea(self.nmea_parser)
         self.nmea_dev.open(dev, baud_rate)
         self.nmea_dev.connect('new-position', self.position_changed)
         self.nmea_dev.connect('new-pressure', self.pressure_level_changed)
@@ -207,18 +209,18 @@ class FreeControl:
 
         return True
 
-    def position_changed(self, nmea):
+    def position_changed(self, _source, nmea):
         """Callback for new GPS position"""
         # Update model with new position
         self.flight.update_position(nmea.time, nmea.latitude, nmea.longitude,
                                     nmea.gps_altitude, nmea.speed, nmea.track,
                                     nmea.num_satellites)
 
-    def pressure_level_changed(self, nmea):
+    def pressure_level_changed(self, _source, nmea):
         """Callback for new pressure altitude"""
         self.flight.update_pressure_level(nmea.pressure_alt)
 
-    def flarm_alarm(self, nmea):
+    def flarm_alarm(self, _source, nmea):
         """Callback for FLARM alarm"""
         if self.flarm_mute or nmea.flarm_alarm_type < 2:
             # Ignore traffic and silent aircraft alarms
