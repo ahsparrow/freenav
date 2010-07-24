@@ -180,7 +180,7 @@ class NmeaApp:
         vbox.pack_end(bbox)
 
         self.apply_callback(None)
-        gobject.timeout_add(2000, self.timeout_callback)
+        gobject.timeout_add(1000, self.timeout_callback)
 
         self.window.add(vbox)
         self.window.show_all()
