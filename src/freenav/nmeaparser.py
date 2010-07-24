@@ -1,7 +1,9 @@
 """NMEA parsing module"""
 
+import calendar
 import logging
 import math
+import time
 
 # GGA fields
 GGA_TIME = 1
@@ -83,8 +85,9 @@ class NmeaParser():
         self.gps_altitude = 0
         self.pressure_alt = 0
 
-        self.gga_is_difftime = True
-        self.rmc_is_difftime = True
+        self.date = "010100"
+        self.rmc_time = 0
+        self.gga_time = 0
 
     def parse(self, data):
         """Parse NMEA data. Return list of signals"""
@@ -132,7 +135,6 @@ class NmeaParser():
         try:
             # Time
             tim = fields[GGA_TIME]
-            gga_time = int(tim[:2]) * 3600 + int(tim[2:4]) * 60 + int(tim[4:6])
 
             # Latitude and longitude
             lat = fields[GGA_LATITUDE]
@@ -152,12 +154,12 @@ class NmeaParser():
             self.logger.error("Error processing: " + ','.join(fields))
             return
 
-        self.gga_is_difftime = (gga_time != self.time)
-        self.time = gga_time
-
-        # Signal new-position unless RMC occurs at the same time
-        if self.rmc_is_difftime:
+        # Don't signal new-position if last GGA and RMC occured at the same time
+        if self.rmc_time != self.gga_time:
+            self.set_time(tim)
             self.signals.add('new-position')
+
+        self.gga_time = tim
 
     def proc_rmc(self, fields):
         """Process RMC GPS data. Time, speed and track"""
@@ -168,7 +170,7 @@ class NmeaParser():
 
         try:
             tim = fields[RMC_TIME]
-            rmc_time = int(tim[:2]) * 3600 + int(tim[2:4]) * 60 + int(tim[4:6])
+            self.date = fields[RMC_DATE]
 
             # Latitude and longitude
             lat = fields[RMC_LATITUDE]
@@ -191,12 +193,12 @@ class NmeaParser():
             self.logger.error("Error processing: " + ','.join(fields))
             return
 
-        self.rmc_is_difftime = (rmc_time != self.time)
-        self.time = rmc_time
-
-        # Signal new-position unless GGA occurs at the same time
-        if self.gga_is_difftime:
+        # Don't signal new-position if last GGA and RMC occured at the same time
+        if self.gga_time != self.rmc_time:
+            self.set_time(tim)
             self.signals.add('new-position')
+
+        self.rmc_time = tim
 
     def proc_grmz(self, fields):
         """Process pressure altitude data"""
@@ -246,3 +248,8 @@ class NmeaParser():
     def proc_unknown(self, fields):
         """Do nothing for unknown sentence"""
         pass
+
+    def set_time(self, tim):
+        """Construct time from RMC data string and RMC/GGA time string"""
+        tm = time.strptime(self.date + tim, "%d%m%y%H%M%S")
+        self.time = calendar.timegm(tm)
