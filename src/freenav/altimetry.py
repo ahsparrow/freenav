@@ -1,6 +1,14 @@
-"""This module provides the altimetry functionality for freenav program"""
+"""This module provides the altimetry functionality for freenav program.
+
+Given the takeoff altitude and QNE setting the class converts from standard
+(1013.25mb) pressure readings to QNH, QFE and FL.
+
+"""
 
 import collections
+
+# Size of the running average for takeoff pressure
+AVG_SAMPLES = 100
 
 class PressureAltimetry:
     """Class to handle altimetry related calculations for freenav"""
@@ -14,34 +22,30 @@ class PressureAltimetry:
         self.pressure_level_deque = collections.deque()
 
     def set_qne(self, qne):
-        """Set QNE value"""
+        """Set QNE configuration value"""
         self.qne = qne
 
-    def set_pressure_level(self, level):
-        """Set pressure level value"""
-        self.pressure_level = level 
-
     def set_takeoff_altitude(self, altitude):
-        """Sets the takeoff altitude"""
+        """Sets the takeoff altitude configuration value"""
         self.takeoff_altitude = altitude
 
     def set_takeoff_pressure_level(self, level):
-        """Set the pressure level at takeoff"""
+        """Set the takeoff pressure level (used to re-initialise in the air)"""
         self.takeoff_pressure_level = level
 
+    def update_pressure_level(self, level):
+        """Update pressure level value"""
+        self.pressure_level = level 
+
     def update_ground_pressure_level(self, level):
-        """Average takeoff pressure level"""
+        """Calculate running average of takeoff pressure level"""
         self.pressure_level_deque.append(level)
+        if len(self.pressure_level_deque) > AVG_SAMPLES:
+            self.pressure_level_deque.popleft()
 
-        # Calculate average over 60 samples
-        if len(self.pressure_level_deque) > 60:
-            self.calc_takeoff_pressure_level()
-
-    def takeoff(self):
-        """Leaving the ground"""
-        if self.takeoff_pressure_level is None and self.pressure_level_deque:
-            # We didn't have time to accumulate a full sample
-            self.calc_takeoff_pressure_level()
+        self.pressure_level = level
+        self.takeoff_pressure_level = (sum(self.pressure_level_deque) /
+                                       float(len(self.pressure_level_deque)))
 
     def get_pressure_height(self):
         """Return height above takeoff airfield"""
@@ -69,9 +73,3 @@ class PressureAltimetry:
             if not (self.qne is None or self.takeoff_pressure_level is None):
                 level = level - self.takeoff_pressure_level + self.qne
         return level
-
-    def calc_takeoff_pressure_level(self):
-        """Update takeoff level"""
-        self.takeoff_pressure_level = (sum(self.pressure_level_deque) /
-                                       len(self.pressure_level_deque))
-        self.pressure_level_deque.clear()

@@ -112,7 +112,7 @@ class Flight:
 
     def update_pressure_level(self, level):
         """Update model with new pressure level data"""
-        self.pressure_alt.set_pressure_level(level)
+        self.pressure_alt.update_pressure_level(level)
 
         self._fsm.new_pressure_level(level)
 
@@ -269,8 +269,6 @@ class Flight:
 
     def do_takeoff(self):
         """Leaving the ground"""
-        self.pressure_alt.takeoff()
-
         # Store takeoff info to database
         self.db.set_takeoff(self.utc_secs,
                             self.pressure_alt.takeoff_pressure_level,
