@@ -129,8 +129,11 @@ class FreeControl:
 
     def button_press(self, _widget, event, *_args):
         """Handle button press (mouse click/screen touch)"""
-        region = self.view.get_button_region(event.x, event.y)
+        if event.type != gtk.gdk.BUTTON_PRESS:
+            # Ignore double press
+            return True
 
+        region = self.view.get_button_region(event.x, event.y)
         if region == 'turnpoint' and self.flight.get_state() != 'Divert':
             # Next/prev turnpoint
             if self.divert_indicator_flag:
@@ -337,8 +340,12 @@ class FreeControl:
 
     def display_time_info(self, secs):
         """Update time info label"""
-        info = time.strftime('%H:%M', time.localtime(secs))
-        self.view.info_label[INFO_TIME].set_text(info)
+        fg, bg = "black", "white"
+        if self.flarm_mute:
+            fg, bg = bg, fg
+        tim = time.strftime("%H:%M", time.localtime(secs))
+        info = '<span foreground="%s" background="%s">%s</span>'% (fg, bg, tim)
+        self.view.info_label[INFO_TIME].set_markup(info)
 
     def divert_timeout(self):
         """Timeout callback for end of divert"""
