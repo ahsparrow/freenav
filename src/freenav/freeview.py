@@ -692,9 +692,9 @@ class FreeView(APP_BASE):
         if left and top:
             region = 'divert'
         elif left and bottom:
-            region = 'prev'
-        elif right and bottom:
             region = 'next'
+        elif right and bottom:
+            region = 'prev'
         elif right and top:
             region = 'user'
         elif left and vertical_middle:

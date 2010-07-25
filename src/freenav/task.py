@@ -61,8 +61,9 @@ class Task:
 
     def reset(self):
         """Reset turnpoint index"""
-        self.tp_index = 0
+        self.tp_index = 1
         self.tp_sector_flag = False
+        self.start_time = 0
 
     def start(self, start_time, x, y, altitude):
         """Start task"""
@@ -70,7 +71,6 @@ class Task:
         self.task_speed = 0
         self.task_air_speed = 0
 
-        self.tp_index = 1
         self.tp_sector_flag = False
         self.tp_log[0] = {'x': x, 'y': y, 'alt': altitude, 'tim': start_time}
 
@@ -194,7 +194,7 @@ class Task:
         self.set_glide_to_finish(x, y, altitude, self.tp_list[tp_index:])
 
         # Calculate speed on current leg and time to complete task
-        if tp_index != 0 and (tim - self.task_calc_time) >= 30:
+        if self.start_time and (tim - self.task_calc_time) >= 30:
             self.task_calc_time = tim
             if self.vmac > self.wind_speed:
                 self.set_task_speed(x, y, altitude, tim,
