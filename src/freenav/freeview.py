@@ -41,6 +41,50 @@ FG_INC = 15
 # Threshold to display final glide indicator
 FG_THRESHOLD = -3000
 
+ICON = [
+"32 32 9 1",
+" 	c None",
+".	c #FFFFFF",
+"+	c #494949",
+"@	c #000000",
+"#	c #B6B6B6",
+"$	c #DBDBDB",
+"%	c #242424",
+"&	c #929292",
+"*	c #6D6D6D",
+"...............+@#..............",
+".....$$$.......%@%..............",
+"....$+%+#......@@@%#$...........",
+"....$%@@+#....$@@@@@@@+&#.......",
+"....$+@@@+$...#@@@@@@@@@@@&.....",
+".....#+@@%#...#@%.%@@@@@@@@%#...",
+"......#%@@+#..&@%.$%@@@@@@@@@#..",
+"......$+@@@+#.*@+...#*+@@@@@@@$.",
+".......#+@@@+$+@*.......$*%@@@*.",
+"........#+@@%#+@&..........+@@+.",
+".........#%@@+%@&...........+@%.",
+".........$+@@@@@#...........$@%.",
+"..........#+@@@@#............+@.",
+"...........#+@@@&............#@.",
+"............#%@@+#............$.",
+"............$%@@@+#.............",
+".............+@@@@+$............",
+".............*@%@@%#............",
+".............+@+%@@+#...........",
+".............%@*+@@@+#..........",
+"....$#***&$..%@##+@@@+$.........",
+"..$+@@@@@@@+$@@#.#+@@%#.........",
+".$%@@%+++%@@@@@$..#%@@+#........",
+".%%&......$&%@@$..$+@@@+#.......",
+"&%...........%@....#+@@@+$......",
+"+#...........#%.....#+@@%#......",
+"*#...........#%......#%@@+#.....",
+"&%$.........$%*......$+@@@+$....",
+".+@*$.....#*@@$.......#+@@%$....",
+".$%@@@%%%@@@%#.........#+%+$....",
+"...&%@@@@@@*$...........$$$.....",
+".....$&&&#......................"]
+
 def add_div(box):
     """Add a dividing bar between box elements"""
     div = gtk.EventBox()
@@ -116,6 +160,7 @@ class FreeView(APP_BASE):
 
         self.divert_flag = False
         self.maccready_flag = False
+        self.mute_flag = False
 
         # Create top level window
         if IS_HILDON_APP:
@@ -192,19 +237,17 @@ class FreeView(APP_BASE):
         self.fg_layout = pango.Layout(self.drawing_area.create_pango_context())
         self.fg_layout.set_attributes(attr_list)
 
-        attr_list = pango.AttrList()
-        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 40, 0, 999))
-        attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
-        self.wind_layout = pango.Layout(
-                self.drawing_area.create_pango_context())
-        self.wind_layout.set_attributes(attr_list)
-
         # Show the window
         if fullscreen:
             self.window.fullscreen()
         else:
             self.window.set_size_request(480, 750)
         self.window.show_all()
+
+        # Mute pixmap
+        self.mute_pixmap, _mask = gtk.gdk.pixmap_create_from_xpm_d(
+            self.drawing_area.window, None, ICON)
+
 
     def view_to_win(self, x, y):
         """Convert real world coordinates to window coordinates"""
@@ -274,6 +317,9 @@ class FreeView(APP_BASE):
 
         # Number of satellites
         self.draw_satellites(gc, win, win_width, win_height)
+
+        # Mute indicator
+        self.draw_mute(gc, win, win_width)
 
         return True
 
@@ -472,7 +518,7 @@ class FreeView(APP_BASE):
             fmt = '%d\n%s\n%.1f'
         self.fg_layout.set_text(fmt % (glide_height, ete_str,
                                        glide['maccready'] * MPS_TO_KTS))
-        _unused, y = self.fg_layout.get_pixel_size()
+        _x, y = self.fg_layout.get_pixel_size()
         win.draw_layout(gc, FG_WIDTH + 5, (win_height / 2) - (2 * y / 3),
                         self.fg_layout, background=None)
 
@@ -516,25 +562,33 @@ class FreeView(APP_BASE):
         win.draw_polygon(gc, False, poly)
 
         speed = wind['speed'] * MPS_TO_KTS
-        self.wind_layout.set_text(str(int(speed)))
-        x, y = self.wind_layout.get_pixel_size()
+        self.fg_layout.set_text(str(int(speed)))
+        x, y = self.fg_layout.get_pixel_size()
 
-        win.draw_layout(gc, x_cent - x - 40, y_cent - y / 2, self.wind_layout,
+        win.draw_layout(gc, x_cent - x - 40, y_cent - y / 2, self.fg_layout,
                         background=None)
 
         ground_speed = self.flight.get_velocity()['speed'] * MPS_TO_KTS
-        self.wind_layout.set_text(str(int(ground_speed)))
-        x, y = self.wind_layout.get_pixel_size()
+        self.fg_layout.set_text(str(int(ground_speed)))
+        x, y = self.fg_layout.get_pixel_size()
 
         win.draw_layout(gc, win_width - x - 2, win_height - y,
-                        self.wind_layout, background=None)
+                        self.fg_layout, background=None)
 
     def draw_satellites(self, gc, win, win_width, win_height):
         """Draw number of satellites in view"""
-        self.wind_layout.set_text('%d' % self.flight.get_num_satellites())
-        x, y = self.wind_layout.get_pixel_size()
+        self.fg_layout.set_text('%d' % self.flight.get_num_satellites())
+        x, y = self.fg_layout.get_pixel_size()
         win.draw_layout(gc, win_width - x - 2, win_height - (2 * y),
-                        self.wind_layout, background=None)
+                        self.fg_layout, background=None)
+
+    def draw_mute(self, gc, win, win_width):
+        """Draw mute indicator"""
+        if self.mute_flag:
+            pm_width, pm_height = self.mute_pixmap.get_size()
+            win.draw_drawable(gc, self.mute_pixmap, 0, 0,
+                              win_width / 2 - pm_width / 2,
+                              pm_height / 2, -1, -1)
 
     # External methods - for use by controller
     def redraw(self):
@@ -605,10 +659,10 @@ class FreeView(APP_BASE):
         dialog.set_label(label)
 
         dialog.show_all()
-        ret = dialog.run()
+        result = dialog.run()
         dialog.destroy()
 
-        return ret
+        return result
 
     def set_divert_indicator(self, flag):
         """Set indicator showing divert select is active"""
@@ -620,18 +674,32 @@ class FreeView(APP_BASE):
         self.maccready_flag = flag
         self.redraw()
 
+    def set_mute_indicator(self, flag):
+        """Set indicator showing mute is active"""
+        self.mute_flag = flag
+        self.redraw()
+
     def get_button_region(self, x, y):
         """Return "button" id of drawing area"""
-        _win_width, win_height = self.drawing_area.window.get_size()
-        if x < 75:
-            if y < 100:
-                return 'divert'
-            elif y > (win_height - 100):
-                return 'turnpoint'
-            elif (abs(y - (win_height / 2)) < 50):
-                return 'glide'
-            else:
-                return 'background'
-        else:
-            return 'background'
+        win_width, win_height = self.drawing_area.window.get_size()
 
+        left = x < 75
+        right = x > (win_width - 75)
+        top = y < 100
+        bottom = y > (win_height - 100)
+        vertical_middle = abs(y - (win_height / 2)) < 50
+
+        if left and top:
+            region = 'divert'
+        elif left and bottom:
+            region = 'prev'
+        elif right and bottom:
+            region = 'next'
+        elif right and top:
+            region = 'user'
+        elif left and vertical_middle:
+            region = 'glide'
+        else:
+            region = 'background'
+
+        return region

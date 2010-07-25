@@ -4,7 +4,6 @@ import datetime
 
 import altimetry
 import flight_sm
-import freedb
 import projection
 import task
 import thermal
@@ -43,11 +42,11 @@ class Flight:
     TAKEOFF_SPEED = 10
     STOPPED_SPEED = 2
 
-    def __init__(self, polar):
+    def __init__(self, db, polar):
         """Class initialisation"""
         self._fsm = flight_sm.Flight_sm(self)
 
-        self.db = freedb.Freedb()
+        self.db = db
         settings = self.db.get_settings()
 
         self.task = task.Task(self.db.get_task(), polar, settings)
@@ -306,6 +305,7 @@ class Flight:
 
     def do_task(self):
         """Start (or re-start) task"""
+        self.task.task_position(self.x, self.y, self.altitude, self.utc_secs)
         self.notify_subscribers(TASK_EVT)
 
     def do_set_divert(self, divert):
@@ -320,10 +320,13 @@ class Flight:
     def do_next_turnpoint(self):
         """Goto next turnpoint"""
         self.task.next_turnpoint(self.x, self.y, self.altitude, self.utc_secs)
+        self.notify_subscribers(NEW_POSITION_EVT)
 
     def do_prev_turnpoint(self):
         """Goto previous turnpoint"""
-        self.task.previous_turnpoint()
+        self.task.previous_turnpoint(self.x, self.y, self.altitude,
+                                     self.utc_secs)
+        self.notify_subscribers(NEW_POSITION_EVT)
 
     def is_previous_start(self):
         """Return true if a start has already been made today"""

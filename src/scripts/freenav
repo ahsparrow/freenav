@@ -8,6 +8,7 @@ import optparse
 import os.path
 
 import freenav.flight
+import freenav.freedb
 import freenav.freeview
 import freenav.freecontrol
 
@@ -73,9 +74,11 @@ def main():
     for coeff in 'abc':
         polar[coeff] = config.getfloat('Polar', coeff)
 
-    model = freenav.flight.Flight(polar)
+    db = freenav.freedb.Freedb()
+
+    model = freenav.flight.Flight(db, polar)
     view = freenav.freeview.FreeView(model, opts.fullscreen)
-    controller = freenav.freecontrol.FreeControl(model, view, config)
+    controller = freenav.freecontrol.FreeControl(model, view, db, config)
     controller.main()
 
 if __name__ == '__main__':

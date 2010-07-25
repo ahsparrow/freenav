@@ -82,19 +82,23 @@ class Task:
         self.tp_index = 1
         self.tp_log[0] = {'x': x, 'y': y, 'alt': altitude, 'tim': resume_time}
 
-    def next_turnpoint(self, x, y, altitude, tp_time):
+    def next_turnpoint(self, x, y, altitude, tim):
         """Increment turnpoint"""
         if self.tp_index < (len(self.tp_list) - 1):
             self.tp_log[self.tp_index] = {'x': x, 'y': y, 'alt': altitude,
-                                          'tim': tp_time}
+                                          'tim': tim}
             self.tp_index += 1
             self.tp_sector_flag = False
 
-    def previous_turnpoint(self):
+            self.task_position(x, y, altitude, tim)
+
+    def previous_turnpoint(self, x, y, altitude, tim):
         """Go back a turnpoint"""
         if self.tp_index > 1:
             self.tp_index -= 1
             self.tp_sector_flag = False
+
+            self.task_position(x, y, altitude, tim)
 
     def set_divert(self, wp):
         """Set the divert waypoint"""
