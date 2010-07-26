@@ -1,3 +1,9 @@
+freenav (0.1.4-1) unstable; urgency=low
+
+  * Add logging exception hook
+
+ -- Alan Sparrow <alan@freeflight.org.uk>  Mon, 26 Jul 2010 21:15:00 +0100
+
 freenav (0.1.3-1) unstable; urgency=low
 
   * Refactoring. User response improvement. Button bindings. Mute indicator
