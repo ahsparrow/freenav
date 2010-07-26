@@ -6,6 +6,7 @@ import logging
 import logging.handlers
 import optparse
 import os.path
+import sys
 
 import freenav.flight
 import freenav.freedb
@@ -23,6 +24,11 @@ LEVELS = {'debug': logging.DEBUG,
           'warning': logging.WARNING,
           'error': logging.ERROR,
           'critical': logging.CRITICAL}
+
+def exceptfunc(logger):
+    def excepthook(*args):
+        logger.critical("Caught exception...", exc_info=args)
+    return excepthook
 
 def main():
     """Main function"""
@@ -48,7 +54,6 @@ def main():
         handler = logging.StreamHandler()
     else:
         # Log to rotating file (rotate file once per run)
-
         log_file = os.path.join(os.path.expanduser('~'), '.freeflight',
                                 LOG_FILENAME)
         handler = logging.handlers.RotatingFileHandler(log_file, backupCount=5)
@@ -63,6 +68,9 @@ def main():
     except:
         parser.error("Illegal logging level")
     freelog.setLevel(level)
+
+    # Re-direct exception info to logger
+    sys.excepthook = exceptfunc(freelog)
 
     # Program configuration
     config = ConfigParser.ConfigParser()
