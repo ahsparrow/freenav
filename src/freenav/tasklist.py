@@ -43,7 +43,6 @@ def dmm(ang, hemis):
 
     return (deg, min, dec_min, hemis[1] if ang < 0 else hemis[0])
 
-
 class TaskListStore(gtk.ListStore):
     """Model for the task list"""
     def __init__(self, db):

@@ -57,11 +57,18 @@ def check_checksum(data_str, checksum_str):
     else:
         return False
 
+class NullHandler(logging.Handler):
+    """Null handler to stop warnings when logging not configured"""
+    def emit(self, _record):
+        pass
+
 class NmeaParser():
     """Class to parse NMEA data from FLARM or Volkslogger"""
     def __init__(self):
         """Class initialisation"""
         self.logger = logging.getLogger('freelog')
+        null_handler = NullHandler()
+        self.logger.addHandler(null_handler)
 
         # Buffer for NMEA data
         self.buf = ''

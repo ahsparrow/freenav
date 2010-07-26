@@ -1,93 +1,68 @@
 #!/usr/bin/env python
+"""Program to display latitude and longitude"""
 
 import ConfigParser
+import math
 import os
 
-import dbus, dbus.mainloop.glib
 import gtk
 import gobject
 
+import freenav
 import freenav.freedb
+import freenav.freenmea
+import freenav.nmeaparser
 
 try:
     import hildon
+    import osso
     IS_HILDON_APP = True
     APP_BASE = hildon.Program
 except ImportError:
     IS_HILDON_APP = False
     APP_BASE = object
 
-OSSO_APPLICATION = "uk.org.freeflight.freenav"
+OSSO_APPLICATION = "uk.org.freeflight.freexyz"
 
-DBUS_SERVICE = "org.freedesktop.Gypsy"
-DBUS_PATH = "/org/freedesktop/Gypsy"
+LATLON_MARKUP = '<span size="32000" weight="bold">%s</span>'
 
-CONTROL_INTERFACE = "org.freedesktop.Gypsy.Server"
-DEVICE_INTERFACE = "org.freedesktop.Gypsy.Device"
-POSITION_INTERFACE = "org.freedesktop.Gypsy.Position"
+def dmm(ang, hemis):
+    """Splits lat/lon, in radians, into degrees, minutes and decimal minutes"""
+    dec_min = int(round(math.degrees(abs(ang)) * 60000))
+    min, dec_min = divmod(dec_min, 1000)
+    deg, min = divmod(min, 60)
 
-latlon_markup = '<span size="32000" weight="bold">%s</span>'
-
-def deg_to_dmm(val):
-    dec = int(round(val * 60 * 1000))
-    min = dec / 1000
-    dec = dec % 1000
-    deg = min / 60
-    min = min % 60
-    return (deg, min, dec)
-
-def fmt_lat(lat):
-    if lat < 0:
-        hemi = "S"
-        lat = -lat
-    else:
-        hemi = "N"
-
-    (deg, min, dec) = deg_to_dmm(lat)
-    return u"%s %02d\u00B0 %02d.%03d'" % (hemi, deg, min, dec)
-
-def fmt_lon(lon):
-    if lon < 0:
-        hemi = "W"
-        lon = -lon
-    else:
-        hemi = "E"
-
-    (deg, min, dec) = deg_to_dmm(lon)
-    return u"%s %03d\u00B0 %02d.%03d'" % (hemi, deg, min, dec)
+    return (hemis[1] if ang < 0 else hemis[0], deg, min, dec_min)
 
 class App(APP_BASE):
-    def __init__(self, config):
+    """Application class"""
+    def __init__(self, db, config):
         APP_BASE.__init__(self)
 
-        db = freenav.freedb.Freedb()
+        # Get GPS device
+        dev_name = config.get('Device-Names', db.get_settings()['gps_device'])
+        dev = config.get(dev_name, 'Device')
+        if config.has_option(dev_name, 'Baud'):
+            baud_rate = config.getint(dev_name, 'Baud')
+        else:
+            baud_rate = None
 
-        # Set-up all the D-Bus stuff
-        dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-
-        bus = dbus.SystemBus()
-        control = bus.get_object(DBUS_SERVICE, DBUS_PATH)
-
-        # GPS device
-        gps_dev_path = config.get('Devices', db.get_settings()['gps_device'])
-        path = control.Create(gps_dev_path, dbus_interface=CONTROL_INTERFACE)
-        gps = bus.get_object(DBUS_SERVICE, path)
-
-        # Various interfaces
-        self.gps_dev_if = dbus.Interface(gps, dbus_interface=DEVICE_INTERFACE)
-        posn_if = dbus.Interface(gps, dbus_interface=POSITION_INTERFACE)
-
-        # Signal handlers for position and pressure level changes
-        posn_if.connect_to_signal("PositionChanged", self.position_changed)
-
-        # Start the GPS
-        self.gps_dev_if.Start()
+        # Open NMEA device and connect signals
+        self.nmea_parser = freenav.nmeaparser.NmeaParser()
+        self.nmea_dev = freenav.freenmea.FreeNmea(self.nmea_parser)
+        self.nmea_dev.open(dev, baud_rate)
+        self.nmea_dev.connect('new-position', self.position_changed)
 
         # Top level window
         if IS_HILDON_APP:
             self.window = hildon.Window()
+            self.osso_c = osso.Context(OSSO_APPLICATION, freenav.__version__,
+                                       False)
+            self.osso_device = osso.DeviceState(self.osso_c)
+            gobject.timeout_add(25000, self.blank_timeout)
         else:
             self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+
         self.window.set_border_width(3)
         self.window.connect('destroy', gtk.main_quit)
 
@@ -101,11 +76,17 @@ class App(APP_BASE):
 
         self.window.show_all()
 
-    def position_changed(self, _field_set,
-                         timestamp, latitude, longitude, altitude):
-        """D-Bus callback"""
-        self.lat_label.set_markup(latlon_markup % fmt_lat(latitude))
-        self.lon_label.set_markup(latlon_markup % fmt_lon(longitude))
+    def blank_timeout(self):
+        """Stop the N810 display from blanking"""
+        self.osso_device.display_blanking_pause()
+        return True
+
+    def position_changed(self, _source, nmea):
+        """ Callback for new GPS position"""
+        lat = "%s%02d %02d.%03d" % dmm(nmea.latitude, 'NS')
+        lon = "%s%03d %02d.%03d" % dmm(nmea.longitude, 'EW')
+        self.lat_label.set_markup(LATLON_MARKUP % lat)
+        self.lon_label.set_markup(LATLON_MARKUP % lon)
 
         self.window.queue_draw()
         return True
@@ -118,7 +99,9 @@ def main():
     config.read(os.path.join(os.path.expanduser('~'), '.freeflight',
                              'freenav.ini'))
 
-    app = App(config)
+    db = freenav.freedb.Freedb()
+
+    app = App(db, config)
     app.main()
 
 if __name__ == '__main__':
