@@ -1,6 +1,7 @@
 """This module provides the view for the freenav program"""
 
 import math
+import os.path
 
 import gtk
 import gtk.gdk
@@ -85,6 +86,17 @@ ICON = [
 "...&%@@@@@@*$...........$$$.....",
 ".....$&&&#......................"]
 
+PIXMAP_DIRS = ['.', '/usr/share/pixmaps', '../../pixmaps']
+
+def find_pixbuf(filename):
+    """Searches for pixmap file and returns corresponding gtk.gdk.Pixbuf"""
+    for dir in PIXMAP_DIRS:
+        path = os.path.join(dir, filename)
+        if os.path.isfile(path):
+            pixbuf = gtk.gdk.pixbuf_new_from_file(path)
+
+    return pixbuf
+
 def add_div(box):
     """Add a dividing bar between box elements"""
     div = gtk.EventBox()
@@ -161,6 +173,9 @@ class FreeView(APP_BASE):
         self.divert_flag = False
         self.maccready_flag = False
         self.mute_flag = False
+
+        # Pixmaps
+        self.glider_pixbuf = find_pixbuf("free_glider.png")
 
         # Create top level window
         if IS_HILDON_APP:
@@ -283,6 +298,7 @@ class FreeView(APP_BASE):
 
         # Start with a blank sheet...
         gc = win.new_gc()
+        ct = win.cairo_create()
         gc.foreground = self.bg_color
         win.draw_rectangle(gc, True, 0, 0, win_width, win_height)
 
@@ -308,8 +324,8 @@ class FreeView(APP_BASE):
         self.draw_glide(gc, win, win_height)
 
         # Heading symbol
-        gc.line_width = 2
-        self.draw_heading(gc, win, win_height, win_width)
+        self.draw_heading(self.flight.get_velocity()['track'], ct, win_height,
+                          win_width)
 
         # Wind arrow
         gc.line_width = 2
@@ -522,27 +538,18 @@ class FreeView(APP_BASE):
         win.draw_layout(gc, FG_WIDTH + 5, (win_height / 2) - (2 * y / 3),
                         self.fg_layout, background=None)
 
-    def draw_heading(self, gc, win, win_height, win_width):
+    def draw_heading(self, heading, ct, win_height, win_width):
         """Draw heading glider symbol"""
         x_cent = win_width / 2
         y_cent = win_height / 2
 
-        vel = self.flight.get_velocity()
-        x = math.sin(vel['track'])
-        y = -math.cos(vel['track'])
-        fuse_front, fuse_back, wing_width, tail_width = 15, 30, 45, 15
-        c_fuse = [x * fuse_front, y * fuse_front,
-                  -x * fuse_back, -y * fuse_back]
-        c_wing = [y * wing_width, -x * wing_width,
-                  -y * wing_width, x * wing_width]
-        c_tail = [-x * fuse_back + y * tail_width,
-                  -y * fuse_back - x * tail_width,
-                  -x * fuse_back - y * tail_width,
-                  -y * fuse_back + x * tail_width]
+        width = self.glider_pixbuf.get_width()
+        height = self.glider_pixbuf.get_height()
 
-        for x1, y1, x2, y2 in (c_fuse, c_wing, c_tail):
-            win.draw_line(gc, int(x_cent + x1 + 0.5), int(y_cent + y1 + 0.5),
-                              int(x_cent + x2 + 0.5), int(y_cent + y2 + 0.5))
+        ct.translate(x_cent, y_cent)
+        ct.rotate(heading)
+        ct.set_source_pixbuf(self.glider_pixbuf, -width / 2, -height / 2)
+        ct.paint()
 
     def draw_wind(self, gc, win, win_width, win_height):
         """Draw wind speed/direction"""
