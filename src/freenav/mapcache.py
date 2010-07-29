@@ -2,6 +2,7 @@
 program"""
 
 import math
+M_2PI = 2 * math.pi
 
 class MapCache():
     """Cached waypoints and airspace"""
@@ -78,13 +79,13 @@ def count_crossings(x, y, as_id, airspace_lines, airspace_arcs):
         start, arc_len = (arc['start'], arc['length'])
         if y >= (y_cent - radius) and y < (y_cent + radius):
             # Each arc has potentially two crossings
-            ang1 = math.degrees(math.asin((y - y_cent) / radius)) * 64
-            ang2 = 180 * 64 - ang1
+            ang1 = math.asin((y - y_cent) / radius)
+            ang2 = math.pi - ang1
 
             for ang in (ang1, ang2):
-                if ((arc_len > 0 and ((ang - start) % (360 * 64)) < arc_len) or
-                    (arc_len < 0 and ((start - ang) % (360 * 64)) < -arc_len)):
-                    x1 = x_cent + radius * math.cos(math.radians(ang / 64.0)) 
+                if ((arc_len > 0 and ((ang - start) % M_2PI) < arc_len) or
+                    (arc_len < 0 and ((start - ang) % M_2PI) < -arc_len)):
+                    x1 = x_cent + radius * math.cos(ang)
                     if x1 < x:
                         odd_node = not odd_node
 

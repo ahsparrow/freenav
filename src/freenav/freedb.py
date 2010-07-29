@@ -2,6 +2,7 @@
 programs
 """
 
+import math
 import os
 import time
 
@@ -37,7 +38,7 @@ SCHEMA = {
 
     'Airspace_Arcs': [
         ('airspace_id', 'TEXT'), ('x', 'INTEGER'), ('y', 'INTEGER'),
-        ('radius', 'INTEGER'), ('start', 'INTEGER'), ('length', 'INTEGER')],
+        ('radius', 'INTEGER'), ('start', 'REAL'), ('length', 'REAL')],
 
     'Tasks' : [('id', 'INTEGER'), ('aat_flag', 'INTEGER')],
 
@@ -259,11 +260,11 @@ class Freedb:
               (airspace_id, x, y, radius, start, length)
               VALUES (?, ?, ?, ?, ?, ?)'''
         self.cursor.execute(sql, (as_id, int(x), int(y), int(radius),
-                             int(start_angle * 64), int(arc_length * 64)))
+                                  start_angle, arc_length))
 
     def insert_airspace_circle(self, as_id, x, y, radius):
-        """Convenience function to add a 360 degree arc"""
-        self.insert_airspace_arc(as_id, x, y, radius, 0, 360)
+        """Convenience function to add a 2 PI radian arc"""
+        self.insert_airspace_arc(as_id, x, y, radius, 0, 2 * math.pi)
 
     def set_qne(self, qne):
         """Set QNE value and date"""

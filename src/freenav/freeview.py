@@ -18,8 +18,7 @@ except ImportError:
 import mapcache
 
 # Constants for drawing arcs
-ARC_LEN = 64
-CIRCLE_LEN = 360 * ARC_LEN
+M_2PI = 2 * math.pi
 
 M_TO_FT = 1 / 0.3048
 MPS_TO_KTS = 3600 / 1852.0
@@ -33,13 +32,13 @@ NUM_INFO_BOXES = 3
 INFO_BOX_SIZE = 90
 
 # Size of waypoint symbol
-WP_SIZE = 10
+WP_SIZE = 5
 
 # Size of final glide indicator
 FG_WIDTH = 30
 FG_INC = 15
 
-# Threshold to display final glide indicator
+# Threshold (in feet) to display final glide indicator
 FG_THRESHOLD = -3000
 
 ICON = [
@@ -196,7 +195,6 @@ class FreeView(APP_BASE):
 
         # Allocate some drawing colours
         cmap = self.drawing_area.get_colormap()
-        self.airspace_color = cmap.alloc_color("blue")
         self.bg_color = cmap.alloc_color("white")
         self.fg_color = cmap.alloc_color("black")
 
@@ -256,13 +254,12 @@ class FreeView(APP_BASE):
         if fullscreen:
             self.window.fullscreen()
         else:
-            self.window.set_size_request(480, 750)
+            self.window.set_size_request(480, 700)
         self.window.show_all()
 
         # Mute pixmap
         self.mute_pixmap, _mask = gtk.gdk.pixmap_create_from_xpm_d(
             self.drawing_area.window, None, ICON)
-
 
     def view_to_win(self, x, y):
         """Convert real world coordinates to window coordinates"""
@@ -296,25 +293,24 @@ class FreeView(APP_BASE):
         win = area.window
         win_width, win_height = win.get_size()
 
-        # Start with a blank sheet...
         gc = win.new_gc()
-        ct = win.cairo_create()
+        cr = win.cairo_create()
+
+        # Start with a blank sheet...
         gc.foreground = self.bg_color
         win.draw_rectangle(gc, True, 0, 0, win_width, win_height)
+        gc.foreground = self.fg_color
 
         # Airspace
-        gc.foreground = self.airspace_color
-        gc.line_width = 2
-        self.draw_airspace(gc, win)
+        self.draw_airspace(cr, win_width, win_height)
 
         # Task and turnpoint sectors
-        gc.foreground = self.fg_color
         gc.line_width = 2
         self.draw_task(gc, win)
 
         # Waypoints
         gc.line_width = 1
-        self.draw_waypoints(win, gc)
+        self.draw_waypoints(win, gc, cr)
 
         # Next turnpoint annotation and course
         self.draw_turnpoint(gc, win, win_height)
@@ -324,7 +320,7 @@ class FreeView(APP_BASE):
         self.draw_glide(gc, win, win_height)
 
         # Heading symbol
-        self.draw_heading(self.flight.get_velocity()['track'], ct, win_height,
+        self.draw_heading(self.flight.get_velocity()['track'], cr, win_height,
                           win_width)
 
         # Wind arrow
@@ -339,44 +335,75 @@ class FreeView(APP_BASE):
 
         return True
 
-    def draw_waypoints(self, win, gc):
+    def draw_waypoints(self, win, gc, cr):
         """Draw waypoints"""
         if self.divert_flag or self.flight.get_state() == 'Divert':
-            wps = self.flight.db.get_landable_list()
+            # Landable waypoints
             fill = True
+            wps = self.flight.db.get_landable_list()
         else:
             fill = False
-            wps = self.mapcache.wps
             if self.view_scale > 71:
+                # Task waypoints
                 tps = [tp['id'] for tp in self.flight.task.tp_list]
-                wps = filter(lambda x: x['id'] in tps, wps)
+                wps = filter(lambda x: x['id'] in tps, self.mapcache.wps)
+            else:
+                wps = self.mapcache.wps
 
+        cr.save()
         for wp in wps:
+            # Draw a circle
             x, y = self.view_to_win(wp['x'], wp['y'])
-            delta = WP_SIZE / 2
-            win.draw_arc(gc, fill, x - delta, y - delta, WP_SIZE, WP_SIZE,
-                         0, CIRCLE_LEN)
+            cr.new_sub_path()
+            cr.arc(x, y, WP_SIZE, 0, M_2PI)
 
+            # Waypoint ID
             self.wp_layout.set_text(wp['id'])
-            win.draw_layout(gc, x + delta, y + delta, self.wp_layout)
+            win.draw_layout(gc, x + WP_SIZE, y + WP_SIZE, self.wp_layout)
 
-    def draw_airspace(self, gc, win):
+        if fill:
+            cr.fill()
+        else:
+            cr.set_line_width(2)
+            cr.stroke()
+        cr.restore()
+
+    def draw_airspace(self, cr, win_width, win_height):
         """Draw airspace boundary lines and arcs"""
+        cr.save()
+        cr.set_line_width(2)
+        cr.set_source_rgba(0, 0, 1, 1)
+
+        # Transform view to window coordinates
+        cr.save()
+        cr.translate(win_width / 2, win_height / 2)
+        cr.scale(1.0 / self.view_scale, -1.0 / self.view_scale)
+        cr.translate(-self.viewx, -self.viewy)
+
         # Airspace lines
         for as_id in self.mapcache.airspace_lines:
             for line in self.mapcache.airspace_lines[as_id]:
-                x1, y1 = self.view_to_win(line['x1'], line['y1'])
-                x2, y2 = self.view_to_win(line['x2'], line['y2'])
-                win.draw_line(gc, x1, y1, x2, y2)
+                cr.move_to(line['x1'], line['y1'])
+                cr.line_to(line['x2'], line['y2'])
 
         # Airspace arcs & circles
         for as_id in self.mapcache.airspace_arcs:
             for arc in self.mapcache.airspace_arcs[as_id]:
-                radius = arc['radius']
-                x, y = self.view_to_win(arc['x'] - radius, arc['y'] + radius)
-                width = 2 * arc['radius'] / self.view_scale
-                win.draw_arc(gc, False, x, y, width, width, arc['start'],
-                             arc['length'])
+                angle1 = arc['start']
+                angle2 = angle1 + arc['length']
+
+                cr.new_sub_path()
+                if arc['length'] > 0:
+                    cr.arc(arc['x'], arc['y'], arc['radius'], angle1, angle2)
+                else:
+                    cr.arc_negative(arc['x'], arc['y'], arc['radius'], angle1,
+                                    angle2)
+
+        # Restore transform
+        cr.restore()
+        cr.stroke()
+
+        cr.restore()
 
     def draw_task(self, gc, win):
         """Draw task and turnpoint sectors"""
@@ -534,11 +561,11 @@ class FreeView(APP_BASE):
             fmt = '%d\n%s\n%.1f'
         self.fg_layout.set_text(fmt % (glide_height, ete_str,
                                        glide['maccready'] * MPS_TO_KTS))
-        _x, y = self.fg_layout.get_pixel_size()
+        x, y = self.fg_layout.get_pixel_size()
         win.draw_layout(gc, FG_WIDTH + 5, (win_height / 2) - (2 * y / 3),
                         self.fg_layout, background=None)
 
-    def draw_heading(self, heading, ct, win_height, win_width):
+    def draw_heading(self, heading, cr, win_height, win_width):
         """Draw heading glider symbol"""
         x_cent = win_width / 2
         y_cent = win_height / 2
@@ -546,10 +573,13 @@ class FreeView(APP_BASE):
         width = self.glider_pixbuf.get_width()
         height = self.glider_pixbuf.get_height()
 
-        ct.translate(x_cent, y_cent)
-        ct.rotate(heading)
-        ct.set_source_pixbuf(self.glider_pixbuf, -width / 2, -height / 2)
-        ct.paint()
+        cr.save()
+        cr.translate(x_cent, y_cent)
+        cr.rotate(heading)
+
+        cr.set_source_pixbuf(self.glider_pixbuf, -width / 2, -height / 2)
+        cr.paint()
+        cr.restore()
 
     def draw_wind(self, gc, win, win_width, win_height):
         """Draw wind speed/direction"""

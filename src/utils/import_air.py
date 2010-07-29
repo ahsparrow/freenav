@@ -27,54 +27,76 @@ class AirProcessor():
             p = airlist[0]
 
             if isinstance(p, tnp.Point):
-                x1, y1 = self.projection.forward(p.lat.radians(),
-                                                 p.lon.radians())
+                # Insert an airspace line
+                lat, lon = p.lat.radians(), p.lon.radians()
+                x1, y1 = self.projection.forward(lat, lon)
+
                 self.db.insert_airspace_line(id, x1, y1, x, y)
-                xmin, ymin, xmax, ymax = \
-                        min(x, x1), min(y, y1), max(x, x1), max(y, y1)
+
+                # Extent of the newly inserted line
+                extent = min(x, x1), min(y, y1), max(x, x1), max(y, y1)
+
             elif isinstance(p, tnp.Arc):
-                x1, y1 = self.projection.forward(p.end.lat.radians(),
-                                                 p.end.lon.radians())
-                xc, yc, = self.projection.forward(p.centre.lat.radians(),
-                                                  p.centre.lon.radians())
-                radius = p.radius*NM_TO_M
-                start = math.degrees(math.atan2(y-yc, x-xc))
-                end = math.degrees(math.atan2(y1-yc, x1-xc))
-                len = end-start
+                # Insert an airspace arc
+                lat, lon = p.end.lat.radians(), p.end.lon.radians()
+                x1, y1 = self.projection.forward(lat, lon)
+
+                lat, lon = p.centre.lat.radians(), p.centre.lon.radians()
+                xc, yc, = self.projection.forward(lat, lon)
+
+                radius = p.radius * NM_TO_M
+                start = math.atan2(y - yc, x - xc)
+                end = math.atan2(y1 - yc, x1 - xc)
+
+                len = end - start
                 if isinstance(p, tnp.CcwArc):
                     if len < 0:
-                        len += 360
+                        len += 2 * math.pi
                 else:
                     if len > 0:
-                        len -= 360
-                self.db.insert_airspace_arc(id, xc, yc, radius, start, len)
-                xmin, ymin, xmax, ymax = \
-                        xc-radius, yc-radius, xc+radius, yc+radius
+                        len -= 2 * math.pi
 
+                self.db.insert_airspace_arc(id, xc, yc, radius, start, len)
+
+                # Extent (sort of) of newly inserted arc
+                extent = xc - radius, yc - radius, xc + radius, yc + radius
+
+            # Recursively add remaining segments
             mm = self.add_segments(id, x1, y1, airlist[1:])
-            return min(xmin, mm[0]), min(ymin, mm[1]), \
-                   max(xmax, mm[2]), max(ymax, mm[3])
+
+            return (min(extent[0], mm[0]),
+                    min(extent[1], mm[1]),
+                    max(extent[2], mm[2]),
+                    max(extent[3], mm[3]))
         else:
             return x, y, x, y
 
     def add_airspace(self, name, airclass, airtype, base, tops, airlist):
+        """Add a new airspace volume"""
         if int(base) <= MAX_LEVEL:
+            # Increment internal ID
             self.id += 1
             id = 'A'+str(self.id)
-            p = airlist[0]
 
+            # Get the first part of the boundary
+            p = airlist[0]
             if isinstance(p, tnp.Circle):
+                # Circle is a special case - it defines the boundary in a
+                # single segment
                 x, y = self.projection.forward(p.centre.lat.radians(),
                                                p.centre.lon.radians())
-                radius = p.radius*NM_TO_M
+                radius = p.radius * NM_TO_M
                 self.db.insert_airspace_circle(id, x, y, radius)
-                xmin, ymin, xmax, ymax = x-radius, y-radius, x+radius, y+radius
+
+                # Calculate maximum X/Y extents
+                extent = (x - radius, y - radius, x + radius, y + radius)
+
             else:
+                # If it isn't a circle it must be a point
                 x, y = self.projection.forward(p.lat.radians(), p.lon.radians())
-                xmin, ymin, xmax, ymax = \
-                    self.add_segments(id, x, y, airlist[1:])
-            self.db.insert_airspace(id, name, str(base), str(tops), xmin,
-                                    ymin, xmax, ymax)
+                extent = self.add_segments(id, x, y, airlist[1:])
+
+            self.db.insert_airspace(id, name, str(base), str(tops), *extent)
 
 def usage():
     print 'usage: import_air [options] input_file'
