@@ -306,7 +306,7 @@ class FreeView(APP_BASE):
 
         # Task and turnpoint sectors
         gc.line_width = 2
-        self.draw_task(gc, win)
+        self.draw_task(cr)
 
         # Waypoints
         gc.line_width = 1
@@ -405,87 +405,100 @@ class FreeView(APP_BASE):
 
         cr.restore()
 
-    def draw_task(self, gc, win):
+    def draw_task(self, cr):
         """Draw task and turnpoint sectors"""
-        pts = [self.view_to_win(tp['mindistx'], tp['mindisty'])
+        win_width, win_height = win.get_size()
+        pts = [(tp['mindistx'], tp['mindisty'])
                for tp in self.flight.task.tp_list]
-        win.draw_lines(gc, pts)
+
+        # Transform view to window coordinates
+        cr.save()
+        cr.translate(win_width / 2, win_height / 2)
+        cr.scale(1.0 / self.view_scale, -1.0 / self.view_scale)
+        cr.translate(-self.viewx, -self.viewy)
+
+        # Draw task legs
+        cr.move_to(*pts[0])
+        for p in pts[1:]:
+            cr.line_to(*p)
 
         # Draw sectors
         if len(self.flight.task.tp_list) > 1:
             for tp in self.flight.task.tp_list[:-1]:
-                self.draw_tp_sector(gc, win, tp)
+                self.draw_tp_sector(cr, tp)
 
             # Draw finish line
-            self.draw_tp_line(gc, win, self.flight.task.tp_list[-1])
+            self.draw_tp_line(cr, self.flight.task.tp_list[-1])
 
-    def draw_tp_line(self, gc, win, tp):
+        cr.restore()
+        cr.stroke()
+
+    def draw_tp_line(self, cr, tp):
         """Draw turnpoint (finish) line"""
-        x, y = tp['x'], tp['y']
-        radius = tp['radius1']
         angle = math.radians(tp['angle12'])
-        dx = -radius * math.cos(angle)
-        dy = radius * math.sin(angle)
+        dx = -tp['radius1'] * math.cos(angle)
+        dy = tp['radius1'] * math.sin(angle)
 
-        x1, y1 = self.view_to_win(x + dx, y + dy)
-        x2, y2 = self.view_to_win(x - dx, y - dy)
-        win.draw_line(gc, x1, y1, x2, y2)
+        x1, y1 = tp['x'] + dx, tp['y'] + dy
+        x2, y2 = tp['x'] - dx, tp['y'] - dy
+        cr.move_to(x1, y1)
+        cr.line_to(x2, y2)
 
-    def draw_tp_sector(self, gc, win, tp):
+    def draw_tp_sector(self, cr, tp):
         """Draw turnpoint sector"""
-        oz_x, oz_y = tp['x'], tp['y']
-        oz_radius1 = tp['radius1']
-        oz_radius2 = tp['radius2']
-        oz_angle1 = tp['angle1']
-        oz_angle2 = tp['angle2']
-        oz_angle = tp['angle12']
+        x, y = tp['x'], tp['y']
+        radius1 = tp['radius1']
+        radius2 = tp['radius2']
+        oz_angle1 = math.radians(tp['angle1'])
+        oz_angle2 = math.radians(tp['angle2'])
+        oz_angle = -math.radians(90 + tp['angle12'])
 
         # Outer arc
-        x, y = self.view_to_win(oz_x - oz_radius1, oz_y + oz_radius1)
-        width = height = int(2 * oz_radius1 / self.view_scale)
-        ang1 = int(((90 - (180 + oz_angle + (oz_angle1 / 2.0))) % 360) * 64)
-        ang2 = int(oz_angle1 * 64)
-        win.draw_arc(gc, False, x, y, width, height, ang1, ang2)
+        ang1 = oz_angle - (oz_angle1 / 2)
+        ang2 = oz_angle + (oz_angle1 / 2)
+        cr.new_sub_path()
+        cr.arc(x, y, radius1, ang1, ang2)
 
-        if abs(oz_angle1 - 360) < 0.1:
+        if abs(oz_angle1 - M_2PI) < 0.01:
             return
 
         # Outer radials
-        ang = 180 + oz_angle + (oz_angle1 / 2.0)
-        self.draw_radial(gc, win, oz_x, oz_y, ang, oz_radius1, oz_radius2)
-        ang = 180 + oz_angle - (oz_angle1 / 2.0)
-        self.draw_radial(gc, win, oz_x, oz_y, ang, oz_radius1, oz_radius2)
+        self.draw_radial(cr, x, y, ang1, radius1, radius2)
+        self.draw_radial(cr, x, y, ang2, radius1, radius2)
 
-        if oz_radius2 == 0:
+        if radius2 == 0:
             return
 
         # Inner arc
-        x, y = self.view_to_win(oz_x - oz_radius2, oz_y + oz_radius2)
-        width = height = int(2 * oz_radius2 / self.view_scale)
-        arc_len = int((oz_angle1 - oz_angle2) * 32)
+        ang1_inner = oz_angle - (oz_angle2 / 2)
+        ang2_inner = oz_angle + (oz_angle2 / 2)
 
-        win.draw_arc(gc, False, x, y, width, height, ang1, arc_len)
-        ang = (ang1 + ang2) % 23040
-        win.draw_arc(gc, False, x, y, width, height, ang, -arc_len)
+        cr.new_sub_path()
+        if oz_angle1 > oz_angle2:
+            cr.arc(x, y, radius2, ang1, ang1_inner)
+            cr.new_sub_path()
+            cr.arc(x, y, radius2, ang2_inner, ang2)
+        else:
+            cr.arc_negative(x, y, radius2, ang1, ang1_inner)
+            cr.new_sub_path()
+            cr.arc_negative(x, y, radius2, ang2_inner, ang2)
 
-        if (oz_angle2 == 0) or (abs(oz_angle2 - 360) < 0.1):
+        if (oz_angle2 == 0) or abs(oz_angle2 - M_2PI) < 0.01:
             return
 
         # Inner radials
-        ang = 180 + oz_angle + (oz_angle2 / 2.0)
-        self.draw_radial(gc, win, oz_x, oz_y, ang, oz_radius2, 0)
-        ang = 180 + oz_angle - (oz_angle2 / 2.0)
-        self.draw_radial(gc, win, oz_x, oz_y, ang, oz_radius2, 0)
+        self.draw_radial(cr, x, y, ang1_inner, 0, radius2)
+        self.draw_radial(cr, x, y, ang2_inner, 0, radius2)
 
-    def draw_radial(self, gc, win, x, y, angle, radius1, radius2):
+    def draw_radial(self, cr, x, y, angle, radius1, radius2):
         """Draw a radial line"""
-        ang = math.radians(angle)
-        cos_ang = math.cos(ang)
-        sin_ang = math.sin(ang)
+        cos_ang = math.cos(angle)
+        sin_ang = math.sin(angle)
 
-        x1, y1 = self.view_to_win(x + radius1 * sin_ang, y + radius1 * cos_ang)
-        x2, y2 = self.view_to_win(x + radius2 * sin_ang, y + radius2 * cos_ang)
-        win.draw_line(gc, x1, y1, x2, y2)
+        x1, y1 = x + radius1 * cos_ang, y + radius1 * sin_ang
+        x2, y2 = x + radius2 * cos_ang, y + radius2 * sin_ang
+        cr.move_to(x1, y1)
+        cr.line_to(x2, y2)
 
     def draw_turnpoint(self, gc, win, win_height):
         """Draw turnpoint annotation and direction pointer"""
