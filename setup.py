@@ -15,5 +15,8 @@ setup(name='freenav',
                   ('share/dbus-1/services', ['data/taskedit.service',
                                              'data/freenav.service',
                                              'data/freeconf.service',
-                                             'data/freexyz.service'])]
+                                             'data/freexyz.service']),
+                  ('share/pixmaps', ['pixmaps/free_glider.png',
+                                     'pixmaps/free_navarrow.png',
+                                     'pixmaps/free_wind.png'])]
      )
