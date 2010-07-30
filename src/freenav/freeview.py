@@ -176,6 +176,7 @@ class FreeView(APP_BASE):
         # Pixmaps
         self.glider_pixbuf = find_pixbuf("free_glider.png")
         self.navarrow_pixbuf = find_pixbuf("free_navarrow.png")
+        self.wind_pixbuf = find_pixbuf("free_wind.png")
 
         # Create top level window
         if IS_HILDON_APP:
@@ -322,8 +323,7 @@ class FreeView(APP_BASE):
                           win_width)
 
         # Wind arrow
-        gc.line_width = 2
-        self.draw_wind(gc, win, win_width, win_height)
+        self.draw_wind(cr, gc, win, win_width, win_height)
 
         # Number of satellites
         self.draw_satellites(gc, win, win_width, win_height)
@@ -589,28 +589,31 @@ class FreeView(APP_BASE):
         cr.paint()
         cr.restore()
 
-    def draw_wind(self, gc, win, win_width, win_height):
+    def draw_wind(self, cr, gc, win, win_width, win_height):
         """Draw wind speed/direction"""
         wind = self.flight.get_wind()
-        x = math.sin(wind['direction'])
-        y = -math.cos(wind['direction'])
-        x_cent = win_width - 40 
-        y_cent = 40
-        a_front, a_back, a_side = 30, 6, 14
 
-        x1, y1 = x * a_front, y * a_front
-        x_poly = [x1, -x1 - y * a_side, -x * a_back, -x1 + y * a_side]
-        y_poly = [y1, -y1 + x * a_side, -y * a_back, -y1 - x * a_side]
-        poly = [(int(x + x_cent + 0.5), int(y + y_cent + 0.5))
-                for x, y in zip(x_poly, y_poly)]
+        # Draw wind direction
+        width = self.wind_pixbuf.get_width()
+        height = self.wind_pixbuf.get_height()
 
-        win.draw_polygon(gc, False, poly)
+        xc = win_width - 40
+        yc = 40
 
+        cr.save()
+        cr.translate(xc, yc)
+        cr.rotate(wind['direction'])
+
+        cr.set_source_pixbuf(self.wind_pixbuf, -width / 2, -height / 2)
+        cr.paint()
+        cr.restore()
+
+        # Draw wind speed value
         speed = wind['speed'] * MPS_TO_KTS
         self.fg_layout.set_text(str(int(speed)))
         x, y = self.fg_layout.get_pixel_size()
 
-        win.draw_layout(gc, x_cent - x - 40, y_cent - y / 2, self.fg_layout,
+        win.draw_layout(gc, xc - x - 40, yc - y / 2, self.fg_layout,
                         background=None)
 
         ground_speed = self.flight.get_velocity()['speed'] * MPS_TO_KTS
