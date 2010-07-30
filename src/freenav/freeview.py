@@ -175,6 +175,7 @@ class FreeView(APP_BASE):
 
         # Pixmaps
         self.glider_pixbuf = find_pixbuf("free_glider.png")
+        self.navarrow_pixbuf = find_pixbuf("free_navarrow.png")
 
         # Create top level window
         if IS_HILDON_APP:
@@ -305,18 +306,15 @@ class FreeView(APP_BASE):
         self.draw_airspace(cr, win_width, win_height)
 
         # Task and turnpoint sectors
-        gc.line_width = 2
-        self.draw_task(cr)
+        self.draw_task(cr, win_width, win_height)
 
         # Waypoints
-        gc.line_width = 1
         self.draw_waypoints(win, gc, cr)
 
         # Next turnpoint annotation and course
-        self.draw_turnpoint(gc, win, win_height)
+        self.draw_turnpoint(cr, gc, win, win_height)
 
         # Final glide indicator
-        gc.line_width = 3
         self.draw_glide(gc, win, win_height)
 
         # Heading symbol
@@ -405,9 +403,8 @@ class FreeView(APP_BASE):
 
         cr.restore()
 
-    def draw_task(self, cr):
+    def draw_task(self, cr, win_width, win_height):
         """Draw task and turnpoint sectors"""
-        win_width, win_height = win.get_size()
         pts = [(tp['mindistx'], tp['mindisty'])
                for tp in self.flight.task.tp_list]
 
@@ -500,39 +497,37 @@ class FreeView(APP_BASE):
         cr.move_to(x1, y1)
         cr.line_to(x2, y2)
 
-    def draw_turnpoint(self, gc, win, win_height):
+    def draw_turnpoint(self, cr, gc, win, win_height):
         """Draw turnpoint annotation and direction pointer"""
         nav = self.flight.get_nav()
-        bearing = math.degrees(nav['bearing']) % 360
 
+        # Annotation
+        bearing = math.degrees(nav['bearing']) % 360
         dist_km = nav['distance'] / 1000
+
         self.tp_layout.set_text('%s %.1f/%.0f' % (nav['id'], dist_km, bearing))
         x, y = self.tp_layout.get_pixel_size()
-
-        win.draw_layout(gc, 2, win_height - y, self.tp_layout,
-                        background=self.bg_color)
+        win.draw_layout(gc, 2, win_height - y, self.tp_layout)
 
         # Draw arrow for relative bearing to TP
-        rel = nav['bearing'] - self.flight.get_velocity()['track']
-        x, y = math.sin(rel), -math.cos(rel)
+        relative_bearing = nav['bearing'] - self.flight.get_velocity()['track']
 
-        x_cent = 40
-        y_cent = 40
-        a_front, a_back, a_side = 30, 10, 20
+        width = self.navarrow_pixbuf.get_width()
+        height = self.navarrow_pixbuf.get_height()
 
-        x1, y1 = x * a_front, y * a_front
-        x_poly = [x1, -x1 - y * a_side, -x * a_back, -x1 + y * a_side]
-        y_poly = [y1, -y1 + x * a_side, -y * a_back, -y1 - x * a_side]
-        poly = [(int(x + x_cent + 0.5), int(y + y_cent + 0.5))
-                for x, y in zip(x_poly, y_poly)]
-
-        filled = (self.divert_flag == False)
-        win.draw_polygon(gc, filled, poly)
+        cr.save()
+        cr.translate(40, 40)
+        cr.rotate(relative_bearing)
+        cr.set_source_pixbuf(self.navarrow_pixbuf, -width / 2, -height / 2)
+        cr.paint()
+        cr.restore()
 
     def draw_glide(self, gc, win, win_height):
         """Draw final glide information"""
         glide = self.flight.task.get_glide()
         glide_height = glide['height'] * M_TO_FT
+
+        gc.line_width = 3
 
         if (glide_height < FG_THRESHOLD) and not self.maccready_flag:
             return
