@@ -20,6 +20,7 @@ import mapcache
 # Constants for drawing arcs
 M_2PI = 2 * math.pi
 
+# Conversion constants
 M_TO_FT = 1 / 0.3048
 MPS_TO_KTS = 3600 / 1852.0
 
@@ -41,56 +42,12 @@ FG_INC = 15
 # Threshold (in feet) to display final glide indicator
 FG_THRESHOLD = -3000
 
-ICON = [
-"32 32 9 1",
-" 	c None",
-".	c #FFFFFF",
-"+	c #494949",
-"@	c #000000",
-"#	c #B6B6B6",
-"$	c #DBDBDB",
-"%	c #242424",
-"&	c #929292",
-"*	c #6D6D6D",
-"...............+@#..............",
-".....$$$.......%@%..............",
-"....$+%+#......@@@%#$...........",
-"....$%@@+#....$@@@@@@@+&#.......",
-"....$+@@@+$...#@@@@@@@@@@@&.....",
-".....#+@@%#...#@%.%@@@@@@@@%#...",
-"......#%@@+#..&@%.$%@@@@@@@@@#..",
-"......$+@@@+#.*@+...#*+@@@@@@@$.",
-".......#+@@@+$+@*.......$*%@@@*.",
-"........#+@@%#+@&..........+@@+.",
-".........#%@@+%@&...........+@%.",
-".........$+@@@@@#...........$@%.",
-"..........#+@@@@#............+@.",
-"...........#+@@@&............#@.",
-"............#%@@+#............$.",
-"............$%@@@+#.............",
-".............+@@@@+$............",
-".............*@%@@%#............",
-".............+@+%@@+#...........",
-".............%@*+@@@+#..........",
-"....$#***&$..%@##+@@@+$.........",
-"..$+@@@@@@@+$@@#.#+@@%#.........",
-".$%@@%+++%@@@@@$..#%@@+#........",
-".%%&......$&%@@$..$+@@@+#.......",
-"&%...........%@....#+@@@+$......",
-"+#...........#%.....#+@@%#......",
-"*#...........#%......#%@@+#.....",
-"&%$.........$%*......$+@@@+$....",
-".+@*$.....#*@@$.......#+@@%$....",
-".$%@@@%%%@@@%#.........#+%+$....",
-"...&%@@@@@@*$...........$$$.....",
-".....$&&&#......................"]
-
 PIXMAP_DIRS = ['.', '/usr/share/pixmaps', '../../pixmaps']
 
 def find_pixbuf(filename):
     """Searches for pixmap file and returns corresponding gtk.gdk.Pixbuf"""
-    for dir in PIXMAP_DIRS:
-        path = os.path.join(dir, filename)
+    for pix_dir in PIXMAP_DIRS:
+        path = os.path.join(pix_dir, filename)
         if os.path.isfile(path):
             pixbuf = gtk.gdk.pixbuf_new_from_file(path)
 
@@ -109,6 +66,7 @@ def add_div(box):
 class BigButtonDialog(gtk.Window):
     """Dialog box with unusually big buttons"""
     def __init__(self, title=None, buttons=None):
+        """Create all of dialog box - except the message label"""
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
         self.set_name('freenav-bigbuttondialog')
         self.set_modal(True)
@@ -131,10 +89,6 @@ class BigButtonDialog(gtk.Window):
 
         self.vbox.pack_end(button_box)
 
-    def set_label(self, widget):
-        """Set dialog box label"""
-        self.vbox.pack_start(widget)
-
     def callback(self, _widget, data):
         """Button press callback"""
         self.response = data
@@ -145,8 +99,10 @@ class BigButtonDialog(gtk.Window):
         self.response = gtk.RESPONSE_DELETE_EVENT
         gtk.main_quit()
 
-    def run(self):
-        """Start the dialog box and return button press response"""
+    def run(self, label):
+        """Add label, wait for button press, return response"""
+        self.vbox.pack_start(label)
+        self.show_all()
         gtk.main()
         return self.response
 
@@ -169,6 +125,7 @@ class FreeView(APP_BASE):
         # Cache of displayed waypoints and airspace
         self.mapcache = mapcache.MapCache(flight)
 
+        # Display element states
         self.divert_flag = False
         self.maccready_flag = False
         self.mute_flag = False
@@ -177,6 +134,7 @@ class FreeView(APP_BASE):
         self.glider_pixbuf = find_pixbuf("free_glider.png")
         self.navarrow_pixbuf = find_pixbuf("free_navarrow.png")
         self.wind_pixbuf = find_pixbuf("free_wind.png")
+        self.mute_pixbuf = find_pixbuf("free_muted.png")
 
         # Create top level window
         if IS_HILDON_APP:
@@ -259,10 +217,6 @@ class FreeView(APP_BASE):
             self.window.set_size_request(480, 700)
         self.window.show_all()
 
-        # Mute pixmap
-        self.mute_pixmap, _mask = gtk.gdk.pixmap_create_from_xpm_d(
-            self.drawing_area.window, None, ICON)
-
     def view_to_win(self, x, y):
         """Convert real world coordinates to window coordinates"""
         win_width, win_height = self.drawing_area.window.get_size()
@@ -298,10 +252,11 @@ class FreeView(APP_BASE):
         gc = win.new_gc()
         cr = win.cairo_create()
 
-        # Start with a blank sheet...
-        gc.foreground = self.bg_color
-        win.draw_rectangle(gc, True, 0, 0, win_width, win_height)
-        gc.foreground = self.fg_color
+        # Start with a clean sheet...
+        cr.set_source_rgba(1, 1, 1, 1)
+        cr.rectangle(0, 0, win_width, win_height)
+        cr.fill()
+        cr.set_source_rgba(0, 0, 0, 1)
 
         # Airspace
         self.draw_airspace(cr, win_width, win_height)
@@ -310,10 +265,10 @@ class FreeView(APP_BASE):
         self.draw_task(cr, win_width, win_height)
 
         # Waypoints
-        self.draw_waypoints(win, gc, cr)
+        self.draw_waypoints(cr)
 
         # Next turnpoint annotation and course
-        self.draw_turnpoint(cr, gc, win, win_height)
+        self.draw_turnpoint(cr, win_height)
 
         # Final glide indicator
         self.draw_glide(gc, win, win_height)
@@ -323,17 +278,17 @@ class FreeView(APP_BASE):
                           win_width)
 
         # Wind arrow
-        self.draw_wind(cr, gc, win, win_width, win_height)
+        self.draw_wind(cr, win_width, win_height)
 
         # Number of satellites
         self.draw_satellites(gc, win, win_width, win_height)
 
         # Mute indicator
-        self.draw_mute(gc, win, win_width)
+        self.draw_mute(cr, win_width)
 
         return True
 
-    def draw_waypoints(self, win, gc, cr):
+    def draw_waypoints(self, cr):
         """Draw waypoints"""
         if self.divert_flag or self.flight.get_state() == 'Divert':
             # Landable waypoints
@@ -357,7 +312,8 @@ class FreeView(APP_BASE):
 
             # Waypoint ID
             self.wp_layout.set_text(wp['id'])
-            win.draw_layout(gc, x + WP_SIZE, y + WP_SIZE, self.wp_layout)
+            cr.move_to(x + WP_SIZE, y + WP_SIZE)
+            cr.show_layout(self.wp_layout)
 
         if fill:
             cr.fill()
@@ -497,7 +453,7 @@ class FreeView(APP_BASE):
         cr.move_to(x1, y1)
         cr.line_to(x2, y2)
 
-    def draw_turnpoint(self, cr, gc, win, win_height):
+    def draw_turnpoint(self, cr, win_height):
         """Draw turnpoint annotation and direction pointer"""
         nav = self.flight.get_nav()
 
@@ -507,7 +463,8 @@ class FreeView(APP_BASE):
 
         self.tp_layout.set_text('%s %.1f/%.0f' % (nav['id'], dist_km, bearing))
         x, y = self.tp_layout.get_pixel_size()
-        win.draw_layout(gc, 2, win_height - y, self.tp_layout)
+        cr.move_to(2, win_height - y)
+        cr.show_layout(self.tp_layout)
 
         # Draw arrow for relative bearing to TP
         relative_bearing = nav['bearing'] - self.flight.get_velocity()['track']
@@ -589,7 +546,7 @@ class FreeView(APP_BASE):
         cr.paint()
         cr.restore()
 
-    def draw_wind(self, cr, gc, win, win_width, win_height):
+    def draw_wind(self, cr, win_width, win_height):
         """Draw wind speed/direction"""
         wind = self.flight.get_wind()
 
@@ -611,17 +568,17 @@ class FreeView(APP_BASE):
         # Draw wind speed value
         speed = wind['speed'] * MPS_TO_KTS
         self.fg_layout.set_text(str(int(speed)))
-        x, y = self.fg_layout.get_pixel_size()
 
-        win.draw_layout(gc, xc - x - 40, yc - y / 2, self.fg_layout,
-                        background=None)
+        x, y = self.fg_layout.get_pixel_size()
+        cr.move_to(xc - x - 40, yc - y / 2)
+        cr.show_layout(self.fg_layout)
 
         ground_speed = self.flight.get_velocity()['speed'] * MPS_TO_KTS
         self.fg_layout.set_text(str(int(ground_speed)))
-        x, y = self.fg_layout.get_pixel_size()
 
-        win.draw_layout(gc, win_width - x - 2, win_height - y,
-                        self.fg_layout, background=None)
+        x, y = self.fg_layout.get_pixel_size()
+        cr.move_to(win_width - x- 2, win_height - y)
+        cr.show_layout(self.fg_layout)
 
     def draw_satellites(self, gc, win, win_width, win_height):
         """Draw number of satellites in view"""
@@ -630,13 +587,16 @@ class FreeView(APP_BASE):
         win.draw_layout(gc, win_width - x - 2, win_height - (2 * y),
                         self.fg_layout, background=None)
 
-    def draw_mute(self, gc, win, win_width):
+    def draw_mute(self, cr, win_width):
         """Draw mute indicator"""
         if self.mute_flag:
-            pm_width, pm_height = self.mute_pixmap.get_size()
-            win.draw_drawable(gc, self.mute_pixmap, 0, 0,
-                              win_width / 2 - pm_width / 2,
-                              pm_height / 2, -1, -1)
+            width = self.mute_pixbuf.get_width()
+
+            cr.save()
+            cr.translate(win_width / 2, 4)
+            cr.set_source_pixbuf(self.mute_pixbuf, -width / 2, 0)
+            cr.paint()
+            cr.restore()
 
     # External methods - for use by controller
     def redraw(self):
@@ -689,10 +649,8 @@ class FreeView(APP_BASE):
                                                     0, 999))
             label = gtk.Label(msg)
             label.set_attributes(attr_list)
-            dialog.set_label(label)
 
-            dialog.show_all()
-            dialog.run()
+            dialog.run(label)
             dialog.destroy()
 
     def task_start_dialog(self):
@@ -704,10 +662,8 @@ class FreeView(APP_BASE):
 
         label = gtk.Label("Start?")
         label.set_attributes(attr_list)
-        dialog.set_label(label)
 
-        dialog.show_all()
-        result = dialog.run()
+        result = dialog.run(label)
         dialog.destroy()
 
         return result

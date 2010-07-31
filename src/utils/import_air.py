@@ -1,7 +1,16 @@
 #!/usr/bin/env python
-#
-# Import airspace data from Tim Newport-Peace format file
-#
+"""Import airspace data from Tim Newport-Peace format file.
+
+Airspace data is imported in lat/lon format from a TNP file. Data is
+converted to X-Y via a Lambert projection and store in the freeflight
+data base.
+
+Positive X coordinates are Eastwards
+Positive Y coordinates are Northwards
+Angles are relative to the X-axis with positive angles towards the Y axis,
+i.e. anti-clockwise
+
+"""
 
 import math
 import getopt

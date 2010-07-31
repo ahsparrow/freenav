@@ -36,12 +36,15 @@ SCHEMA = {
         ('airspace_id', 'TEXT'), ('x1', 'INTEGER'), ('y1', 'INTEGER'),
         ('x2', 'INTEGER'), ('y2', 'INTEGER')],
 
+    # Start and length are in radians. Zero angle is along x-axis, positive
+    # angles are anti-clockwise (towards y-axis)
     'Airspace_Arcs': [
         ('airspace_id', 'TEXT'), ('x', 'INTEGER'), ('y', 'INTEGER'),
         ('radius', 'INTEGER'), ('start', 'REAL'), ('length', 'REAL')],
 
     'Tasks' : [('id', 'INTEGER'), ('aat_flag', 'INTEGER')],
 
+    # Angles are degrees relative to North, increasing clockwise
     'Turnpoints': [
         ('task_id', 'INTEGER'), ('task_index', 'INTEGER'),
         ('waypoint_id', 'TEXT'),

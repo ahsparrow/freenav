@@ -18,5 +18,6 @@ setup(name='freenav',
                                              'data/freexyz.service']),
                   ('share/pixmaps', ['pixmaps/free_glider.png',
                                      'pixmaps/free_navarrow.png',
-                                     'pixmaps/free_wind.png'])]
+                                     'pixmaps/free_wind.png',
+                                     'pixmaps/free_muted.png'])]
      )
