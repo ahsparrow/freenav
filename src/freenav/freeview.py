@@ -249,10 +249,8 @@ class FreeView(APP_BASE):
         win = area.window
         win_width, win_height = win.get_size()
 
-        gc = win.new_gc()
+        # Start with a clean white sheet...
         cr = win.cairo_create()
-
-        # Start with a clean sheet...
         cr.set_source_rgba(1, 1, 1, 1)
         cr.rectangle(0, 0, win_width, win_height)
         cr.fill()
@@ -271,17 +269,16 @@ class FreeView(APP_BASE):
         self.draw_turnpoint(cr, win_height)
 
         # Final glide indicator
-        self.draw_glide(gc, win, win_height)
+        self.draw_glide(cr, win_height)
 
         # Heading symbol
-        self.draw_heading(self.flight.get_velocity()['track'], cr, win_height,
-                          win_width)
+        self.draw_heading(cr, win_height, win_width)
 
         # Wind arrow
         self.draw_wind(cr, win_width, win_height)
 
         # Number of satellites
-        self.draw_satellites(gc, win, win_width, win_height)
+        self.draw_satellites(cr, win_width, win_height)
 
         # Mute indicator
         self.draw_mute(cr, win_width)
@@ -303,31 +300,27 @@ class FreeView(APP_BASE):
             else:
                 wps = self.mapcache.wps
 
-        cr.save()
         for wp in wps:
             # Draw a circle
             x, y = self.view_to_win(wp['x'], wp['y'])
             cr.new_sub_path()
             cr.arc(x, y, WP_SIZE, 0, M_2PI)
 
-            # Waypoint ID
+            # Waypoint ID text
             self.wp_layout.set_text(wp['id'])
             cr.move_to(x + WP_SIZE, y + WP_SIZE)
             cr.show_layout(self.wp_layout)
 
         if fill:
+            # Draw landables as filled circle
             cr.fill()
         else:
+            # Draw normal waypoints as outline circles
             cr.set_line_width(2)
             cr.stroke()
-        cr.restore()
 
     def draw_airspace(self, cr, win_width, win_height):
         """Draw airspace boundary lines and arcs"""
-        cr.save()
-        cr.set_line_width(2)
-        cr.set_source_rgba(0, 0, 1, 1)
-
         # Transform view to window coordinates
         cr.save()
         cr.translate(win_width / 2, win_height / 2)
@@ -355,14 +348,18 @@ class FreeView(APP_BASE):
 
         # Restore transform
         cr.restore()
+
+        # Draw lines... a beautiful shade of blue
+        cr.save()
+        cr.set_source_rgba(0, 0, 1, 1)
         cr.stroke()
 
         cr.restore()
 
     def draw_task(self, cr, win_width, win_height):
         """Draw task and turnpoint sectors"""
-        pts = [(tp['mindistx'], tp['mindisty'])
-               for tp in self.flight.task.tp_list]
+        task_points = [(tp['mindistx'], tp['mindisty'])
+                       for tp in self.flight.task.tp_list]
 
         # Transform view to window coordinates
         cr.save()
@@ -371,9 +368,9 @@ class FreeView(APP_BASE):
         cr.translate(-self.viewx, -self.viewy)
 
         # Draw task legs
-        cr.move_to(*pts[0])
-        for p in pts[1:]:
-            cr.line_to(*p)
+        cr.move_to(*task_points[0])
+        for task_point in task_points[1:]:
+            cr.line_to(*task_point)
 
         # Draw sectors
         if len(self.flight.task.tp_list) > 1:
@@ -479,19 +476,21 @@ class FreeView(APP_BASE):
         cr.paint()
         cr.restore()
 
-    def draw_glide(self, gc, win, win_height):
+    def draw_glide(self, cr, win_height):
         """Draw final glide information"""
         glide = self.flight.task.get_glide()
         glide_height = glide['height'] * M_TO_FT
 
-        gc.line_width = 3
-
         if (glide_height < FG_THRESHOLD) and not self.maccready_flag:
             return
 
-        # Draw origin
-        y = win_height / 2
-        win.draw_line(gc, 1, y, FG_WIDTH + 1, y)
+        cr.save()
+        cr.set_line_width(3)
+        cr.translate(0, win_height / 2)
+
+        # Draw origin line
+        cr.move_to(1, 0)
+        cr.line_to(FG_WIDTH + 1, 0)
 
         # Draw chevrons
         num_arrows = abs(int(glide['margin'] * 20))
@@ -499,19 +498,23 @@ class FreeView(APP_BASE):
             yinc = -FG_INC
         else:
             yinc =  FG_INC
-        y = y - yinc / 2
 
-        for _dummy in range(min(num_arrows, 5)):
-            y =  y + yinc
-            win.draw_lines(gc, [(1, y), ((FG_WIDTH / 2) + 1, y + yinc),
-                                (FG_WIDTH + 1, y)])
+        for n in range(min(num_arrows, 5)):
+            y = yinc * (n  + 0.5)
+            cr.move_to(1, y)
+            cr.line_to((FG_WIDTH / 2) + 1, y + yinc)
+            cr.line_to(FG_WIDTH + 1, y)
+
         # Draw limit bar
         if num_arrows > 5:
             if yinc > 0:
-                y = y + yinc + gc.line_width
+                y = y + yinc + 4
             else:
-                y = y + yinc - gc.line_width
-            win.draw_line(gc, 1, y, FG_WIDTH + 1, y)
+                y = y + yinc - 4
+            cr.move_to(1, y)
+            cr.line_to(FG_WIDTH + 1, y)
+
+        cr.stroke()
 
         # Arrival height, MacCready and ETE
         ete_mins = glide['ete'] / 60
@@ -527,20 +530,19 @@ class FreeView(APP_BASE):
         self.fg_layout.set_text(fmt % (glide_height, ete_str,
                                        glide['maccready'] * MPS_TO_KTS))
         x, y = self.fg_layout.get_pixel_size()
-        win.draw_layout(gc, FG_WIDTH + 5, (win_height / 2) - (2 * y / 3),
-                        self.fg_layout, background=None)
+        cr.move_to(FG_WIDTH + 5, -(2 * y / 3))
+        cr.show_layout(self.fg_layout)
 
-    def draw_heading(self, heading, cr, win_height, win_width):
+        cr.restore()
+
+    def draw_heading(self, cr, win_height, win_width):
         """Draw heading glider symbol"""
-        x_cent = win_width / 2
-        y_cent = win_height / 2
-
         width = self.glider_pixbuf.get_width()
         height = self.glider_pixbuf.get_height()
 
         cr.save()
-        cr.translate(x_cent, y_cent)
-        cr.rotate(heading)
+        cr.translate(win_width / 2, win_height / 2)
+        cr.rotate(self.flight.get_velocity()['track'])
 
         cr.set_source_pixbuf(self.glider_pixbuf, -width / 2, -height / 2)
         cr.paint()
@@ -573,6 +575,7 @@ class FreeView(APP_BASE):
         cr.move_to(xc - x - 40, yc - y / 2)
         cr.show_layout(self.fg_layout)
 
+        # Draw ground speed value
         ground_speed = self.flight.get_velocity()['speed'] * MPS_TO_KTS
         self.fg_layout.set_text(str(int(ground_speed)))
 
@@ -580,12 +583,12 @@ class FreeView(APP_BASE):
         cr.move_to(win_width - x- 2, win_height - y)
         cr.show_layout(self.fg_layout)
 
-    def draw_satellites(self, gc, win, win_width, win_height):
+    def draw_satellites(self, cr, win_width, win_height):
         """Draw number of satellites in view"""
         self.fg_layout.set_text('%d' % self.flight.get_num_satellites())
         x, y = self.fg_layout.get_pixel_size()
-        win.draw_layout(gc, win_width - x - 2, win_height - (2 * y),
-                        self.fg_layout, background=None)
+        cr.move_to(win_width - x - 2, win_height - (2 * y))
+        cr.show_layout(self.fg_layout)
 
     def draw_mute(self, cr, win_width):
         """Draw mute indicator"""
