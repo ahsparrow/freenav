@@ -57,16 +57,21 @@ def add_div(box):
     """Add a dividing bar between box elements"""
     div = gtk.EventBox()
     div.modify_bg(gtk.STATE_NORMAL, div.get_colormap().alloc_color("black"))
+
+    # Detect whether we are using horizontal or vertical layout
     if isinstance(box, gtk.VBox):
+        # Horizontal bar
         div.set_size_request(-1, 3)
     else:
+        # Vertical bar
         div.set_size_request(3, -1)
+
     box.pack_start(div, expand=False)
 
 class BigButtonDialog(gtk.Window):
-    """Dialog box with unusually big buttons"""
+    """A dialog box with unusually big buttons"""
     def __init__(self, title=None, buttons=None):
-        """Create all of dialog box - except the message label"""
+        """Create all of the dialog box - except the message label"""
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
         self.set_name('freenav-bigbuttondialog')
         self.set_modal(True)
@@ -82,6 +87,8 @@ class BigButtonDialog(gtk.Window):
 
         button_box = gtk.HBox(homogeneous=True, spacing=10)
         button_box.set_size_request(300, 150)
+
+        # buttons is list of button#1 name, response#1, button#2 name, ...
         for but, resp in zip(buttons[::2], buttons[1::2]):
             button = gtk.Button(stock=but)
             button.connect("clicked", self.callback, resp)
@@ -165,28 +172,31 @@ class FreeView(APP_BASE):
         topbox.pack_end(info_sizer, expand=False)
 
         # Array of info boxes with event boxes to capture button presses
+        attr_list = pango.AttrList()
+        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 45, 0, 999))
+        attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
+
         self.info_box = []
         self.info_label = []
         self.size_group = gtk.SizeGroup(gtk.SIZE_GROUP_HORIZONTAL)
         for _dummy in range(NUM_INFO_BOXES):
             label = gtk.Label()
-            attr_list = pango.AttrList()
-            attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 45,
-                                                    0, 999))
-            attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
             label.set_attributes(attr_list)
 
             align = gtk.Alignment(xalign=0.5, yalign=0.5)
             align.add(label)
+
             ebox = gtk.EventBox()
             ebox.add(align)
             ebox.add_events(gtk.gdk.BUTTON_PRESS_MASK)
             ebox.modify_bg(gtk.STATE_NORMAL,
                            ebox.get_colormap().alloc_color("white"))
+
             self.info_box.append(ebox)
             self.info_label.append(label)
             self.size_group.add_widget(ebox)
 
+        # Create info boxes with dividing bars between
         info_sizer.pack_start(self.info_box[0])
         for ibox in self.info_box[1:]:
             add_div(info_sizer)
@@ -265,8 +275,8 @@ class FreeView(APP_BASE):
         # Waypoints
         self.draw_waypoints(cr)
 
-        # Next turnpoint annotation and course
-        self.draw_turnpoint(cr, win_height)
+        # Next turnpoint annotation and navigation
+        self.draw_nav(cr, win_height)
 
         # Final glide indicator
         self.draw_glide(cr, win_height)
@@ -298,6 +308,7 @@ class FreeView(APP_BASE):
                 tps = [tp['id'] for tp in self.flight.task.tp_list]
                 wps = filter(lambda x: x['id'] in tps, self.mapcache.wps)
             else:
+                # All waypoints
                 wps = self.mapcache.wps
 
         for wp in wps:
@@ -450,7 +461,7 @@ class FreeView(APP_BASE):
         cr.move_to(x1, y1)
         cr.line_to(x2, y2)
 
-    def draw_turnpoint(self, cr, win_height):
+    def draw_nav(self, cr, win_height):
         """Draw turnpoint annotation and direction pointer"""
         nav = self.flight.get_nav()
 
@@ -489,32 +500,30 @@ class FreeView(APP_BASE):
         cr.translate(0, win_height / 2)
 
         # Draw origin line
-        cr.move_to(1, 0)
-        cr.line_to(FG_WIDTH + 1, 0)
+        cr.move_to(0, 0)
+        cr.line_to(FG_WIDTH + 2, 0)
 
         # Draw chevrons
         num_arrows = abs(int(glide['margin'] * 20))
+        cr.save()
         if glide['margin'] > 0:
-            yinc = -FG_INC
-        else:
-            yinc =  FG_INC
+            # Reverse scale if above glide
+            cr.scale(1, -1)
 
         for n in range(min(num_arrows, 5)):
-            y = yinc * (n  + 0.5)
+            y = FG_INC * (n  + 0.5)
             cr.move_to(1, y)
-            cr.line_to((FG_WIDTH / 2) + 1, y + yinc)
+            cr.line_to((FG_WIDTH / 2) + 1, y + FG_INC)
             cr.line_to(FG_WIDTH + 1, y)
 
         # Draw limit bar
         if num_arrows > 5:
-            if yinc > 0:
-                y = y + yinc + 4
-            else:
-                y = y + yinc - 4
-            cr.move_to(1, y)
-            cr.line_to(FG_WIDTH + 1, y)
+            y = y + FG_INC + 4
+            cr.move_to(0, y)
+            cr.line_to(FG_WIDTH + 2, y)
 
         cr.stroke()
+        cr.restore()
 
         # Arrival height, MacCready and ETE
         ete_mins = glide['ete'] / 60
@@ -552,35 +561,32 @@ class FreeView(APP_BASE):
         """Draw wind speed/direction"""
         wind = self.flight.get_wind()
 
-        # Draw wind direction
-        width = self.wind_pixbuf.get_width()
-        height = self.wind_pixbuf.get_height()
-
-        xc = win_width - 40
-        yc = 40
-
         cr.save()
-        cr.translate(xc, yc)
-        cr.rotate(wind['direction'])
-
-        cr.set_source_pixbuf(self.wind_pixbuf, -width / 2, -height / 2)
-        cr.paint()
-        cr.restore()
+        cr.translate(win_width - 40, 40)
 
         # Draw wind speed value
         speed = wind['speed'] * MPS_TO_KTS
         self.fg_layout.set_text(str(int(speed)))
 
         x, y = self.fg_layout.get_pixel_size()
-        cr.move_to(xc - x - 40, yc - y / 2)
+        cr.move_to(-x - 40, -y / 2)
         cr.show_layout(self.fg_layout)
+
+        # Draw wind speed direction
+        width = self.wind_pixbuf.get_width()
+        height = self.wind_pixbuf.get_height()
+
+        cr.rotate(wind['direction'])
+        cr.set_source_pixbuf(self.wind_pixbuf, -width / 2, -height / 2)
+        cr.paint()
+        cr.restore()
 
         # Draw ground speed value
         ground_speed = self.flight.get_velocity()['speed'] * MPS_TO_KTS
-        self.fg_layout.set_text(str(int(ground_speed)))
+        self.fg_layout.set_text("%d" % ground_speed)
 
         x, y = self.fg_layout.get_pixel_size()
-        cr.move_to(win_width - x- 2, win_height - y)
+        cr.move_to(win_width - x - 2, win_height - y)
         cr.show_layout(self.fg_layout)
 
     def draw_satellites(self, cr, win_width, win_height):
