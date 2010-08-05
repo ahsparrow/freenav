@@ -20,30 +20,35 @@ OSSO_APPLICATION = "uk.org.freeflight.taskedit"
 TASKS = 'ABCDEFGH'
 
 TP_DIRNS = ['SYM', 'NEXT', 'PREV', 'FIX']
+TP_TYPES = ['TURNPOINT', 'LINE', 'AREA']
 START_TP_DIRNS = ['NEXT', 'FIX']
 FINISH_TP_DIRNS = ['PREV', 'FIX']
 
 class OzDialog(gtk.Dialog):
     """Observation zone parameter dialog box"""
-    def __init__(self, parent, tp, tp_type):
+    def __init__(self, parent, tp, tp_posn):
         """Class initialisation"""
         self.tp = tp
+
         title = 'Obs. Zone - ' + self.tp['waypoint_id']
         gtk.Dialog.__init__(self, title, parent,
                             gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT,
                             (gtk.STOCK_CANCEL, gtk.RESPONSE_REJECT,
                              gtk.STOCK_OK, gtk.RESPONSE_OK))
+        self.set_resizable(False)
 
-        table = gtk.Table(6, 2, True)
+        # Layout controls using table sizer
+        table = gtk.Table(7, 2, True)
         table.set_col_spacing(0, 5)
         table.set_row_spacings(3)
-        for n, txt in enumerate(['Outer Radius (m)', 'Angle (deg)',
-                                 'Inner Radius (m)', 'Angle (deg)',
-                                 'Dirn', 'Bisect (deg)']):
+        for n, txt in enumerate(["Outer Radius (m)", "Angle (deg)",
+                                 "Inner Radius (m)", "Angle (deg)",
+                                 "Dirn", "Bisect (deg)", "Type"]):
             label = gtk.Label(txt)
             label.set_alignment(1, 0.5)
             table.attach(label, 0, 1, n, n + 1)
 
+        # Create spin buttons for ranges and angles
         rad1_adj = gtk.Adjustment(self.tp['radius1'], 0, 50000, 500)
         ang1_adj = gtk.Adjustment(self.tp['angle1'], 0, 360, 45)
         rad2_adj = gtk.Adjustment(self.tp['radius2'], 0, 50000, 500)
@@ -67,10 +72,18 @@ class OzDialog(gtk.Dialog):
         table.attach(self.ang2_spin, 1, 2, 3, 4)
         table.attach(self.ang12_spin, 1, 2, 5, 6)
 
+        # Create combo box for TP type
+        self.tp_type_combobox = gtk.combo_box_new_text()
+        for typ in TP_TYPES:
+            self.tp_type_combobox.append_text(typ)
+        self.tp_type_combobox.set_active(TP_TYPES.index(self.tp['tp_type']))
+        table.attach(self.tp_type_combobox, 1, 2, 6, 7)
+
+        # Create combobox for leg direction
         self.dirn_combobox = gtk.combo_box_new_text()
-        if tp_type == 'start':
+        if tp_posn == 'start':
             tp_dirns = START_TP_DIRNS
-        elif tp_type == 'finish':
+        elif tp_posn == 'finish':
             tp_dirns = FINISH_TP_DIRNS
         else:
             tp_dirns = TP_DIRNS
@@ -80,6 +93,7 @@ class OzDialog(gtk.Dialog):
         table.attach(self.dirn_combobox, 1, 2, 4, 5)
         self.dirn_combobox.connect('changed', self.on_dirn_select)
 
+        # (De-)active fixed leg angle adjustment
         self.ang12_spin.set_sensitive(self.tp['direction'] == 'FIX')
 
         self.vbox.pack_start(table)
@@ -95,15 +109,13 @@ class OzDialog(gtk.Dialog):
 
     def get_values(self):
         """Return values from the dialog box"""
-        model = self.dirn_combobox.get_model()
-        dirn = model[self.dirn_combobox.get_active()][0]
-
         return {'radius1': self.rad1_spin.get_value_as_int(),
                 'radius2': self.rad2_spin.get_value_as_int(),
                 'angle1': self.ang1_spin.get_value(),
                 'angle2': self.ang2_spin.get_value(),
                 'angle12': self.ang12_spin.get_value(),
-                'direction': dirn}
+                'tp_type': self.tp_type_combobox.get_active_text(),
+                'direction': self.dirn_combobox.get_active_text()}
 
 if is_hildon_app:
     AppBase = hildon.Program
@@ -306,7 +318,7 @@ class TaskApp(AppBase):
     def tp_dialog(self, wp_id):
         """Display waypoint info"""
         wp = self.task_db.get_waypoint(wp_id)
-        msg = "%s\n%s\n%s\n%s" % (wp_id, wp['name'], wp['turnpoint'],
+        msg = "%s\n%s\n\n%s\n\n%s" % (wp_id, wp['name'], wp['turnpoint'],
                                   wp['comment'])
         dialog = gtk.MessageDialog(None, gtk.DIALOG_MODAL, gtk.MESSAGE_INFO, 
                                    gtk.BUTTONS_CLOSE, msg)
@@ -338,12 +350,12 @@ class TaskApp(AppBase):
             tp_index = model.get_path(model_iter)[0]
             tp = model[tp_index][0]
             if tp_index == 0:
-                tp_type = 'start'
+                tp_posn = 'start'
             elif tp_index == len(model) - 1:
-                tp_type = 'finish'
+                tp_posn = 'finish'
             else:
-                tp_type = 'tp'
-            dialog = OzDialog(self.window, tp, tp_type)
+                tp_posn = 'tp'
+            dialog = OzDialog(self.window, tp, tp_posn)
             response = dialog.run()
 
             if response == gtk.RESPONSE_OK:

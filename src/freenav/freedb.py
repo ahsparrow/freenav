@@ -42,12 +42,10 @@ SCHEMA = {
         ('airspace_id', 'TEXT'), ('x', 'INTEGER'), ('y', 'INTEGER'),
         ('radius', 'INTEGER'), ('start', 'REAL'), ('length', 'REAL')],
 
-    'Tasks' : [('id', 'INTEGER'), ('aat_flag', 'INTEGER')],
-
     # Angles are degrees relative to North, increasing clockwise
     'Turnpoints': [
         ('task_id', 'INTEGER'), ('task_index', 'INTEGER'),
-        ('waypoint_id', 'TEXT'),
+        ('waypoint_id', 'TEXT'), ('tp_type', 'TEXT'),
         ('radius1', 'INTEGER'), ('angle1', 'REAL'),
         ('radius2', 'INTEGER'), ('angle2', 'REAL'),
         ('direction', 'TEXT'), ('angle12', 'REAL'),
@@ -193,26 +191,22 @@ class Freedb:
         self.cursor.execute(sql, (wp_id,))
         return self.cursor.fetchall()
 
-    def set_task(self, task, wp_id=0):
+    def set_task(self, task, task_id=0):
         """Delete old task data and add new"""
-        sql = 'DELETE FROM Tasks WHERE id=? '
-        self.cursor.execute(sql, (wp_id,))
         sql = 'DELETE FROM Turnpoints WHERE task_id=?'
-        self.cursor.execute(sql, (wp_id,))
+        self.cursor.execute(sql, (task_id,))
 
-        sql = 'INSERT INTO Tasks (id, aat_flag) VALUES (?, ?)'
-        self.cursor.execute(sql, (wp_id, 0))
-
-        sql = '''INSERT INTO Turnpoints (task_id, task_index, Waypoint_Id,
-              radius1, angle1, radius2, angle2, direction, angle12,
+        sql = '''INSERT INTO Turnpoints (task_id, task_index, waypoint_id,
+              tp_type, radius1, angle1, radius2, angle2, direction, angle12,
               mindistx, mindisty)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'''
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'''
         for tp_num, tp in enumerate(task):
-            self.cursor.execute(sql, (wp_id, tp_num, tp['waypoint_id'],
-                                 tp['radius1'], tp['angle1'],
-                                 tp['radius2'], tp['angle2'],
-                                 tp['direction'], tp['angle12'],
-                                 tp['mindistx'], tp['mindisty']))
+            self.cursor.execute(sql, (task_id, tp_num,
+                                      tp['waypoint_id'], tp['tp_type'],
+                                      tp['radius1'], tp['angle1'],
+                                      tp['radius2'], tp['angle2'],
+                                      tp['direction'], tp['angle12'],
+                                      tp['mindistx'], tp['mindisty']))
 
     def get_task(self, wp_id=-1):
         """Get turnpoints for specified task"""

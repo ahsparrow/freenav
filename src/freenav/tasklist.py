@@ -7,9 +7,6 @@ import gtk
 
 import freenav.projection
 
-TP_KEYS = ('waypoint_id', 'radius1', 'angle1', 'radius2', 'angle2',
-           'direction', 'angle12')
-
 # Default observation zone values
 RAD1 = 500
 ANG1 = 360
@@ -18,10 +15,10 @@ ANG2 = 0
 START_RAD = 5000
 FINISH_RAD = 500
 
-def make_tp(wp_id, rad1=RAD1, ang1=ANG1, rad2=RAD2, ang2=ANG2, dirn='SYM',
-            ang12=0, mindistx=None, mindisty=None):
+def make_tp(wp_id, tp_type='TURNPOINT', rad1=RAD1, ang1=ANG1, rad2=RAD2,
+            ang2=ANG2, dirn='SYM', ang12=0, mindistx=None, mindisty=None):
     """Generate a default turnpoint"""
-    return {'waypoint_id': wp_id,
+    return {'waypoint_id': wp_id, 'tp_type': tp_type,
             'radius1': rad1, 'angle1': ang1,
             'radius2': rad2, 'angle2': ang2,
             'direction': dirn, 'angle12': ang12,
@@ -31,9 +28,11 @@ def make_start_tp(wp_id, rad1=START_RAD, ang1=180, dirn='NEXT', ang12=0):
     """Generate a default start point"""
     return make_tp(wp_id, rad1=rad1, ang1=ang1, dirn=dirn, ang12=ang12)
 
-def make_finish_tp(wp_id, rad1=FINISH_RAD, ang1=0, dirn='PREV', ang12=0):
+def make_finish_tp(wp_id, tp_type='LINE', rad1=FINISH_RAD, ang1=0, dirn='PREV',
+                   ang12=0):
     """Generate a default finish point"""
-    return make_tp(wp_id, rad1=rad1, ang1=ang1, dirn=dirn, ang12=ang12)
+    return make_tp(wp_id, tp_type=tp_type, rad1=rad1, ang1=ang1, dirn=dirn,
+                   ang12=ang12)
 
 def dmm(ang, hemis):
     """Splits lat/lon, in radians, into degrees, minutes and decimal minutes"""
@@ -69,11 +68,7 @@ class TaskListStore(gtk.ListStore):
         self.task_id = task_id
 
         for tp in self.db.get_task(task_id):
-            # Convert from DB object to standard dict
-            t = {}
-            for k in TP_KEYS:
-                t[k] = tp[k]
-            self.append([t])
+            self.append([tp])
         self.emit("task_changed")
 
     def declare(self):
@@ -146,6 +141,7 @@ class TaskListStore(gtk.ListStore):
         else:
             # Inserting in middle of task
             self.insert(index, [make_tp(wp_id)])
+
         self.update_angles()
         self.emit("task_changed")
 
@@ -154,7 +150,7 @@ class TaskListStore(gtk.ListStore):
         if (dest == source) or (dest == source + 1):
             return
 
-        if source in (0, len(self) - 1) or dest in (0, len(self)):
+        if (source in (0, len(self) - 1)) or (dest in (0, len(self))):
             # Source or dest is start or finish so delete souce and
             # re-create at dest
             wp_id = self[source][0]['waypoint_id']
@@ -163,11 +159,13 @@ class TaskListStore(gtk.ListStore):
             if dest > source:
                 dest = dest - 1
             self.insert_tp(dest, wp_id)
+
         else:
             # Both source and dest are in the middle of the task, so just move
             source_iter = self.get_iter((source,))
             dest_iter = self.get_iter((dest,))
             self.move_before(source_iter, dest_iter)
+
         self.update_angles()
         self.emit("task_changed")
 
@@ -176,6 +174,8 @@ class TaskListStore(gtk.ListStore):
         tp = self[index][0]
         for k in vals:
             tp[k] = vals[k]
+        self.update_angles()
+
         self.emit("task_changed")
 
     def get_task_len(self):
@@ -186,6 +186,7 @@ class TaskListStore(gtk.ListStore):
         else:
             wp = self.db.get_waypoint(tp_list[0])
             dist = self.calc_distance(wp, tp_list[1:])
+
         return dist
 
     def calc_distance(self, wp, tp_list):
@@ -245,9 +246,7 @@ class TaskListStore(gtk.ListStore):
         for tp, wp in zip(task, wps):
             ang12 = math.radians(tp['angle12'])
 
-            if tp['radius1'] == 500 or tp['radius2'] == 500:
-                dx = dy = 0
-            else:
+            if tp['tp_type'] == 'AREA':
                 if tp['angle1'] == 360:
                     dx = tp['radius1'] * math.sin(ang12)
                     dy = tp['radius1'] * math.cos(ang12)
@@ -260,6 +259,8 @@ class TaskListStore(gtk.ListStore):
                 else:
                     dx = -tp['radius2'] * math.sin(ang12)
                     dy = -tp['radius2'] * math.cos(ang12)
+            else:
+                dx = dy = 0
 
             tp['mindistx'] = wp['x'] + dx
             tp['mindisty'] = wp['y'] + dy
