@@ -385,11 +385,11 @@ class FreeView(APP_BASE):
 
         # Draw sectors
         if len(self.flight.task.tp_list) > 1:
-            for tp in self.flight.task.tp_list[:-1]:
-                self.draw_tp_sector(cr, tp)
-
-            # Draw finish line
-            self.draw_tp_line(cr, self.flight.task.tp_list[-1])
+            for tp in self.flight.task.tp_list:
+                if tp['tp_type'] == 'LINE':
+                    self.draw_tp_line(cr, tp)
+                else:
+                    self.draw_tp_sector(cr, tp)
 
         cr.restore()
         cr.stroke()
@@ -472,7 +472,15 @@ class FreeView(APP_BASE):
         self.tp_layout.set_text('%s %.1f/%.0f' % (nav['id'], dist_km, bearing))
         x, y = self.tp_layout.get_pixel_size()
         cr.move_to(2, win_height - y)
-        cr.show_layout(self.tp_layout)
+
+        # Draw text with white outline
+        cr.layout_path(self.tp_layout)
+        cr.save()
+        cr.set_line_width(5)
+        cr.set_source_rgba(1, 1, 1, 1)
+        cr.stroke_preserve()
+        cr.set_source_rgba(0, 0, 0, 1)
+        cr.fill()
 
         # Draw arrow for relative bearing to TP
         relative_bearing = nav['bearing'] - self.flight.get_velocity()['track']

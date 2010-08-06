@@ -78,6 +78,9 @@ class OzDialog(gtk.Dialog):
             self.tp_type_combobox.append_text(typ)
         self.tp_type_combobox.set_active(TP_TYPES.index(self.tp['tp_type']))
         table.attach(self.tp_type_combobox, 1, 2, 6, 7)
+        self.tp_type_combobox.connect('changed', self.on_tp_type_select)
+
+        self.on_tp_type_select(self.tp_type_combobox)
 
         # Create combobox for leg direction
         self.dirn_combobox = gtk.combo_box_new_text()
@@ -94,18 +97,25 @@ class OzDialog(gtk.Dialog):
         self.dirn_combobox.connect('changed', self.on_dirn_select)
 
         # (De-)active fixed leg angle adjustment
-        self.ang12_spin.set_sensitive(self.tp['direction'] == 'FIX')
+        self.on_dirn_select(self.dirn_combobox)
 
         self.vbox.pack_start(table)
         self.show_all()
 
     def on_dirn_select(self, combobox):
-        """Direction changed"""
-        model = combobox.get_model()
-        dirn = model[combobox.get_active()][0]
+        """Set control sensitivity depending on direction"""
+        dirn = combobox.get_active_text()
 
         # Set activate spin box if direction is FIX
         self.ang12_spin.set_sensitive(dirn == 'FIX')
+
+    def on_tp_type_select(self, combobox):
+        """Set control sensitivity depending on TP type"""
+        tp_type = combobox.get_active_text()
+
+        self.ang1_spin.set_sensitive(tp_type != 'LINE')
+        self.ang2_spin.set_sensitive(tp_type != 'LINE')
+        self.rad2_spin.set_sensitive(tp_type != 'LINE')
 
     def get_values(self):
         """Return values from the dialog box"""

@@ -359,7 +359,7 @@ class Task:
             return False
 
         if self.in_sector(x, y, tp_index):
-            if self.tp_list[tp_index]['radius1'] <= 500:
+            if self.tp_list[tp_index]['tp_type'] == 'TURNPOINT':
                 self.next_turnpoint(x, y, altitude, tim)
             else:
                 self.tp_sector_flag = True
