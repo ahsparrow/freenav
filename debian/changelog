@@ -1,3 +1,9 @@
+freenav (0.1.5-1) unstable; urgency=low
+
+  * Cairo-isation and explicit area TPs
+
+ -- Alan Sparrow <alan@freeflight.org.uk>  Fri, 06 Aug 2010 21:15:00 +0100
+
 freenav (0.1.4-1) unstable; urgency=low
 
   * Add logging exception hook
