@@ -33,8 +33,9 @@ ENTRIES = (('ALT', 'Altititude (ft)', '4000'),
            ('BUGS', 'Bugs (%)', '0'))
 
 class NmeaGen:
-    def __init__(self, qnh):
+    def __init__(self, qnh, flarm_flag):
         self.qnh = qnh
+        self.flarm_flag = flarm_flag
         self.db = freedb.Freedb()
         p = self.db.get_projection()
         self.lambert = projection.Lambert(
@@ -120,8 +121,12 @@ class NmeaGen:
         data = self.add_checksum(data)
         stream.write(data)
 
-        alarm_level = random.randrange(4)
-        bearing = random.randrange(-180, 180)
+        if self.flarm_flag:
+            alarm_level = random.randrange(4)
+            bearing = random.randrange(-180, 180)
+        else:
+            alarm_level = 0
+            bearing = 0
         data = '$PFLAU,1,1,2,1,%d,%d,2,0,0' % (alarm_level, bearing)
         data = self.add_checksum(data)
         stream.write(data)
@@ -135,12 +140,12 @@ class NmeaGen:
         return data + '*' + checksum + '\r\n'
 
 class NmeaApp:
-    def __init__(self, bt_flag, serial_dev, baud_rate, qnh):
+    def __init__(self, bt_flag, serial_dev, baud_rate, qnh, flarm_flag):
         self.bt_flag = bt_flag
         self.stream_is_open = False
 
         self.open_stream(bt_flag, serial_dev, baud_rate)
-        self.nmea_gen = NmeaGen(qnh)
+        self.nmea_gen = NmeaGen(qnh, flarm_flag)
 
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.window.set_border_width(10)
@@ -255,6 +260,8 @@ def main():
     parser.add_option("-b", "--bluetooth",
                       dest="bt_flag", action="store_true", default=False,
                       help="Bluetooth server")
+    parser.add_option("-f", "--flarm", dest="flarm_flag", action="store_true",
+                      default=False, help="Enable FLARM alarms")
     parser.add_option("-q", "--qnh", default=1013, help="QNH pressure")
     parser.add_option("-s", "--serial_dev", default=None, help="Serial device")
     parser.add_option("-r", "--baud_rate", default=4800,
@@ -262,7 +269,8 @@ def main():
     (options, args) = parser.parse_args()
 
     nmea_app = NmeaApp(options.bt_flag, options.serial_dev,
-                       int(options.baud_rate), int(options.qnh))
+                       int(options.baud_rate), int(options.qnh),
+                       options.flarm_flag)
     nmea_app.main()
 
 if __name__ == '__main__':
