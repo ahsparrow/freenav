@@ -37,6 +37,11 @@ FLAU_ALARM_BEARING = 6
 # GCS (Volkslogger pressure altitude) fields
 GCS_ALTITUDE = 3
 
+# Fix quality values
+FIX_QUALITY_INVALID = 0
+FIX_QUALITY_GPS = 1
+FIX_QUALITY_DGPS = 2
+
 KTS_TO_MPS = 1852 / 3600.0
 FT_TO_M = 12 * 25.4 / 1000
 
@@ -151,6 +156,9 @@ class NmeaParser():
             self.longitude = math.radians(int(lon[:3]) + float(lon[3:]) / 60)
             if fields[GGA_EW] == 'W':
                 self.longitude = -self.longitude
+
+            # Fix quality
+            self.fix_quality = int(fields[GGA_FIX_QUALITY])
 
             # Number of satellites
             self.num_satellites = int(fields[GGA_NUM_SATELLITES])

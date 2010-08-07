@@ -16,6 +16,7 @@ except ImportError:
     APP_BASE = object
 
 import mapcache
+import nmeaparser
 
 # Constants for drawing arcs
 M_2PI = 2 * math.pi
@@ -599,7 +600,12 @@ class FreeView(APP_BASE):
 
     def draw_satellites(self, cr, win_width, win_height):
         """Draw number of satellites in view"""
-        self.fg_layout.set_text('%d' % self.flight.get_num_satellites())
+        fix_quality = self.flight.get_fix_quality()
+        txt = "%d" % fix_quality['satellites']
+        if fix_quality['quality'] == nmeaparser.FIX_QUALITY_DGPS:
+            txt += "D"
+
+        self.fg_layout.set_text(txt)
         x, y = self.fg_layout.get_pixel_size()
         cr.move_to(win_width - x - 2, win_height - (2 * y))
         cr.show_layout(self.fg_layout)

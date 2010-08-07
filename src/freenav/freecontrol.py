@@ -203,7 +203,7 @@ class FreeControl:
         # Update model with new position
         self.flight.update_position(nmea.time, nmea.latitude, nmea.longitude,
                                     nmea.gps_altitude, nmea.speed, nmea.track,
-                                    nmea.num_satellites)
+                                    nmea.num_satellites, nmea.fix_quality)
 
     def pressure_level_changed(self, _source, nmea):
         """Callback for new pressure altitude"""

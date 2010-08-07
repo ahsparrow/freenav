@@ -67,6 +67,7 @@ class Flight:
         self.ground_speed = 0
         self.track = 0
         self.num_satellites = 0
+        self.fix_quality = 0
 
         # List of model observers
         self.subscriber_list = set()
@@ -85,7 +86,7 @@ class Flight:
     # Flight change methods
 
     def update_position(self, utc_secs, latitude, longitude, altitude,
-                        ground_speed, track, num_satellites):
+                        ground_speed, track, num_satellites, fix_quality):
         "Update model with new position data"""
         self.utc_secs = utc_secs
         x, y = [int(p) for p in self.projection.forward(latitude, longitude)]
@@ -94,6 +95,7 @@ class Flight:
         self.track = track
         self.ground_speed = ground_speed
         self.num_satellites = num_satellites
+        self.fix_quality = fix_quality
 
         self._fsm.new_position()
 
@@ -173,9 +175,9 @@ class Flight:
             state = self._fsm.getState()
         return state.getName().split('.')[-1]
 
-    def get_num_satellites(self):
+    def get_fix_quality(self):
         """Return number of satellites in view"""
-        return self.num_satellites
+        return {'satellites': self.num_satellites, 'quality': self.fix_quality}
 
     #------------------------------------------------------------------------
     # State machine methods
