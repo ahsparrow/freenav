@@ -266,5 +266,5 @@ class NmeaParser():
 
     def set_time(self, tim):
         """Construct time from RMC data string and RMC/GGA time string"""
-        tm = time.strptime(self.date + tim, "%d%m%y%H%M%S")
+        tm = time.strptime(self.date + tim[:6], "%d%m%y%H%M%S")
         self.time = calendar.timegm(tm)
