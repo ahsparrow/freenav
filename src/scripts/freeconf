@@ -131,15 +131,15 @@ class SettingsApp(AppBase):
         # Buttons
         button_box = gtk.HButtonBox()
         button_box.set_layout(gtk.BUTTONBOX_SPREAD)
-        ok_button = gtk.Button("OK")
+        ok_button = gtk.Button("Save All")
         ok_button.connect("clicked", self.on_ok_button)
-        cancel_button = gtk.Button("Cancel")
+        cancel_button = gtk.Button("Quit")
         cancel_button.connect("clicked", self.on_cancel_button)
         clear_button = gtk.Button("QNE Clear")
         clear_button.connect("clicked", self.on_clear_button)
         button_box.add(ok_button)
-        button_box.add(cancel_button)
         button_box.add(clear_button)
+        button_box.add(cancel_button)
 
         vbox = gtk.VBox(False, 0)
         vbox.pack_start(table, True, False, 10)
