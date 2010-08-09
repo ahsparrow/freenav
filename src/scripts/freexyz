@@ -26,6 +26,8 @@ OSSO_APPLICATION = "uk.org.freeflight.freexyz"
 
 LATLON_MARKUP = '<span size="32000" weight="bold">%s</span>'
 
+M_TO_FT = 1000.0 / 25.4 / 12
+
 def dmm(ang, hemis):
     """Splits lat/lon, in radians, into degrees, minutes and decimal minutes"""
     dec_min = int(round(math.degrees(abs(ang)) * 60000))
@@ -71,8 +73,10 @@ class App(APP_BASE):
 
         self.lat_label = gtk.Label('')
         self.lon_label = gtk.Label('')
+        self.alt_label = gtk.Label('')
         vbox.pack_start(self.lat_label, False, False, 30)
         vbox.pack_start(self.lon_label, False, False, 20)
+        vbox.pack_start(self.alt_label, False, False, 20)
 
         self.window.show_all()
 
@@ -85,8 +89,10 @@ class App(APP_BASE):
         """ Callback for new GPS position"""
         lat = "%s%02d %02d.%03d" % dmm(nmea.latitude, 'NS')
         lon = "%s%03d %02d.%03d" % dmm(nmea.longitude, 'EW')
+        alt = "%d FT" % (nmea.gps_altitude * M_TO_FT)
         self.lat_label.set_markup(LATLON_MARKUP % lat)
         self.lon_label.set_markup(LATLON_MARKUP % lon)
+        self.alt_label.set_markup(LATLON_MARKUP % alt)
 
         self.window.queue_draw()
         return True
