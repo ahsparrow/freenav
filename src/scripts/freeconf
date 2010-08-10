@@ -160,7 +160,6 @@ class SettingsApp(AppBase):
         self.db.set_bugs((self.bugs_spin.get_value_as_int() / 100.0) + 1)
         self.db.set_ballast((self.ballast_spin.get_value_as_int() / 100.0) + 1)
         self.db.commit()
-        gtk.main_quit()
 
     def on_clear_button(self, _widget):
         """Clear button pressed"""
