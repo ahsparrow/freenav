@@ -26,7 +26,6 @@ class Task:
     """Task calculation class"""
     def __init__(self, tp_list, polar, settings):
         """Class initialisation"""
-
         # Input data
         self.tp_list = tp_list
         self.polar = polar
@@ -59,11 +58,22 @@ class Task:
         self.task_ete = 0
         self.task_calc_time = 0
 
+    #------------------------------------------------------------------------
+    # State change-y stuff
+
     def reset(self):
         """Reset turnpoint index"""
         self.tp_index = 1
         self.tp_sector_flag = False
         self.start_time = 0
+
+    def resume(self, start_time, resume_time, x, y, altitude):
+        """Resume task after program re-start"""
+        self.tp_index = 1
+        self.tp_sector_flag = False
+        self.start_time = start_time
+
+        self.tp_log[0] = {'x': x, 'y': y, 'alt': altitude, 'tim': resume_time}
 
     def start(self, start_time, x, y, altitude):
         """Start task"""
@@ -73,14 +83,6 @@ class Task:
 
         self.tp_sector_flag = False
         self.tp_log[0] = {'x': x, 'y': y, 'alt': altitude, 'tim': start_time}
-
-    def resume(self, start_time, resume_time, x, y, altitude):
-        """Resume task after program re-start"""
-        self.tp_sector_flag = False
-
-        self.start_time = start_time
-        self.tp_index = 1
-        self.tp_log[0] = {'x': x, 'y': y, 'alt': altitude, 'tim': resume_time}
 
     def next_turnpoint(self, x, y, altitude, tim):
         """Increment turnpoint"""
@@ -105,12 +107,15 @@ class Task:
         self.divert_wp = wp
         self.nav_wp = wp
 
+    #------------------------------------------------------------------------
+    # Set parameters
+
     def set_wind(self, wind):
         """Set a new wind vector"""
         self.wind_speed = wind['speed']
         self.wind_direction = wind['direction']
 
-        self.set_tp_glides()
+        self.calculate_tp_glides()
 
     def set_maccready(self, maccready):
         """Set new Maccready parameters"""
@@ -125,7 +130,7 @@ class Task:
         self.vmac = math.sqrt((c - self.maccready) / a)
         self.vmac_sink_rate = -(a * self.vmac ** 2 + b * self.vmac + c)
 
-        self.set_tp_glides()
+        self.calculate_tp_glides()
 
     def increment_maccready(self, incr):
         """Increment Maccready setting"""
@@ -137,6 +142,15 @@ class Task:
         if maccready < 0.1:
             maccready = 0
         self.set_maccready(maccready)
+
+    #------------------------------------------------------------------------
+    # Access methods
+
+    def get_nav(self):
+        """Return navigation (to current TP) data"""
+        return {'id': self.get_turnpoint_id(),
+                'distance': self.tp_distance,
+                'bearing': self.tp_bearing}
 
     def get_glide(self):
         """Return final glide parameters"""
@@ -173,6 +187,9 @@ class Task:
 
         return sector
 
+    #------------------------------------------------------------------------
+    # Position update methods
+
     def task_position(self, x, y, altitude, tim):
         """Update position for task"""
         # First check for sector (and possibly increment TP)
@@ -191,13 +208,13 @@ class Task:
             tp_index = self.tp_index + 1
 
         # Calculate glide around rest of the task
-        self.set_glide_to_finish(x, y, altitude, self.tp_list[tp_index:])
+        self.calculate_glide_to_finish(x, y, altitude, self.tp_list[tp_index:])
 
         # Calculate speed on current leg and time to complete task
         if self.start_time and (tim - self.task_calc_time) >= 30:
             self.task_calc_time = tim
             if self.vmac > self.wind_speed:
-                self.set_task_speed(x, y, altitude, tim,
+                self.calculate_task_speed(x, y, altitude, tim,
                                     self.tp_log[self.tp_index - 1])
 
                 if self.task_air_speed > self.wind_speed:
@@ -216,12 +233,12 @@ class Task:
         self.tp_distance = dist
         self.tp_bearing = bearing
 
-        self.set_glide_to_finish(x, y, altitude, [self.divert_wp])
+        self.calculate_glide_to_finish(x, y, altitude, [self.divert_wp])
 
     #-------------------------------------------------------------------------
     # Internal stuff
 
-    def set_task_speed(self, x, y, altitude, tim, tp_ref):
+    def calculate_task_speed(self, x, y, altitude, tim, tp_ref):
         """Calcuate task speed from last TP"""
         # Deltas from turnpoint
         dt = tim - tp_ref['tim']
@@ -250,7 +267,7 @@ class Task:
         # Wind corrected speed
         self.task_air_speed = self.calculate_air_speed(self.task_speed, course)
 
-    def set_glide_to_finish(self, x, y, altitude, tp_list):
+    def calculate_glide_to_finish(self, x, y, altitude, tp_list):
         """Calculate glide around remainder of task"""
         if self.vmac > self.wind_speed:
             tp = tp_list[0]
@@ -269,7 +286,7 @@ class Task:
             self.glide_arrival_height = 0
             self.glide_margin = 0
 
-    def set_tp_glides(self):
+    def calculate_tp_glides(self):
         """Calculate height loss and time around all task turnpoints"""
         if self.vmac <= self.wind_speed:
             return
@@ -349,7 +366,7 @@ class Task:
         return tim
 
     def check_sector(self, x, y, altitude, tim):
-        """Return True on sector entry, increment TP if barrel sector"""
+        """Return True on sector entry, increment TP if turnpoint sector"""
         if self.tp_sector_flag:
             return False
 

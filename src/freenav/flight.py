@@ -151,12 +151,6 @@ class Flight:
         """Return X, Y position"""
         return (self.x, self.y)
 
-    def get_nav(self):
-        """Return navigation (to current TP) data"""
-        return {'id': self.task.get_turnpoint_id(),
-                'distance': self.task.tp_distance,
-                'bearing': self.task.tp_bearing}
-
     def get_velocity(self):
         """Return ground speed and track"""
         return {'speed': self.ground_speed, 'track': self.track}
