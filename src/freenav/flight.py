@@ -226,8 +226,8 @@ class Flight:
     def do_resume(self):
         """Resume task after program re-start in air"""
         settings = self.db.get_settings()
-        self.task.resume(settings["start_time"], self.utc_secs, self.x, self.y,
-                         self.altitude)
+        self.task.resume(self.x, self.y, self.altitude,
+                         settings["start_time"], self.utc_secs)
 
         self.notify_subscribers(RESUME_EVT)
 
@@ -292,7 +292,7 @@ class Flight:
 
     def do_line(self):
         """Crossing line - start task"""
-        self.task.start(self.utc_secs, self.x, self.y, self.altitude)
+        self.task.start(self.x, self.y, self.altitude, self.utc_secs)
 
         self.db.set_start(self.utc_secs)
         self.db.commit()

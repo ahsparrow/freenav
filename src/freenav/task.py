@@ -67,7 +67,7 @@ class Task:
         self.tp_sector_flag = False
         self.start_time = 0
 
-    def resume(self, start_time, resume_time, x, y, altitude):
+    def resume(self, x, y, altitude, start_time, resume_time):
         """Resume task after program re-start"""
         self.tp_index = 1
         self.tp_sector_flag = False
@@ -75,7 +75,7 @@ class Task:
 
         self.tp_log[0] = {'x': x, 'y': y, 'alt': altitude, 'tim': resume_time}
 
-    def start(self, start_time, x, y, altitude):
+    def start(self, x, y, altitude, start_time):
         """Start task"""
         self.start_time = start_time
         self.task_speed = 0

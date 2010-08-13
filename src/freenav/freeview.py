@@ -464,7 +464,7 @@ class FreeView(APP_BASE):
 
     def draw_nav(self, cr, win_height):
         """Draw turnpoint annotation and direction pointer"""
-        nav = self.flight.get_nav()
+        nav = self.flight.task.get_nav()
 
         # Annotation
         bearing = math.degrees(nav['bearing']) % 360
