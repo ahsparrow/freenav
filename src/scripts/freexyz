@@ -12,6 +12,7 @@ import freenav
 import freenav.freedb
 import freenav.freenmea
 import freenav.nmeaparser
+import freenav.util
 
 try:
     import hildon
@@ -27,14 +28,6 @@ OSSO_APPLICATION = "uk.org.freeflight.freexyz"
 LATLON_MARKUP = '<span size="32000" weight="bold">%s</span>'
 
 M_TO_FT = 1000.0 / 25.4 / 12
-
-def dmm(ang, hemis):
-    """Splits lat/lon, in radians, into degrees, minutes and decimal minutes"""
-    dec_min = int(round(math.degrees(abs(ang)) * 60000))
-    min, dec_min = divmod(dec_min, 1000)
-    deg, min = divmod(min, 60)
-
-    return (hemis[1] if ang < 0 else hemis[0], deg, min, dec_min)
 
 class App(APP_BASE):
     """Application class"""
@@ -87,8 +80,10 @@ class App(APP_BASE):
 
     def position_changed(self, _source, nmea):
         """ Callback for new GPS position"""
-        lat = "%s%02d %02d.%03d" % dmm(nmea.latitude, 'NS')
-        lon = "%s%03d %02d.%03d" % dmm(nmea.longitude, 'EW')
+        lat = "%(ns)s %(deg)d %(min)02d.%(dec)03d" %\
+                freenav.util.dmm(nmea.latitude, 3)
+        lon = "%(ew)s %(deg)d %(min)02d.%(dec)03d" %\
+                freenav.util.dmm(nmea.longitude, 3)
         alt = "%d FT" % (nmea.gps_altitude * M_TO_FT)
         self.lat_label.set_markup(LATLON_MARKUP % lat)
         self.lon_label.set_markup(LATLON_MARKUP % lon)

@@ -6,6 +6,7 @@ import gobject
 import gtk
 
 import freenav.projection
+import freenav.util
 
 # Default observation zone values
 RAD1 = 500
@@ -33,14 +34,6 @@ def make_finish_tp(wp_id, tp_type='LINE', rad1=FINISH_RAD, ang1=0, dirn='PREV',
     """Generate a default finish point"""
     return make_tp(wp_id, tp_type=tp_type, rad1=rad1, ang1=ang1, dirn=dirn,
                    ang12=ang12)
-
-def dmm(ang, hemis):
-    """Splits lat/lon, in radians, into degrees, minutes and decimal minutes"""
-    dec_min = int(round(math.degrees(abs(ang)) * 60000))
-    min, dec_min = divmod(dec_min, 1000)
-    deg, min = divmod(min, 60)
-
-    return (deg, min, dec_min, hemis[1] if ang < 0 else hemis[0])
 
 class TaskListStore(gtk.ListStore):
     """Model for the task list"""
@@ -80,8 +73,10 @@ class TaskListStore(gtk.ListStore):
 
             for tp in self:
                 wp = self.db.get_waypoint(tp[0]['waypoint_id'])
-                lat = "%02d%02d%03d%s" % dmm(wp['latitude'], 'NS')
-                lon = "%03d%02d%03d%s" % dmm(wp['longitude'], 'EW')
+                lat = "%(deg)02d%(min)02d%(dec)03d%(ns)s" %\
+                        freenav.util.dmm(wp['latitude'], 3)
+                lon = "%(deg)03d%(min)02d%(dec)03d%(ew)s" %\
+                        freenav.util.dmm(wp['longitude'], 3)
                 str = "$PFLAC,S,ADDWP,%s,%s,%s\n" % (lat, lon, wp['id'])
                 f.write(str)
             f.write("$PFLAC,S,ADDWP,0000000N,00000000W,Land\n")

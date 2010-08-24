@@ -1,5 +1,6 @@
+"""Freenav utility funtions"""
+
 import math
-import re
 
 def dmm(val, precision=3):
     """Splits a lat/lon value into degrees, minutes, decimal minutes and
