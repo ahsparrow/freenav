@@ -270,12 +270,20 @@ class FlightFSM_Task(FlightFSM_Default):
 
     def new_position(self, fsm):
         ctxt = fsm.getOwner()
-        endState = fsm.getState()
-        fsm.clearState()
-        try:
-            ctxt.do_task_position()
-        finally:
-            fsm.setState(endState)
+        if ctxt.average_ground_speed < ctxt.STOPPED_SPEED :
+            fsm.getState().Exit(fsm)
+            # No actions.
+            pass
+            fsm.setState(FlightFSM.Land)
+            fsm.getState().Entry(fsm)
+        else:
+            endState = fsm.getState()
+            fsm.clearState()
+            try:
+                ctxt.do_task_position()
+            finally:
+                fsm.setState(endState)
+
 
     def next_turnpoint(self, fsm):
         ctxt = fsm.getOwner()
@@ -330,12 +338,31 @@ class FlightFSM_Divert(FlightFSM_Default):
 
     def new_position(self, fsm):
         ctxt = fsm.getOwner()
-        endState = fsm.getState()
-        fsm.clearState()
-        try:
-            ctxt.do_divert_position()
-        finally:
-            fsm.setState(endState)
+        if ctxt.average_ground_speed < ctxt.STOPPED_SPEED :
+            fsm.getState().Exit(fsm)
+            # No actions.
+            pass
+            fsm.setState(FlightFSM.Land)
+            fsm.getState().Entry(fsm)
+        else:
+            endState = fsm.getState()
+            fsm.clearState()
+            try:
+                ctxt.do_divert_position()
+            finally:
+                fsm.setState(endState)
+
+
+class FlightFSM_Land(FlightFSM_Default):
+
+    def Entry(self, fsm):
+        ctxt = fsm.getOwner()
+        ctxt.do_land()
+
+    def new_position(self, fsm):
+        fsm.getState().Exit(fsm)
+        fsm.setState(FlightFSM.Ground)
+        fsm.getState().Entry(fsm)
 
 class FlightFSM(object):
 
@@ -349,6 +376,7 @@ class FlightFSM(object):
     Resume = FlightFSM_Resume('FlightFSM.Resume', 7)
     Task = FlightFSM_Task('FlightFSM.Task', 8)
     Divert = FlightFSM_Divert('FlightFSM.Divert', 9)
+    Land = FlightFSM_Land('FlightFSM.Land', 10)
     Default = FlightFSM_Default('FlightFSM.Default', -1)
 
 class Flight_sm(statemap.FSMContext):

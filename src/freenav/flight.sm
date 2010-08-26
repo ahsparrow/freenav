@@ -198,6 +198,11 @@ Task
             do_restart();
         }
 
+    new_position [ctxt.average_ground_speed < ctxt.STOPPED_SPEED]
+        Land
+        {
+        }
+
     new_position
         nil
         {
@@ -222,10 +227,27 @@ Divert
             do_set_divert(waypoint_id);
         }
 
+    new_position [ctxt.average_ground_speed < ctxt.STOPPED_SPEED]
+        Land
+        {
+        }
+
     new_position
         nil
         {
             do_divert_position();
+        }
+}
+
+//---------------------------------------------------------------------------
+// Landing
+
+Land
+    Entry {do_land();}
+{
+    new_position
+        Ground
+        {
         }
 }
 

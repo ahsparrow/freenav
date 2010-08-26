@@ -1,5 +1,6 @@
 """This module provides the flight model for the freenav program"""
 
+import collections
 import datetime
 
 import altimetry
@@ -11,6 +12,7 @@ import thermal
 KTS_TO_MPS = 1852.0 / 3600
 
 INIT_COUNT = 5
+GROUND_SPEED_DEQUE_LEN = 10
 
 SHORT_NAMES = {'Init':   'Init',
                'Ground': 'Grnd',
@@ -21,7 +23,8 @@ SHORT_NAMES = {'Init':   'Init',
                'Sector': 'Sect',
                'Line':   'Line',
                'Task':   'Task',
-               'Divert': 'Dvrt'}
+               'Divert': 'Dvrt',
+               'Land':   'Land'}
 
 INIT_POSITION_EVT, \
 INIT_GROUND_EVT, \
@@ -35,7 +38,8 @@ START_SECTOR_EVT, \
 LINE_EVT, \
 TASK_EVT, \
 DIVERT_EVT, \
-SECTOR_EVT = range(13)
+SECTOR_EVT, \
+LAND_EVT = range(14)
 
 class Flight:
     """Flight model class"""
@@ -65,9 +69,12 @@ class Flight:
         self.altitude = 0
         self.utc_secs = 0
         self.ground_speed = 0
+        self.average_ground_speed = 0
         self.track = 0
         self.num_satellites = 0
         self.fix_quality = 0
+
+        self.ground_speed_deque = collections.deque()
 
         # List of model observers
         self.subscriber_list = set()
@@ -96,6 +103,12 @@ class Flight:
         self.ground_speed = ground_speed
         self.num_satellites = num_satellites
         self.fix_quality = fix_quality
+
+        self.ground_speed_deque.append(ground_speed)
+        if len(self.ground_speed_deque) > GROUND_SPEED_DEQUE_LEN:
+            self.ground_speed_deque.popleft()
+        self.average_ground_speed = (sum(self.ground_speed_deque) / 
+                                     float(len(self.ground_speed_deque)))
 
         self._fsm.new_position()
 
@@ -334,6 +347,9 @@ class Flight:
     def in_start_sector(self):
         """Return true if in start sector"""
         return self.task.in_sector(self.x, self.y, 0)
+
+    def do_land(self):
+        self.notify_subscribers(LAND_EVT)
 
     #------------------------------------------------------------------------
     # Internal stuff
