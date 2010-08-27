@@ -3,6 +3,7 @@
 import math
 import os.path
 
+import gobject
 import gtk
 import gtk.gdk
 import pango
@@ -40,6 +41,9 @@ WP_SIZE = 5
 FG_WIDTH = 30
 FG_INC = 15
 
+# Time to display airspace info
+AIRSPACE_TIMEOUT = 10000
+
 # Threshold (in feet) to display final glide indicator
 FG_THRESHOLD = -3000
 
@@ -71,7 +75,7 @@ def add_div(box):
 
 class BigButtonDialog(gtk.Window):
     """A dialog box with unusually big buttons"""
-    def __init__(self, title=None, buttons=None):
+    def __init__(self, title=None, buttons=None, timeout=None):
         """Create all of the dialog box - except the message label"""
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
         self.set_name('freenav-bigbuttondialog')
@@ -80,7 +84,11 @@ class BigButtonDialog(gtk.Window):
         self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_DIALOG)
         self.set_title(title)
 
+        self.timeout = timeout
+        self.timeout_id = None
+
         self.connect("delete_event", self.delete_event)
+        self.connect("map-event", self.map_event)
 
         self.vbox = gtk.VBox(spacing=10)
         self.vbox.set_border_width(5)
@@ -100,19 +108,36 @@ class BigButtonDialog(gtk.Window):
     def callback(self, _widget, data):
         """Button press callback"""
         self.response = data
+
+        if self.timeout_id:
+            gobject.source_remove(self.timeout_id)
         gtk.main_quit()
 
     def delete_event(self, _widget, _event):
         """Delete event callback"""
         self.response = gtk.RESPONSE_DELETE_EVENT
+
+        if self.timeout_id:
+            gobject.source_remove(self.timeout_id)
         gtk.main_quit()
+
+    def map_event(self, _widget, _event):
+        if self.timeout:
+            self.timeout_id = gobject.timeout_add(self.timeout, self.on_timeout)
+        return False
 
     def run(self, label):
         """Add label, wait for button press, return response"""
         self.vbox.pack_start(label)
         self.show_all()
+
         gtk.main()
         return self.response
+
+    def on_timeout(self):
+        self.response = None
+        gtk.main_quit()
+        return False
 
 class FreeView(APP_BASE):
     """Main view class"""
@@ -665,7 +690,8 @@ class FreeView(APP_BASE):
         if msgs:
             msg = "\n\n".join(msgs)
             dialog = BigButtonDialog("Airspace",
-                                     (gtk.STOCK_OK, gtk.RESPONSE_OK))
+                                     (gtk.STOCK_OK, gtk.RESPONSE_OK),
+                                     timeout=AIRSPACE_TIMEOUT)
 
             attr_list = pango.AttrList()
             attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 30,
