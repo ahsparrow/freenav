@@ -1,9 +1,7 @@
 """Send SMS message via a Bluetooth connected mobile phone"""
 
 import bluetooth
-import time
-
-import freenav.util
+import logging
 
 RF_COMM_CHANNEL = 1
 
@@ -12,7 +10,16 @@ class Sms:
         """Initialise class variables"""
         self.bt_addr = bt_addr
         self.bg_channel = bt_channel
+
         self.bt_sock = None
+        self.phonebook = {}
+
+        self.logger = logging.getLogger('freelog')
+
+    def add_phonebook_entry(self, name, phone_number, email_address=None):
+        """Add entry to phone book"""
+        self.phonebook[name] = {'phone_number': phone_number,
+                                'email_address': email_address}
 
     def connect(self):
         """Connect to phone and set SMS text mode"""
@@ -24,49 +31,12 @@ class Sms:
             # Set SMS text mode
             self.bt_sock.send("AT+CMGF=1\r")
         except bluetooth.BluetoothError:
+            self.logger.warning("Can't connect to bluetooth " + self.bt_addr)
             self.bt_sock = None
 
         return self.bt_sock
 
-    def send(self, phone_number, land_secs, latitude, longitude,
-             email_address=None):
-        """Send an SMS message
-
-        phone_number - SMS recipient, format "+441234567890"
-        land_secs - number of seconds since the epoch
-        latitude, longitdue - radians
-        email_address - (optional) email address string
-        """
-
-        if self.bt_sock is None:
-            return
-
-        # SMS send command
-        sms_at_command = "AT+CMGS=\"%s\"\r" % phone_number
-
-        # Create SMS message body
-        tim_str = time.strftime("%H:%M", time.localtime(land_secs))
-        lat_str = "%(deg)02d %(min)02d.%(dec)03d%(ns)s" % \
-                freenav.util.dmm(latitude, 3)
-        lon_str = "%(deg)03d %(min)02d.%(dec)03d%(ew)s" % \
-                freenav.util.dmm(longitude, 3)
-        msg = "LANDED %s %s %s" % (tim_str, lat_str, lon_str)
-
-        # Prepend email address, append CTRL-Z
-        if email_address:
-            sms_txt = email_address + " " + msg + "\x1a"
-        else:
-            sms_txt = msg + "\x1a"
-        print msg
-
-        # Send commands to phone
-        try:
-            self.bt_sock.send(sms_at_command)
-            self.bt_sock.send(sms_txt)
-        except bluetooth.BluetoothError:
-            self.close()
-
-    def close(self):
+    def disconnect(self):
         """Close connection to phone"""
         if self.bt_sock:
             try:
@@ -74,3 +44,37 @@ class Sms:
             except bluetooth.BluetoothError:
                 pass
             self.bt_sock = None
+
+    def send(self, name, msg):
+        """Send an SMS message to specified phonebook entry"""
+        if self.bt_sock is None:
+            self.logger.error("No bluetooth connection, can't send message")
+            return
+
+        # SMS send command
+        try:
+            pb_entry = self.phonebook[name]
+        except KeyError:
+            self.logger.error("Unknown SMS name: " + name)
+            return
+
+        sms_at_command = "AT+CMGS=\"%s\"\r" % pb_entry['phone_number']
+
+        # Prepend email address, append CTRL-Z
+        if pb_entry['email_address']:
+            sms_txt = pb_entry['email_address'] + " " + msg + "\x1a"
+        else:
+            sms_txt = msg + "\x1a"
+
+        # Send commands to phone
+        try:
+            self.bt_sock.send(sms_at_command)
+            self.bt_sock.send(sms_txt)
+        except bluetooth.BluetoothError:
+            self.logger.error("Send SMS message failed")
+            self.disconnect()
+
+    def send_all(self, msg):
+        """Send SMS message to all entries in the phonebook"""
+        for name in self.phonebook:
+            self.send(name, msg)

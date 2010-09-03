@@ -1,6 +1,8 @@
 """This model provides the controller for the freenav program"""
 
 import collections
+import ConfigParser
+import logging
 import time
 
 import gobject
@@ -17,6 +19,7 @@ import flight
 import freesound
 import freenmea
 import nmeaparser
+import sms
 
 OSSO_APPLICATION = "uk.org.freeflight.freenav"
 
@@ -37,13 +40,31 @@ class FreeControl:
     """Controller class for freenav program"""
     def __init__(self, flight_model, view, db, config):
         """Class initialisation"""
+        self.logger = logging.getLogger('freelog')
+
         # Links to view and model
         self.view = view
         self.flight = flight_model
         self.flight.subscribe(self)
+        self.config = config
 
         # Sounds
         self.sound = freesound.Sound()
+
+        # SMS configuration
+        if config.has_section('SMS-Device'):
+            bt_addr = config.get('SMS-Device', 'Bluetooth-Address')
+            self.sms = sms.Sms(bt_addr)
+            items = config.items('SMS-Names')
+            for name, sms_id in items:
+                number = config.get(sms_id, 'Number')
+                try:
+                    email = config.get(sms_id, 'Email')
+                except ConfigParser.NoOptionError:
+                    email = None
+                self.sms.add_phonebook_entry(name, number, email)
+        else:
+            self.sms = None
 
         # FLARM audio control
         self.flarm_mute = False
@@ -58,7 +79,6 @@ class FreeControl:
         self.task_display_type = collections.deque(["start_time",
                                                     "task_speed",
                                                     "task_time"])
-
         # Get GPS device
         dev_name = config.get('Device-Names', db.get_settings()['gps_device'])
         dev = config.get(dev_name, 'Device')
@@ -238,19 +258,30 @@ class FreeControl:
     def flight_update(self, event):
         """Callback on flight model change"""
         if event == flight.LINE_EVT:
+            # Crossing line, play sound and reset task info
             self.sound.play('line')
             while self.task_display_type[0] != "start_time":
                 self.task_display_type.rotate()
 
         if event == flight.START_SECTOR_EVT or event == flight.SECTOR_EVT:
+            # Enter sector, play sound
             self.sound.play('sector')
 
         self.display_task_info()
 
         if event != flight.INIT_POSITION_EVT:
+            # Update display
             self.display_level_info()
             self.display_time_info(self.flight.get_utc_secs())
             self.view.update_position(*self.flight.get_position())
+
+        if event == flight.LAND_EVT:
+            # Send SMS position messages
+            if self.sms:
+                self.sound.play("sms-beep")
+                response = self.view.landing_dialog()
+                if response != gtk.RESPONSE_NO:
+                    self.send_sms()
 
     #------------------------------------------------------------------
 
@@ -396,6 +427,21 @@ class FreeControl:
         """Display airspace info"""
         info = self.view.mapcache.get_airspace_info(x, y)
         self.view.show_airspace_info(info)
+
+    def send_sms(self):
+        """Send Lat/Lon landing report via SMS"""
+        tim = self.flight.utc_secs
+        lat, lon = self.flight.get_latlon()
+
+        # Create SMS message body
+        tim_str = time.strftime("%H:%M", time.localtime(tim))
+        lat_str = "%(deg)02d %(min)02d.%(dec)03d%(ns)s" % \
+                freenav.util.dmm(lat, 3)
+        lon_str = "%(deg)03d %(min)02d.%(dec)03d%(ew)s" % \
+                freenav.util.dmm(lon, 3)
+        msg = "LANDED %s %s %s" % (tim_str, lat_str, lon_str)
+
+        self.sms.send_all(msg)
 
     def main(self):
         """Main program entry"""

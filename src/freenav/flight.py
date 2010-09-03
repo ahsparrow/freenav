@@ -164,6 +164,10 @@ class Flight:
         """Return X, Y position"""
         return (self.x, self.y)
 
+    def get_latlon(self):
+        """Return latitude, longitude position"""
+        return self.projection.reverse(self.x, self.y)
+
     def get_velocity(self):
         """Return ground speed and track"""
         return {'speed': self.ground_speed, 'track': self.track}
@@ -337,6 +341,10 @@ class Flight:
                                      self.utc_secs)
         self.notify_subscribers(NEW_POSITION_EVT)
 
+    def do_land(self):
+        """Back on the ground"""
+        self.notify_subscribers(LAND_EVT)
+
     def is_previous_start(self):
         """Return true if a start has already been made today"""
         settings = self.db.get_settings()
@@ -347,9 +355,6 @@ class Flight:
     def in_start_sector(self):
         """Return true if in start sector"""
         return self.task.in_sector(self.x, self.y, 0)
-
-    def do_land(self):
-        self.notify_subscribers(LAND_EVT)
 
     #------------------------------------------------------------------------
     # Internal stuff

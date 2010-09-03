@@ -43,6 +43,7 @@ FG_INC = 15
 
 # Time to display airspace info
 AIRSPACE_TIMEOUT = 10000
+LANDING_TIMEOUT = 10000
 
 # Threshold (in feet) to display final glide indicator
 FG_THRESHOLD = -3000
@@ -710,6 +711,22 @@ class FreeView(APP_BASE):
         attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 40, 0, 999))
 
         label = gtk.Label("Start?")
+        label.set_attributes(attr_list)
+
+        result = dialog.run(label)
+        dialog.destroy()
+
+        return result
+
+    def landing_dialog(self):
+        """Puts up a dialog box to ask whether to send an SMS"""
+        dialog = BigButtonDialog("SMS", (gtk.STOCK_YES, gtk.RESPONSE_YES,
+                                         gtk.STOCK_NO, gtk.RESPONSE_NO),
+                                         timeout=LANDING_TIMEOUT)
+        attr_list = pango.AttrList()
+        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 40, 0, 999))
+
+        label = gtk.Label("Send SMS?")
         label.set_attributes(attr_list)
 
         result = dialog.run(label)
