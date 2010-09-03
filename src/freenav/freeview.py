@@ -183,7 +183,8 @@ class FreeView(APP_BASE):
 
         # Main drawing area
         self.drawing_area = gtk.DrawingArea()
-        self.drawing_area.add_events(gtk.gdk.BUTTON_PRESS_MASK)
+        self.drawing_area.add_events(gtk.gdk.BUTTON_PRESS_MASK |
+                                     gtk.gdk.BUTTON_RELEASE_MASK)
         self.drawing_area.connect('expose-event', self.area_expose)
         topbox.pack_start(self.drawing_area, expand=True, fill=True)
 

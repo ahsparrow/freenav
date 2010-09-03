@@ -97,6 +97,7 @@ class FreeControl:
 
         # Handle user interface events
         view.drawing_area.connect('button_press_event', self.button_press)
+        view.drawing_area.connect('button_release_event', self.button_release)
         view.window.connect('key_press_event', self.key_press)
         view.window.connect('destroy', self.destroy)
         for i, ibox in enumerate(view.info_box):
@@ -146,15 +147,27 @@ class FreeControl:
         return True
 
     def button_press(self, _widget, event):
-        """Handle button press (mouse click/screen touch)"""
         if event.type != gtk.gdk.BUTTON_PRESS:
             # Ignore double press
             return False
 
+        self.button_press_x = event.x
+        self.button_press_y = event.y
+
+    def button_release(self, _widget, event):
+        """Handle button press (mouse click/screen touch)"""
         x, y = self.view.win_to_view(event.x, event.y)
         region = self.view.get_button_region(event.x, event.y)
 
-        if self.divert_indicator_flag:
+        if (event.y - self.button_press_y) > 200:
+            self.view.zoom_in()
+            self.view.redraw()
+
+        elif (self.button_press_y - event.y) > 200:
+            self.view.zoom_out()
+            self.view.redraw()
+
+        elif self.divert_indicator_flag:
             self.divert(x, y)
 
         elif region == 'divert':
