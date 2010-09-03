@@ -36,6 +36,8 @@ INFO_LEVEL = 0
 INFO_TASK = 1
 INFO_TIME = 2
 
+ZOOM_DRAG = 100
+
 class FreeControl:
     """Controller class for freenav program"""
     def __init__(self, flight_model, view, db, config):
@@ -159,11 +161,11 @@ class FreeControl:
         x, y = self.view.win_to_view(event.x, event.y)
         region = self.view.get_button_region(event.x, event.y)
 
-        if (event.y - self.button_press_y) > 200:
+        if (event.y - self.button_press_y) > ZOOM_DRAG:
             self.view.zoom_in()
             self.view.redraw()
 
-        elif (self.button_press_y - event.y) > 200:
+        elif (self.button_press_y - event.y) > ZOOM_DRAG:
             self.view.zoom_out()
             self.view.redraw()
 
