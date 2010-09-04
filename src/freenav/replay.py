@@ -2,6 +2,7 @@
 import datetime
 import fcntl
 import math
+import optparse
 import os
 import pty
 import sys
@@ -50,7 +51,7 @@ def gen_pgrmz(altitude):
     return nmea
 
 def add_checksum(data):
-    checksum = 0;
+    checksum = 0
     for i in range(len(data) - 1):
         checksum = checksum ^ ord(data[i + 1])
 
@@ -95,6 +96,16 @@ def igc_parse(rec):
     return dt, lat, lon, gps_alt, pressure_alt
 
 def main():
+    # Parse command line
+    parser = optparse.OptionParser()
+    parser.add_option("-n", "--nmea", action="store_true", dest="nmea",
+                      default=True, help="Read NMEA log file")
+    (options, args) = parser.parse_args()
+
+    # Open input file
+    in_file = open(args[0])
+
+    # stdin manipulation to allow speed up/down
     stdin_fd = sys.stdin.fileno()
     oldterm = termios.tcgetattr(stdin_fd)
     newattr = termios.tcgetattr(stdin_fd)
@@ -103,6 +114,7 @@ def main():
     oldflags = fcntl.fcntl(stdin_fd, fcntl.F_GETFL)
     fcntl.fcntl(stdin_fd, fcntl.F_SETFL, oldflags | os.O_NONBLOCK)
 
+    # Open GPS psuedo terminal
     master_fd, slave_fd = pty.openpty()
 
     slave_name = os.ttyname(slave_fd)
@@ -120,35 +132,40 @@ def main():
     termios.tcsetattr(slave_fd, termios.TCSANOW,
                       [iflag, oflag, cflag, lflag, ispeed, ospeed, cc])
 
-    igc_file = open(sys.argv[1])
-    proj = projection.Lambert(math.radians(49), math.radians(55),
-                              math.radians(52), math.radians(0))
+    if not options.nmea:
+        proj = projection.Lambert(math.radians(49), math.radians(55),
+                                  math.radians(52), math.radians(0))
 
-    for rec in igc_file:
-        if rec[0] == 'B':
-            break
-    dt1, lat1, lon1, gps_alt, pressure_alt = igc_parse(rec)
-    x1, y1 = proj.forward(lat1, lon1)
+        for rec in in_file:
+            if rec[0] == 'B':
+                break
+        dt1, lat1, lon1, gps_alt, pressure_alt = igc_parse(rec)
+        x1, y1 = proj.forward(lat1, lon1)
 
     sleep_time = 1.0
 
     try:
-        for rec in igc_file:
-            if rec[0] == 'B':
-                dt, lat, lon, gps_alt, pressure_alt = igc_parse(rec)
-                x, y = proj.forward(lat, lon)
-
-                tdelta = dt - dt1
-                dist = math.sqrt((x - x1) ** 2 + (y - y1) ** 2)
-                speed = dist / tdelta.seconds
-                track = math.atan2(x - x1, y - y1)
-
-                dt1, x1, y1 = dt, x, y
-
-                os.write(master_fd, gen_gprmc(lat, lon, speed, track, dt))
-                os.write(master_fd, gen_gpgga(lat, lon, gps_alt, dt))
-                os.write(master_fd, gen_pgrmz(pressure_alt))
+        for rec in in_file:
+            if options.nmea:
+                os.write(master_fd, rec)
                 time.sleep(sleep_time)
+
+            else:
+                if rec[0] == 'B':
+                    dt, lat, lon, gps_alt, pressure_alt = igc_parse(rec)
+                    x, y = proj.forward(lat, lon)
+
+                    tdelta = dt - dt1
+                    dist = math.sqrt((x - x1) ** 2 + (y - y1) ** 2)
+                    speed = dist / tdelta.seconds
+                    track = math.atan2(x - x1, y - y1)
+
+                    dt1, x1, y1 = dt, x, y
+
+                    os.write(master_fd, gen_gprmc(lat, lon, speed, track, dt))
+                    os.write(master_fd, gen_gpgga(lat, lon, gps_alt, dt))
+                    os.write(master_fd, gen_pgrmz(pressure_alt))
+                    time.sleep(sleep_time)
 
             try:
                 c = sys.stdin.read(1)
