@@ -188,11 +188,6 @@ class FreeView(APP_BASE):
         self.drawing_area.connect('expose-event', self.area_expose)
         topbox.pack_start(self.drawing_area, expand=True, fill=True)
 
-        # Allocate some drawing colours
-        cmap = self.drawing_area.get_colormap()
-        self.bg_color = cmap.alloc_color("white")
-        self.fg_color = cmap.alloc_color("black")
-
         # Box for info boxes
         add_div(topbox)
         info_sizer = gtk.HBox(homogeneous=False)
@@ -289,10 +284,10 @@ class FreeView(APP_BASE):
 
         # Start with a clean white sheet...
         cr = win.cairo_create()
-        cr.set_source_rgba(1, 1, 1, 1)
+        cr.set_source_rgba(0, 0, 0, 1)
         cr.rectangle(0, 0, win_width, win_height)
         cr.fill()
-        cr.set_source_rgba(0, 0, 0, 1)
+        cr.set_source_rgba(1, 1, 1, 1)
 
         # Airspace
         self.draw_airspace(cr, win_width, win_height)
@@ -390,7 +385,7 @@ class FreeView(APP_BASE):
 
         # Draw lines... a beautiful shade of blue
         cr.save()
-        cr.set_source_rgba(0, 0, 1, 1)
+        cr.set_source_rgba(0.75, 0.75, 1, 1)
         cr.stroke()
 
         cr.restore()
@@ -501,13 +496,13 @@ class FreeView(APP_BASE):
         x, y = self.tp_layout.get_pixel_size()
         cr.move_to(2, win_height - y)
 
-        # Draw text with white outline
+        # Draw text with black outline
         cr.layout_path(self.tp_layout)
         cr.save()
         cr.set_line_width(5)
-        cr.set_source_rgba(1, 1, 1, 1)
-        cr.stroke_preserve()
         cr.set_source_rgba(0, 0, 0, 1)
+        cr.stroke_preserve()
+        cr.set_source_rgba(1, 1, 1, 1)
         cr.fill()
 
         # Draw arrow for relative bearing to TP
