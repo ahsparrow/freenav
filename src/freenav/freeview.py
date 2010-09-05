@@ -385,7 +385,7 @@ class FreeView(APP_BASE):
 
         # Draw lines... a beautiful shade of blue
         cr.save()
-        cr.set_source_rgba(0.75, 0.75, 1, 1)
+        cr.set_source_rgba(0.5, 0.65, 1, 1)
         cr.stroke()
 
         cr.restore()
