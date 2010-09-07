@@ -114,6 +114,8 @@ class Freedb:
         self.cursor.execute('CREATE INDEX Xmax_Index ON Airspace (x_max)')
         self.cursor.execute('CREATE INDEX Ymin_Index ON Airspace (y_min)')
         self.cursor.execute('CREATE INDEX Ymax_Index ON Airspace (y_max)')
+        self.cursor.execute('CREATE INDEX Id1 ON Airspace_Lines (airspace_id)')
+        self.cursor.execute('CREATE INDEX Id2 ON Airspace_Arcs (airspace_id)')
 
         self.commit()
 
@@ -150,7 +152,11 @@ class Freedb:
 
     def get_area_waypoint_list(self, x, y, width, height):
         """Return list of waypoints filtered by area"""
-        sql = 'SELECT * FROM Waypoints WHERE x>? AND x<? AND y>? AND y<?'
+        sql = """SELECT * FROM Waypoints WHERE rowid IN
+                 (SELECT rowid FROM Waypoints Where x > ? INTERSECT
+                  SELECT rowid FROM Waypoints Where x < ? INTERSECT
+                  SELECT rowid FROM Waypoints Where y > ? INTERSECT
+                  SELECT rowid FROM Waypoints Where y < ?)"""
         self.cursor.execute(sql, (x - width/2, x + width/2,
                              y - height/2, y + height/2))
         return self.cursor.fetchall()
@@ -173,8 +179,11 @@ class Freedb:
 
     def get_area_airspace(self, x, y, width, height):
         """Return list of airspace filtered by area"""
-        sql = '''SELECT * FROM Airspace
-              WHERE ? < x_max AND ? > x_min AND ? < y_max AND ? > y_min'''
+        sql = '''SELECT * FROM Airspace WHERE rowid IN
+                 (SELECT rowid FROM Airspace WHERE ? < x_max INTERSECT
+                  SELECT rowid FROM Airspace WHERE ? > x_min INTERSECT
+                  SELECT rowid FROM Airspace WHERE ? < y_max INTERSECT
+                  SELECT rowid FROM Airspace WHERE ? > y_min)'''
         self.cursor.execute(sql, (x - width/2, x + width/2,
                              y - height/2, y + height/2))
         return self.cursor.fetchall()
