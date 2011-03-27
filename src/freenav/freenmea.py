@@ -20,6 +20,8 @@ class FreeNmea(gobject.GObject):
                            gobject.TYPE_NONE, [gobject.TYPE_PYOBJECT])
         gobject.signal_new("flarm-alarm", FreeNmea, gobject.SIGNAL_ACTION,
                            gobject.TYPE_NONE, [gobject.TYPE_PYOBJECT])
+        gobject.signal_new("flarm-traffic", FreeNmea, gobject.SIGNAL_ACTION,
+                           gobject.TYPE_NONE, [gobject.TYPE_PYOBJECT])
 
     def open(self, dev, baud_rate):
         """Open NMEA device"""

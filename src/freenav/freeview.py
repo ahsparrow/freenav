@@ -48,6 +48,9 @@ LANDING_TIMEOUT = 10000
 # Threshold (in feet) to display final glide indicator
 FG_THRESHOLD = -3000
 
+# Maximum flarm radar range
+MAX_FLARM_RADAR = 2000.0
+
 PIXMAP_DIRS = ['.', '/usr/share/pixmaps', '../../pixmaps']
 
 def find_pixbuf(filename):
@@ -163,12 +166,16 @@ class FreeView(APP_BASE):
         self.divert_flag = False
         self.maccready_flag = False
         self.mute_flag = False
+        self.flarm_radar_flag = False
 
         # Pixmaps
         self.glider_pixbuf = find_pixbuf("free_glider.png")
         self.navarrow_pixbuf = find_pixbuf("free_navarrow.png")
         self.wind_pixbuf = find_pixbuf("free_wind.png")
         self.mute_pixbuf = find_pixbuf("free_muted.png")
+        self.flarm_pixbuf = find_pixbuf("free_flarm.png")
+        self.stealth_pixbuf = find_pixbuf("free_stealth.png")
+        self.north_pixbuf = find_pixbuf("free_north.png")
 
         # Create top level window
         if IS_HILDON_APP:
@@ -238,7 +245,7 @@ class FreeView(APP_BASE):
         self.tp_layout.set_attributes(attr_list)
 
         attr_list = pango.AttrList()
-        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 40, 0, 999))
+        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 35, 0, 999))
         attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
         self.fg_layout = pango.Layout(self.drawing_area.create_pango_context())
         self.fg_layout.set_attributes(attr_list)
@@ -289,34 +296,108 @@ class FreeView(APP_BASE):
         cr.fill()
         cr.set_source_rgba(1, 1, 1, 1)
 
-        # Airspace
-        self.draw_airspace(cr, win_width, win_height)
+        if self.flarm_radar_flag:
+            self.draw_flarm_radar(cr, win_width, win_height)
+        else:
+            # Airspace
+            self.draw_airspace(cr, win_width, win_height)
 
-        # Task and turnpoint sectors
-        self.draw_task(cr, win_width, win_height)
+            # Task and turnpoint sectors
+            self.draw_task(cr, win_width, win_height)
 
-        # Waypoints
-        self.draw_waypoints(cr)
+            # Waypoints
+            self.draw_waypoints(cr)
 
-        # Next turnpoint annotation and navigation
-        self.draw_nav(cr, win_height)
+            # Heading symbol
+            self.draw_heading(cr, win_height, win_width)
+
+            # Number of satellites
+            self.draw_satellites(cr, win_width, win_height)
 
         # Final glide indicator
         self.draw_glide(cr, win_height)
 
-        # Heading symbol
-        self.draw_heading(cr, win_height, win_width)
+        # Next turnpoint annotation and navigation
+        self.draw_nav(cr, win_height)
 
         # Wind arrow
         self.draw_wind(cr, win_width, win_height)
-
-        # Number of satellites
-        self.draw_satellites(cr, win_width, win_height)
 
         # Mute indicator
         self.draw_mute(cr, win_width)
 
         return True
+
+    def draw_flarm_radar(self, cr, win_width, win_height):
+        """Display FLARM radar"""
+        # Translate origin to center of screen
+        cr.save()
+        cr.translate(0.5 * win_width, 0.55 * win_height)
+
+        # Draw range rings
+        scale = (min(win_width, win_height) - 50) / (2.0 * MAX_FLARM_RADAR)
+        cr.new_sub_path()
+        cr.arc(0, 0, scale * MAX_FLARM_RADAR, 0, M_2PI)
+        cr.new_sub_path()
+        cr.arc(0, 0, scale * MAX_FLARM_RADAR / 2, 0, M_2PI)
+
+        cr.save()
+        cr.set_source_rgba(0.5, 0.65, 1, 1)
+        cr.stroke()
+        cr.restore()
+
+        # North marker bug
+        offset = self.north_pixbuf.get_width() / 2
+        sin_track = math.sin(self.flight.track)
+        cos_track = math.cos(self.flight.track)
+        x = -scale * MAX_FLARM_RADAR * sin_track
+        y = scale * MAX_FLARM_RADAR * cos_track
+
+        cr.save()
+        cr.translate(x, -y)
+        cr.set_source_pixbuf(self.north_pixbuf, -offset, -offset)
+        cr.paint()
+        cr.restore()
+
+        # Traffic
+        offset = self.flarm_pixbuf.get_width() / 2
+        for f in self.flight.flarm_traffic.values():
+            x = scale * f.east
+            y = scale * f.north
+            xf = x * cos_track - y * sin_track
+            yf = x * sin_track + y * cos_track
+
+            cr.save()
+            cr.translate(xf, -yf)
+
+            # Annotation
+            level = round(f.vertical * M_TO_FT / 100)
+            self.wp_layout.set_text("%d" % level)
+            pw, ph = self.wp_layout.get_pixel_size()
+            if f.stealth:
+                cr.move_to(offset - 4, -ph - 4)
+                cr.show_layout(self.wp_layout)
+            else:
+                cr.move_to(offset, -ph + 4)
+                cr.show_layout(self.wp_layout)
+                self.wp_layout.set_text("%.1f" % (f.climb_rate * MPS_TO_KTS))
+                cr.move_to(offset, -2)
+                cr.show_layout(self.wp_layout)
+
+            # Symbol
+            cr.move_to(0, 0)
+            if not f.stealth:
+                cr.rotate(f.track - self.flight.track)
+                pb = self.flarm_pixbuf
+            else:
+                pb = self.stealth_pixbuf
+
+            cr.set_source_pixbuf(pb, -offset, -offset)
+            cr.paint()
+            cr.restore()
+
+        # Restore transformation
+        cr.restore()
 
     def draw_waypoints(self, cr):
         """Draw waypoints"""
@@ -743,6 +824,11 @@ class FreeView(APP_BASE):
     def set_mute_indicator(self, flag):
         """Set indicator showing mute is active"""
         self.mute_flag = flag
+        self.redraw()
+
+    def set_flarm_display(self, flag):
+        """Set flarm radar display mode"""
+        self.flarm_radar_flag = flag
         self.redraw()
 
     def get_button_region(self, x, y):

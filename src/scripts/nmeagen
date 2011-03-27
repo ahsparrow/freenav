@@ -47,6 +47,9 @@ class NmeaGen:
         self.time = time.time()
         self.altitude = wp['altitude']
 
+        self.flarm_north = 2000
+        self.flarm_track = 0
+
     def set_values(self, altitude, air_speed, ground_speed, course, maccready,
                    ballast, bugs):
         self.altitude = int(altitude)*FT_TO_METERS
@@ -128,6 +131,19 @@ class NmeaGen:
             alarm_level = 0
             bearing = 0
         data = '$PFLAU,1,1,2,1,%d,%d,2,0,0' % (alarm_level, bearing)
+        data = self.add_checksum(data)
+        stream.write(data)
+
+        fmt = "$PFLAA,0,{1:d},{2:d},{3:d},2,{0},{4},{5:.1f},0,{6:.1f},1"
+        id = int(self.flarm_north/500)
+        data = fmt.format(id, self.flarm_north, 100, 100, self.flarm_track, 0,
+                          -1)
+        data = self.add_checksum(data)
+        stream.write(data)
+        self.flarm_north -= 50
+        self.flarm_track += 20
+
+        data = fmt.format(2, 500, 1500, 0, '', 0, 0, 0)
         data = self.add_checksum(data)
         stream.write(data)
 

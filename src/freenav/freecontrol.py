@@ -71,6 +71,10 @@ class FreeControl:
         # FLARM audio control
         self.flarm_mute = False
 
+        # FLARM radar display control
+        self.flarm_display = False
+        self.flarm_detections = {}
+
         # Controller state variables
         self.divert_indicator_flag = False
         self.maccready_indicator_flag = False
@@ -186,7 +190,7 @@ class FreeControl:
             self.view.redraw()
 
         elif region == 'user':
-            self.toggle_mute()
+            self.toggle_flarm()
             self.view.redraw()
 
         elif region == 'glide' and not self.maccready_indicator_flag:
@@ -235,6 +239,12 @@ class FreeControl:
 
     def position_changed(self, _source, nmea):
         """Callback for new GPS position"""
+        # Remove old flarm traffic
+        for f in nmea.flarm_traffic.keys():
+            if (nmea.time - nmea.flarm_traffic[f].time) > 5:
+                del nmea.flarm_traffic[f]
+        self.flight.flarm_traffic = nmea.flarm_traffic
+
         # Update model with new position
         self.flight.update_position(nmea.time, nmea.latitude, nmea.longitude,
                                     nmea.gps_altitude, nmea.speed, nmea.track,
@@ -437,6 +447,11 @@ class FreeControl:
         """Toggle the FLARM mute"""
         self.flarm_mute = not self.flarm_mute
         self.view.set_mute_indicator(self.flarm_mute)
+
+    def toggle_flarm(self):
+        """Toggle FLARM radar display"""
+        self.flarm_display = not self.flarm_display
+        self.view.set_flarm_display(self.flarm_display)
 
     def display_airspace(self, x, y):
         """Display airspace info"""

@@ -34,6 +34,15 @@ FLAU_ALARM_LEVEL = 5
 FLAU_ALARM_TYPE = 7
 FLAU_ALARM_BEARING = 6
 
+# FLAA fields
+FLAA_RELATIVE_NORTH = 2
+FLAA_RELATIVE_EAST = 3
+FLAA_RELATIVE_VERTICAL = 4
+FLAA_ID = 6
+FLAA_TRACK = 7
+FLAA_TURN_RATE = 8
+FLAA_CLIMB_RATE = 10
+
 # GCS (Volkslogger pressure altitude) fields
 GCS_ALTITUDE = 3
 
@@ -67,7 +76,11 @@ class NullHandler(logging.Handler):
     def emit(self, _record):
         pass
 
-class NmeaParser():
+class FlarmTraffic:
+    def __init__(self, time):
+        self.time = time
+
+class NmeaParser:
     """Class to parse NMEA data from FLARM or Volkslogger"""
     def __init__(self):
         """Class initialisation"""
@@ -86,6 +99,7 @@ class NmeaParser():
                            'GPGGA': self.proc_gga,
                            'PGRMZ': self.proc_grmz,
                            'PFLAU': self.proc_flau,
+                           'PFLAA': self.proc_flaa,
                            'PGCS': self.proc_gcs}
 
         # Initialise variables
@@ -96,6 +110,7 @@ class NmeaParser():
         self.num_satellites = 0
         self.gps_altitude = 0
         self.pressure_alt = 0
+        self.flarm_traffic = {}
 
         self.date = "010100"
         self.rmc_time = 0
@@ -246,6 +261,31 @@ class NmeaParser():
         # Add signal only if alarm level has increased
         if self.flarm_alarm_level > old_alarm_level:
             self.signals.add("flarm-alarm")
+
+    def proc_flaa(self, fields):
+        """Process FLARM traffic data"""
+        f = FlarmTraffic(self.time)
+        try:
+            f.north = int(fields[FLAA_RELATIVE_NORTH])
+            f.east = int(fields[FLAA_RELATIVE_EAST])
+            f.vertical = int(fields[FLAA_RELATIVE_VERTICAL])
+            f.id = fields[FLAA_ID]
+        except ValueError:
+            self.logger.error("Error processing: " + ','.join(fields))
+            return
+
+        # Some fields are empty in stealth mode
+        f.stealth = False
+        try:
+            f.track = math.radians(float(fields[FLAA_TRACK]))
+            f.turn_rate = math.radians(float(fields[FLAA_TURN_RATE]))
+            f.climb_rate = float(fields[FLAA_CLIMB_RATE])
+        except ValueError:
+            f.stealth = True
+
+        self.flarm_traffic[f.id] = f
+
+        self.signals.add("flarm-traffic")
 
     def proc_gcs(self, fields):
         """Process Volkslogger pressure altitude"""
