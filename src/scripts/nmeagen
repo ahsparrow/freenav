@@ -135,13 +135,9 @@ class NmeaGen:
         stream.write(data)
 
         fmt = "$PFLAA,0,{1:d},{2:d},{3:d},2,{0},{4},{5:.1f},0,{6:.1f},1"
-        id = int(self.flarm_north/500)
-        data = fmt.format(id, self.flarm_north, 100, 100, self.flarm_track, 0,
-                          -1)
+        data = fmt.format(1, 1500, 100, 100, 45, 0, -1)
         data = self.add_checksum(data)
         stream.write(data)
-        self.flarm_north -= 50
-        self.flarm_track += 20
 
         data = fmt.format(2, 500, 1500, 0, '', 0, 0, 0)
         data = self.add_checksum(data)
