@@ -16,7 +16,7 @@ setup(name='freenav',
                                              'data/freenav.service',
                                              'data/freeconf.service',
                                              'data/freexyz.service']),
-                  ('share/pixmaps', ['pixmaps/free_flarm.png'
+                  ('share/pixmaps', ['pixmaps/free_flarm.png',
                                      'pixmaps/free_glider.png',
                                      'pixmaps/free_navarrow.png',
                                      'pixmaps/free_north.png',
