@@ -1,7 +1,7 @@
 from distutils.core import setup
 
 setup(name='freenav',
-      version='0.1.9',
+      version='0.1.10',
       description='FreeNav task and navigation programs',
       author='Alan Sparrow',
       scripts=['src/scripts/taskedit', 'src/scripts/freenav',
@@ -16,8 +16,11 @@ setup(name='freenav',
                                              'data/freenav.service',
                                              'data/freeconf.service',
                                              'data/freexyz.service']),
-                  ('share/pixmaps', ['pixmaps/free_glider.png',
+                  ('share/pixmaps', ['pixmaps/free_flarm.png'
+                                     'pixmaps/free_glider.png',
                                      'pixmaps/free_navarrow.png',
+                                     'pixmaps/free_north.png',
+                                     'pixmaps/free_stealth.png',
                                      'pixmaps/free_wind.png',
                                      'pixmaps/free_muted.png'])]
      )
