@@ -53,25 +53,6 @@ MAX_FLARM_RADAR = 2000.0
 
 PIXMAP_DIRS = ['.', '/usr/share/pixmaps', '../../pixmaps']
 
-def climb_sym(climb_rate):
-    """Returns symbol for given climb rate, in m/s"""
-    if climb_rate < 0:
-        return ""
-
-    climb_rate = int(round(climb_rate * MPS_TO_KTS))
-    if climb_rate <= 1:
-        sym = u"\N{UPWARDS ARROW}"
-    elif climb_rate == 2:
-        sym = u"\N{UPWARDS TWO HEADED ARROW}"
-    elif climb_rate == 3:
-        sym = u"\N{UPWARDS WHITE ARROW}"
-    elif climb_rate == 4:
-        sym = u"\N{UPWARDS WHITE DOUBLE ARROW}"
-    else:
-        sym = u"\N{UPWARDS BLACK ARROW}"
-
-    return sym
-
 def find_pixbuf(filename):
     """Searches for pixmap file and returns corresponding gtk.gdk.Pixbuf"""
     for pix_dir in PIXMAP_DIRS:
@@ -399,9 +380,11 @@ class FreeView(APP_BASE):
             else:
                 cr.move_to(offset, -ph + 4)
                 cr.show_layout(self.wp_layout)
-                self.wp_layout.set_text(climb_sym(f.climb_rate))
-                cr.move_to(offset - 4, -2)
-                cr.show_layout(self.wp_layout)
+                if f.climb_rate > 0:
+                    climb_rate = int(round(f.climb_rate))
+                    self.wp_layout.set_text(str(climb_rate))
+                    cr.move_to(offset, -2)
+                    cr.show_layout(self.wp_layout)
 
             # Symbol
             cr.move_to(0, 0)
