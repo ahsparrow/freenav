@@ -278,7 +278,6 @@ class NmeaParser:
         f.stealth = False
         try:
             f.track = math.radians(float(fields[FLAA_TRACK]))
-            f.turn_rate = math.radians(float(fields[FLAA_TURN_RATE]))
             f.climb_rate = float(fields[FLAA_CLIMB_RATE])
         except ValueError:
             f.stealth = True
