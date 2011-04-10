@@ -1,3 +1,9 @@
+freenav (0.1.10-2) unstable; urgency=low
+
+  * FLARM radar - bug fix to ignore turn rate
+
+ -- Alan Sparrow <alan@freeflight.org.uk>  Tue,  29 Mar 2011 18:00:00 +0100
+
 freenav (0.1.10-1) unstable; urgency=low
 
   * FLARM radar
