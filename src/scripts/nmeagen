@@ -134,8 +134,8 @@ class NmeaGen:
         data = self.add_checksum(data)
         stream.write(data)
 
-        fmt = "$PFLAA,0,{1:d},{2:d},{3:d},2,{0},{4},{5:.1f},0,{6:.1f},1"
-        data = fmt.format(1, 1500, 100, 100, 45, 0, -1)
+        fmt = "$PFLAA,0,{1:d},{2:d},{3:d},2,{0},{4},,0,{6:.1f},1"
+        data = fmt.format(1, 1500, 100, 100, 45, 0, 0.1)
         data = self.add_checksum(data)
         stream.write(data)
 
