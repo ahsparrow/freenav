@@ -99,7 +99,7 @@ def main():
     # Parse command line
     parser = optparse.OptionParser()
     parser.add_option("-n", "--nmea", action="store_true", dest="nmea",
-                      default=True, help="Read NMEA log file")
+                      default=False, help="Read NMEA log file")
     (options, args) = parser.parse_args()
 
     # Open input file

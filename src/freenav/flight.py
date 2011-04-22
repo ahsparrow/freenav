@@ -5,6 +5,7 @@ import datetime
 
 import altimetry
 import flight_sm
+import freelog
 import projection
 import task
 import thermal
@@ -76,6 +77,9 @@ class Flight:
 
         self.ground_speed_deque = collections.deque()
 
+        # Track log
+        self.track_log = freelog.FreeLog()
+
         # List of model observers
         self.subscriber_list = set()
 
@@ -109,6 +113,9 @@ class Flight:
             self.ground_speed_deque.popleft()
         self.average_ground_speed = (sum(self.ground_speed_deque) / 
                                      float(len(self.ground_speed_deque)))
+
+        # Update track log
+        self.track_log.update(x, y, utc_secs)
 
         self._fsm.new_position()
 
@@ -238,6 +245,7 @@ class Flight:
                                             settings["takeoff_pressure_level"])
             self.pressure_alt.set_takeoff_altitude(settings["takeoff_altitude"])
 
+        self.track_log.start()
         self.notify_subscribers(INIT_AIR_EVT)
 
     def do_resume(self):
@@ -287,6 +295,7 @@ class Flight:
                             self.pressure_alt.takeoff_altitude)
         self.db.commit()
 
+        self.track_log.start()
         self.notify_subscribers(TAKEOFF_EVT)
 
     def do_launch(self):
@@ -343,6 +352,7 @@ class Flight:
 
     def do_land(self):
         """Back on the ground"""
+        self.track_log.stop()
         self.notify_subscribers(LAND_EVT)
 
     def is_previous_start(self):
