@@ -55,7 +55,11 @@ KTS_TO_MPS = 1852 / 3600.0
 FT_TO_M = 12 * 25.4 / 1000
 
 def check_checksum(data_str, checksum_str):
-    """Return True if calculated checksum matches given checksum"""
+    """Return True if no checksum or calculated checksum matches given
+       checksum"""
+    if not checksum_str:
+        return True
+
     try:
         checksum = int(checksum_str, 16)
     except ValueError:
@@ -100,6 +104,7 @@ class NmeaParser:
                            'PGRMZ': self.proc_grmz,
                            'PFLAU': self.proc_flau,
                            'PFLAA': self.proc_flaa,
+                           'PFLAC': self.proc_flac,
                            'PGCS': self.proc_gcs}
 
         # Initialise variables
@@ -285,6 +290,11 @@ class NmeaParser:
         self.flarm_traffic[f.id] = f
 
         self.signals.add("flarm-traffic")
+
+    def proc_flac(self, fields):
+        """Process FLARM command response"""
+        # Nothing to do other than add a signal
+        self.signals.add('flarm-command')
 
     def proc_gcs(self, fields):
         """Process Volkslogger pressure altitude"""
