@@ -319,6 +319,9 @@ class FreeView(APP_BASE):
             # Airspace
             self.draw_airspace(cr, win_width, win_height)
 
+            # Draw track log
+            self.draw_track_log(cr, win_width, win_height)
+
             # Task and turnpoint sectors
             self.draw_task(cr, win_width, win_height)
 
@@ -444,6 +447,25 @@ class FreeView(APP_BASE):
         # Restore transformation
         cr.restore()
 
+    def draw_track_log(self, cr, win_width, win_height):
+        """Draw track snail trail"""
+        if len(self.flight.track_log) == 0:
+            return
+
+        cr.save()
+        cr.translate(win_width / 2, win_height / 2)
+        cr.scale(1.0 / self.view_scale, -1.0 / self.view_scale)
+        cr.translate(-self.viewx, -self.viewy)
+
+        utc, sp = self.flight.track_log[0]
+        cr.move_to(*sp)
+        for utc, p in self.flight.track_log:
+            cr.line_to(*p)
+
+        cr.restore()
+        cr.set_line_width(1)
+        cr.stroke()
+
     def draw_waypoints(self, cr):
         """Draw waypoints"""
         if self.divert_flag or self.flight.get_state() == 'Divert':
@@ -541,6 +563,7 @@ class FreeView(APP_BASE):
                     self.draw_tp_sector(cr, tp)
 
         cr.restore()
+        cr.set_line_width(2)
         cr.stroke()
 
     def draw_tp_line(self, cr, tp):
