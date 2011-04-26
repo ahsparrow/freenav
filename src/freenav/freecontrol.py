@@ -14,6 +14,7 @@ try:
 except ImportError:
     IS_HILDON_APP = False
 
+import freeview
 import freenav
 import flight
 import freesound
@@ -28,15 +29,10 @@ KPH_TO_MPS = 1000 / 3600.0
 FT_TO_M = 0.3048
 
 DIVERT_TIMEOUT = 5000
-MACCREADY_TIMEOUT = 3000
-
-MACCREADY_STEP = 0.5 * KTS_TO_MPS
 
 INFO_LEVEL = 0
 INFO_TASK = 1
 INFO_TIME = 2
-
-ZOOM_DRAG = 100
 
 class FreeControl:
     """Controller class for freenav program"""
@@ -77,7 +73,6 @@ class FreeControl:
 
         # Controller state variables
         self.divert_indicator_flag = False
-        self.maccready_indicator_flag = False
         self.level_display_type = collections.deque(["flight_level",
                                                      "height",
                                                      "altitude",
@@ -163,42 +158,48 @@ class FreeControl:
     def button_release(self, _widget, event):
         """Handle button press (mouse click/screen touch)"""
         x, y = self.view.win_to_view(event.x, event.y)
-        region = self.view.get_button_region(event.x, event.y)
+        mode, region_val = self.view.get_button_region(event.x, event.y)
 
-        if (event.y - self.button_press_y) > ZOOM_DRAG:
-            self.view.zoom_in()
-            self.view.redraw()
+        if mode == 'matrix':
+            if region_val != None:
+                if self.matrix_mode == 'maccready':
+                    self.flight.update_maccready(region_val * KTS_TO_MPS)
+                elif self.matrix_mode == 'zoom':
+                    self.view.set_zoom(region_val)
 
-        elif (self.button_press_y - event.y) > ZOOM_DRAG:
-            self.view.zoom_out()
-            self.view.redraw()
-
-        elif self.divert_indicator_flag:
-            self.divert(x, y)
-
-        elif region == 'divert':
-            if self.flight.get_state() in ('Task', 'Divert'):
-                self.start_divert()
-                self.view.redraw()
-
-        elif region == 'next':
-            self.flight.next_turnpoint()
-            self.view.redraw()
-
-        elif region == 'prev':
-            self.flight.prev_turnpoint()
-            self.view.redraw()
-
-        elif region == 'user':
-            self.toggle_flarm()
-            self.view.redraw()
-
-        elif region == 'glide' and not self.maccready_indicator_flag:
-            self.start_maccready()
-            self.view.redraw()
+            self.view.cancel_matrix()
 
         else:
-            self.display_airspace(x, y)
+            if self.divert_indicator_flag:
+                self.divert(x, y)
+
+            elif region_val == 'divert':
+                if self.flight.get_state() in ('Task', 'Divert'):
+                    self.start_divert()
+                    self.view.redraw()
+
+            elif region_val == 'next':
+                self.flight.next_turnpoint()
+                self.view.redraw()
+
+            elif region_val == 'prev':
+                self.flight.prev_turnpoint()
+                self.view.redraw()
+
+            elif region_val == 'user1':
+                self.toggle_flarm()
+                self.view.redraw()
+
+            elif region_val == 'user2':
+                self.matrix_mode = 'zoom'
+                self.view.set_matrix(freeview.ZOOM_LABELS)
+
+            elif region_val == 'glide':
+                self.matrix_mode = 'maccready'
+                self.view.set_matrix([str(x) for x in range(9)])
+
+            else:
+                self.display_airspace(x, y)
 
         return True
 
@@ -210,20 +211,12 @@ class FreeControl:
 
         elif keyname in ('Up', 'F7'):
             # F7 is N810 'Zoom in' key
-            if self.maccready_indicator_flag:
-                self.flight.incr_maccready(MACCREADY_STEP)
-                self.restart_maccready()
-            else:
-                self.view.zoom_in()
+            self.view.zoom_in()
             self.view.redraw()
 
         elif keyname in ('Down', 'F8'):
             # F8 is N810 'Zoom out' key
-            if self.maccready_indicator_flag:
-                self.flight.decr_maccready(MACCREADY_STEP)
-                self.restart_maccready()
-            else:
-                self.view.zoom_out()
+            self.view.zoom_out()
             self.view.redraw()
 
         elif keyname == 'Right':
@@ -423,25 +416,6 @@ class FreeControl:
         self.divert_indicator_flag = False
         self.view.set_divert_indicator(False)
         return False
-
-    def start_maccready(self):
-        "Set Maccready indicator and start timeout"""
-        self.maccready_indicator_flag = True
-        self.view.set_maccready_indicator(True)
-        self.maccready_timeout_id = gobject.timeout_add(MACCREADY_TIMEOUT,
-                                                        self.reset_maccready)
-
-    def reset_maccready(self):
-        """Callback for the end of MacCready adjustment period"""
-        self.maccready_indicator_flag = False
-        self.view.set_maccready_indicator(False)
-        return False
-
-    def restart_maccready(self):
-        """Restart the MacCready adjustment timeout"""
-        gobject.source_remove(self.maccready_timeout_id)
-        self.maccready_timeout_id = gobject.timeout_add(MACCREADY_TIMEOUT,
-                                                        self.reset_maccready)
 
     def toggle_mute(self):
         """Toggle the FLARM mute"""

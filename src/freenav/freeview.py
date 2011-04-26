@@ -27,8 +27,10 @@ M_TO_FT = 1 / 0.3048
 MPS_TO_KTS = 3600 / 1852.0
 
 # Map scale limits (metres per pixel)
-SCALE = [6, 9, 12, 17, 25, 35, 50, 71, 100, 141, 200, 282, 400]
+SCALE = [6, 9, 12, 17, 25, 35, 50, 71, 100, 200, 400]
 DEFAULT_SCALE = SCALE[4]
+ZOOM_LABELS = ["2.5", "4", "6", "8", "12", "16", "25", "35",
+               "50", "100", "200"]
 
 # Number and size of info boxes
 NUM_INFO_BOXES = 3
@@ -50,6 +52,10 @@ FG_THRESHOLD = -3000
 
 # Maximum flarm radar range
 MAX_FLARM_RADAR = 2000.0
+
+# Input matrix
+NX_MATRIX = 3
+NY_MATRIX = 4
 
 PIXMAP_DIRS = ['.', '/usr/share/pixmaps', '../../pixmaps']
 
@@ -164,9 +170,9 @@ class FreeView(APP_BASE):
 
         # Display element states
         self.divert_flag = False
-        self.maccready_flag = False
         self.mute_flag = False
         self.flarm_radar_flag = False
+        self.matrix_flag = False
 
         # Pixmaps
         self.glider_pixbuf = find_pixbuf("free_glider.png")
@@ -250,6 +256,12 @@ class FreeView(APP_BASE):
         self.fg_layout = pango.Layout(self.drawing_area.create_pango_context())
         self.fg_layout.set_attributes(attr_list)
 
+        attr_list = pango.AttrList()
+        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 60, 0, 999))
+        attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
+        self.matrix_layout = pango.Layout(self.drawing_area.create_pango_context())
+        self.matrix_layout.set_attributes(attr_list)
+
         # Show the window
         if fullscreen:
             self.window.fullscreen()
@@ -296,6 +308,11 @@ class FreeView(APP_BASE):
         cr.fill()
         cr.set_source_rgba(1, 1, 1, 1)
 
+        if self.matrix_flag:
+            # Input button matrix
+            self.draw_matrix(cr, win_width, win_height)
+            return True
+
         if self.flarm_radar_flag:
             self.draw_flarm_radar(cr, win_width, win_height)
         else:
@@ -327,6 +344,32 @@ class FreeView(APP_BASE):
         self.draw_mute(cr, win_width)
 
         return True
+
+    def draw_matrix(self, cr, win_width, win_height):
+        """Draw user input matrix"""
+        x_inc = win_width / NX_MATRIX
+        y_inc = win_height / NY_MATRIX
+
+        # Draw grid
+        for x in range(1, NX_MATRIX):
+            cr.move_to(x * x_inc, 0)
+            cr.line_to(x * x_inc, win_height - 1)
+            cr.stroke()
+
+        for y in range(1, NY_MATRIX):
+            cr.move_to(0, y * y_inc)
+            cr.line_to(win_width - 1, y * y_inc)
+            cr.stroke()
+
+        # Draw labels
+        for n, txt in enumerate(self.matrix_labels):
+            self.matrix_layout.set_text(txt)
+            xs, ys = self.matrix_layout.get_pixel_size()
+
+            x = ((n % NX_MATRIX) * x_inc) + (x_inc / 2) - (xs / 2)
+            y = ((n / NX_MATRIX) * y_inc) + (y_inc / 2) - (ys / 2)
+            cr.move_to(x, y)
+            cr.show_layout(self.matrix_layout)
 
     def draw_flarm_radar(self, cr, win_width, win_height):
         """Display FLARM radar"""
@@ -606,7 +649,7 @@ class FreeView(APP_BASE):
         glide = self.flight.task.get_glide()
         glide_height = glide['height'] * M_TO_FT
 
-        if (glide_height < FG_THRESHOLD) and not self.maccready_flag:
+        if glide_height < FG_THRESHOLD:
             return
 
         cr.save()
@@ -646,10 +689,7 @@ class FreeView(APP_BASE):
         else:
             ete_str = "%d:%02d" % (ete_mins / 60, ete_mins % 60)
 
-        if self.maccready_flag:
-            fmt = '%d\n%s\n%.1f*'
-        else:
-            fmt = '%d\n%s\n%.1f'
+        fmt = '%d\n%s\n%.1f'
         self.fg_layout.set_text(fmt % (glide_height, ete_str,
                                        glide['maccready'] * MPS_TO_KTS))
         x, y = self.fg_layout.get_pixel_size()
@@ -727,8 +767,12 @@ class FreeView(APP_BASE):
             cr.restore()
 
     # External methods - for use by controller
-    def redraw(self):
+    def redraw(self, reload_map=False):
         """Redraw display"""
+        if reload_map:
+            width, height = self.get_view_size()
+            self.mapcache.reload(self.viewx, self.viewy, width, height)
+
         self.window.queue_draw()
 
     def update_position(self, x, y):
@@ -741,25 +785,25 @@ class FreeView(APP_BASE):
 
         self.redraw()
 
-    def zoom_out(self):
+    def set_zoom(self, level, reload_map=True):
+        """Set zoom level"""
+        if (level >= 0) and (level < len(SCALE)):
+            self.view_scale = SCALE[level]
+
+        # Big change in view, so reload the cache
+        if reload_map:
+            width, height = self.get_view_size()
+            self.mapcache.reload(self.viewx, self.viewy, width, height)
+
+    def zoom_out(self, reload_map=True):
         """See some more"""
         ind = SCALE.index(self.view_scale)
-        if ind < (len(SCALE) - 1):
-            self.view_scale = SCALE[ind + 1]
+        self.set_zoom(ind + 1, reload_map)
 
-            # Big change in view, so reload the cache
-            width, height = self.get_view_size()
-            self.mapcache.reload(self.viewx, self.viewy, width, height)
-
-    def zoom_in(self):
+    def zoom_in(self, reload_map=True):
         """See some less"""
         ind = SCALE.index(self.view_scale)
-        if ind > 0:
-            self.view_scale = SCALE[ind - 1]
-
-            # Big change in view, so reload the cache
-            width, height = self.get_view_size()
-            self.mapcache.reload(self.viewx, self.viewy, width, height)
+        self.set_zoom(ind - 1, reload_map)
 
     def show_airspace_info(self, airspace_info):
         """Show message dialog with aispace info message"""
@@ -818,11 +862,6 @@ class FreeView(APP_BASE):
         self.divert_flag = flag
         self.redraw()
 
-    def set_maccready_indicator(self, flag):
-        """Set indicator showing Maccready is active"""
-        self.maccready_flag = flag
-        self.redraw()
-
     def set_mute_indicator(self, flag):
         """Set indicator showing mute is active"""
         self.mute_flag = flag
@@ -833,27 +872,54 @@ class FreeView(APP_BASE):
         self.flarm_radar_flag = flag
         self.redraw()
 
+    def set_matrix(self, labels):
+        """Display input matrix"""
+        self.matrix_flag = True
+        self.matrix_labels = labels
+        self.redraw()
+
+    def cancel_matrix(self):
+        """Cancel input matrix display"""
+        self.matrix_flag = False
+        self.redraw()
+
     def get_button_region(self, x, y):
         """Return "button" id of drawing area"""
         win_width, win_height = self.drawing_area.window.get_size()
 
-        left = x < 75
-        right = x > (win_width - 75)
-        top = y < 100
-        bottom = y > (win_height - 100)
-        vertical_middle = abs(y - (win_height / 2)) < 50
+        if self.matrix_flag:
+            # Input matrix mode
+            mode = "matrix"
+            val = (int((float(x) / win_width) * NX_MATRIX) +
+                   int((float(y) / win_height) * NY_MATRIX) * NX_MATRIX)
 
-        if left and top:
-            region = 'divert'
-        elif left and bottom:
-            region = 'next'
-        elif right and bottom:
-            region = 'prev'
-        elif right and top:
-            region = 'user'
-        elif left and vertical_middle:
-            region = 'glide'
+            # Return None if label is blank
+            if val >= len(self.matrix_labels):
+                val = None
+
         else:
-            region = 'background'
+            # Normal display mode
+            mode = "view"
+            left = x < 75
+            right = x > (win_width - 75)
+            top = y < 100
+            bottom = y > (win_height - 100)
+            vertical_middle = abs(y - (win_height / 2)) < 50
+            horiz_middle = abs(x - (win_width / 2)) < 50
 
-        return region
+            if left and top:
+                val = 'divert'
+            elif left and bottom:
+                val = 'next'
+            elif right and bottom:
+                val = 'prev'
+            elif right and top:
+                val = 'user1'
+            elif horiz_middle and top:
+                val = 'user2'
+            elif left and vertical_middle:
+                val = 'glide'
+            else:
+                val = 'background'
+
+        return (mode, val)

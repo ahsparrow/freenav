@@ -1,3 +1,9 @@
+freenav (0.1.11-1) unstable; urgency=low
+
+  * Improved drag zoom
+
+ -- Alan Sparrow <alan@freeflight.org.uk>  Tue,  26 Apr 2011 08:00:00 +0100
+
 freenav (0.1.10-2) unstable; urgency=low
 
   * FLARM radar - bug fix to ignore turn rate
