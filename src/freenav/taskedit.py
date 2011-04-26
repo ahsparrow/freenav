@@ -156,7 +156,7 @@ class TaskApp(AppBase):
         self.window.set_title('Task')
         self.window.set_border_width(3)
         self.window.connect('destroy', gtk.main_quit)
-        self.window.connect('delete_event', self.on_quit)
+        self.window.connect('delete_event', self.on_delete)
         self.window.connect('key-press-event', self.on_keypress)
         self.window.connect('window-state-event', self.on_window_state_change)
 
@@ -231,6 +231,10 @@ class TaskApp(AppBase):
         save_button = gtk.Button('Save')
         save_button.connect('clicked', self.on_save)
 
+        # Quit
+        quit_button = gtk.Button('Quit')
+        quit_button.connect('clicked', self.on_quit)
+
         # Packing
         vbox = gtk.VBox()
         vbox.set_spacing(5)
@@ -239,6 +243,7 @@ class TaskApp(AppBase):
         vbox.pack_start(del_button, expand=False)
         vbox.pack_start(oz_button, expand=False)
         vbox.pack_start(gtk.HSeparator(), expand=False)
+        vbox.pack_end(quit_button, expand=False)
         vbox.pack_end(save_button, expand=False)
         vbox.pack_end(declare_button, expand=False)
         vbox.pack_end(combobox, expand=False)
@@ -288,15 +293,20 @@ class TaskApp(AppBase):
         """Callback on task list model change"""
         self.update_distance()
 
-    def on_quit(self, _widget, _event, _data=None):
+    def on_delete(self, _widget, _event, _data=None):
         """Callback on application quit"""
         if not self.task_saved:
-            dialog = gtk.MessageDialog(buttons=gtk.BUTTONS_YES_NO,
-                message_format='Task updated, are you sure you want to quit?',
-                type=gtk.MESSAGE_QUESTION)
-            ret = dialog.run()
-            dialog.destroy()
-            return (ret == gtk.RESPONSE_NO)
+            resp = self.confirm_quit_dialog()
+            return resp
+
+    def confirm_quit_dialog(self):
+        """Display quit confirmation dialog"""
+        dialog = gtk.MessageDialog(buttons=gtk.BUTTONS_YES_NO,
+            message_format='Task updated, are you sure you want to quit?',
+            type=gtk.MESSAGE_QUESTION)
+        ret = dialog.run()
+        dialog.destroy()
+        return (ret == gtk.RESPONSE_NO)
 
     def on_window_state_change(self, _widget, event, *_args):
         """Callback on window state change"""
@@ -342,6 +352,16 @@ class TaskApp(AppBase):
         dialog.destroy()
 
         return False
+
+    def on_quit(self, _button):
+        """Callback on quit button pressed"""
+        if not self.task_saved:
+            resp = self.confirm_quit_dialog()
+        else:
+            resp = False
+
+        if not resp:
+            self.window.destroy()
 
     def on_save(self, _button):
         """Callback on save button pressed"""
