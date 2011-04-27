@@ -79,7 +79,8 @@ class FreeControl:
                                                      "thermal_average"])
         self.task_display_type = collections.deque(["start_time",
                                                     "task_speed",
-                                                    "task_time"])
+                                                    "task_time",
+                                                    "thermal_average"])
         # Get GPS device
         dev_name = config.get('Device-Names', db.get_settings()['gps_device'])
         dev = config.get(dev_name, 'Device')
@@ -192,11 +193,14 @@ class FreeControl:
 
             elif region_val == 'user2':
                 self.matrix_mode = 'zoom'
-                self.view.set_matrix(freeview.ZOOM_LABELS)
+                ind = freeview.SCALE.index(self.view.view_scale)
+                self.view.set_matrix(freeview.ZOOM_LABELS, ind)
 
             elif region_val == 'glide':
                 self.matrix_mode = 'maccready'
-                self.view.set_matrix([str(x) for x in range(9)])
+                maccready = self.flight.task.get_glide()['maccready']
+                ind = int(round(maccready / KTS_TO_MPS))
+                self.view.set_matrix([str(x) for x in range(9)], ind)
 
             else:
                 self.display_airspace(x, y)
@@ -364,23 +368,27 @@ class FreeControl:
         """Update task info label"""
         task_state = self.flight.get_state()
         if task_state == "Task":
-            if self.task_display_type[0] == "start_time":
+            display_type = self.task_display_type[0]
+            if display_type == "start_time":
                 # Start time
                 info_str = time.strftime(
                     "%H:%M", time.localtime(self.flight.task.start_time))
 
-            elif self.task_display_type[0] == "task_speed":
+            elif display_type == "task_speed":
                 # Task speed, limited to 999kph
                 speed = self.flight.task.task_air_speed / KPH_TO_MPS
                 speed = min(speed, 999)
                 info_str = ("%.0f" % speed)
 
-            else:
+            elif display_type == "task_time":
                 # Task time, limited to 9:59
                 ete = min(self.flight.task.task_ete, 35940)
                 tim_str = time.strftime("%H:%M", time.gmtime(ete))
                 info_str = tim_str[1:]
-
+            else:
+                # Total thermal average
+                info_str = "%.1f" % (self.flight.thermal.thermal_average /
+                                     KTS_TO_MPS)
         elif task_state == "Init":
             # Initialisation countdown
             info_str = "Init-%d" % self.flight.init_count

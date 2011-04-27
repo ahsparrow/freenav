@@ -256,12 +256,6 @@ class FreeView(APP_BASE):
         self.fg_layout = pango.Layout(self.drawing_area.create_pango_context())
         self.fg_layout.set_attributes(attr_list)
 
-        attr_list = pango.AttrList()
-        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 60, 0, 999))
-        attr_list.insert(pango.AttrWeight(pango.WEIGHT_BOLD, 0, 999))
-        self.matrix_layout = pango.Layout(self.drawing_area.create_pango_context())
-        self.matrix_layout.set_attributes(attr_list)
-
         # Show the window
         if fullscreen:
             self.window.fullscreen()
@@ -365,14 +359,23 @@ class FreeView(APP_BASE):
             cr.stroke()
 
         # Draw labels
+        font_size = self.font_size * 50
+        markup_template = '<span weight="bold" size="%d" underline="%s">%s</span>'
         for n, txt in enumerate(self.matrix_labels):
-            self.matrix_layout.set_text(txt)
-            xs, ys = self.matrix_layout.get_pixel_size()
+            layout = pango.Layout(self.drawing_area.create_pango_context())
+            if n == self.matrix_selected:
+                underline = "single"
+            else:
+                underline = "none"
+
+            markup = markup_template % (font_size, underline, txt)
+            layout.set_markup(markup)
+            xs, ys = layout.get_pixel_size()
 
             x = ((n % NX_MATRIX) * x_inc) + (x_inc / 2) - (xs / 2)
             y = ((n / NX_MATRIX) * y_inc) + (y_inc / 2) - (ys / 2)
             cr.move_to(x, y)
-            cr.show_layout(self.matrix_layout)
+            cr.show_layout(layout)
 
     def draw_flarm_radar(self, cr, win_width, win_height):
         """Display FLARM radar"""
@@ -895,10 +898,11 @@ class FreeView(APP_BASE):
         self.flarm_radar_flag = flag
         self.redraw()
 
-    def set_matrix(self, labels):
+    def set_matrix(self, labels, selected=None):
         """Display input matrix"""
         self.matrix_flag = True
         self.matrix_labels = labels
+        self.matrix_selected = selected
         self.redraw()
 
     def cancel_matrix(self):
