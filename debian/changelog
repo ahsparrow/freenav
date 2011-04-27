@@ -1,3 +1,9 @@
+freenav (0.1.12-2) unstable; urgency=low
+
+  * Thermal averge display on second info label. Select indicator for matrix.
+
+ -- Alan Sparrow <alan@freeflight.org.uk>  Tue,  26 Apr 2011 14:00:00 +0100
+
 freenav (0.1.12-1) unstable; urgency=low
 
   * Track log and display
