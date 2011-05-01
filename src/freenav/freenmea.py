@@ -4,7 +4,13 @@ import bluetooth
 import gobject
 import serial
 
+import nmeaparser
+import util
+
 RF_COMM_CHANNEL = 1
+
+def make_sentence(nmea):
+    return "$" + nmea + "*" + nmeaparser.calc_checksum_str(nmea) + "\r\n"
 
 class FreeNmea(gobject.GObject):
     """Class to process data from serial or bluetooth connected GPS"""
@@ -22,6 +28,14 @@ class FreeNmea(gobject.GObject):
                            gobject.TYPE_NONE, [gobject.TYPE_PYOBJECT])
         gobject.signal_new("flarm-traffic", FreeNmea, gobject.SIGNAL_ACTION,
                            gobject.TYPE_NONE, [gobject.TYPE_PYOBJECT])
+        gobject.signal_new("flarm-command", FreeNmea, gobject.SIGNAL_ACTION,
+                           gobject.TYPE_NONE, [gobject.TYPE_PYOBJECT])
+        gobject.signal_new("flarm-declare", FreeNmea, gobject.SIGNAL_ACTION,
+                           gobject.TYPE_NONE, [gobject.TYPE_BOOLEAN])
+
+        self.connect('flarm-command', self.flac_callback)
+
+        self.nmea_dev = None
 
     def open(self, dev, baud_rate):
         """Open NMEA device"""
@@ -36,8 +50,11 @@ class FreeNmea(gobject.GObject):
         bt_sock.connect((addr, RF_COMM_CHANNEL))
 
         # Add I/O watch
-        gobject.io_add_watch(bt_sock, gobject.IO_IN, self.bt_io_callback)
+        self.io_source = gobject.io_add_watch(bt_sock, gobject.IO_IN,
+                                              self.bt_io_callback)
+
         self.nmea_dev = bt_sock
+        self.write_func = bt_sock.send
 
     def open_serial(self, dev_path, baudrate=None):
         """Open serial device"""
@@ -50,12 +67,18 @@ class FreeNmea(gobject.GObject):
         ser.flushInput()
 
         # Add I/O watch
-        gobject.io_add_watch(ser, gobject.IO_IN, self.ser_io_callback)
+        self.io_source = gobject.io_add_watch(ser, gobject.IO_IN,
+                                              self.ser_io_callback)
         self.nmea_dev = ser
+        self.write_func = ser.write
 
     def close(self):
         """Close input device"""
-        self.nmea_dev.close()
+        if self.nmea_dev:
+            gobject.source_remove(self.io_source)
+            self.nmea_dev.close()
+
+            self.nmea_dev = None
 
     def ser_io_callback(self, *_args):
         """Callback on serial input data"""
@@ -77,3 +100,31 @@ class FreeNmea(gobject.GObject):
         for signal in signals:
             self.emit(signal, self.parser)
 
+    def flac_callback(self, _source, nmea):
+        if self.nmea_declaration:
+            self.write_func(self.nmea_declaration.pop(0))
+        else:
+            # Reset FLARM and signal end of declaration
+            self.write_func(make_sentence("$PFLAR,0"))
+            self.emit('flarm-declare', True)
+
+    def declare(self, declaration):
+        """Start sending task declaration to FLARM"""
+        nmea_decl = ["PFLAC,S,NEWTASK,Task"]
+        nmea_decl.append("PFLAC,S,ADDWP,0000000N,00000000W,Takeoff")
+
+        for tp in declaration:
+            lat = ("%(deg)02d%(min)02d%(dec)03d%(ns)s" %
+                   util.dmm(tp['latitude'], 3))
+            lon = ("%(deg)03d%(min)02d%(dec)03d%(ew)s" %
+                   util.dmm(tp['longitude'], 3))
+
+            nmea_decl.append(
+                "PFLAC,S,ADDWP,%s,%s,%s" % (lat, lon, tp['id']))
+
+        nmea_decl.append("PFLAC,S,ADDWP,0000000N,00000000W,Land")
+        self.nmea_declaration = map(make_sentence, nmea_decl)
+
+        # Write first part of declaration to FLARM
+        self.write_func("\r\n")
+        self.write_func(self.nmea_declaration.pop(0))

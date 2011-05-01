@@ -86,6 +86,11 @@ class TaskListStore(gtk.ListStore):
 
         return True
 
+    def get_waypoints(self):
+        """Return list of turnpoint"""
+        wps = [self.db.get_waypoint(tp[0]['waypoint_id']) for tp in self]
+        return wps
+
     def save(self):
         """Save task to database"""
         self.update_min_dist()

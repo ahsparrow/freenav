@@ -54,22 +54,22 @@ FIX_QUALITY_DGPS = 2
 KTS_TO_MPS = 1852 / 3600.0
 FT_TO_M = 12 * 25.4 / 1000
 
-def check_checksum(data_str, checksum_str):
-    """Return True if calculated checksum matches given checksum"""
-    try:
-        checksum = int(checksum_str, 16)
-    except ValueError:
-        return False
-
-    # Checksum is XOR of all characters in the data
+def calc_checksum_str(data_str):
+    """Return two digit string checksum - XOR of all characters in the data"""
     csum = 0
     for c in data_str:
         csum = csum ^ ord(c)
 
-    if csum == checksum:
+    return "%02X" % csum
+
+def check_checksum(data_str, checksum_str):
+    """Return True if no checksum or calculated checksum matches given
+       checksum"""
+    if not checksum_str:
         return True
-    else:
-        return False
+
+    csum = calc_checksum_str(data_str)
+    return csum == checksum_str
 
 class NullHandler(logging.Handler):
     """Null handler to stop warnings when logging not configured"""
@@ -100,6 +100,7 @@ class NmeaParser:
                            'PGRMZ': self.proc_grmz,
                            'PFLAU': self.proc_flau,
                            'PFLAA': self.proc_flaa,
+                           'PFLAC': self.proc_flac,
                            'PGCS': self.proc_gcs}
 
         # Initialise variables
@@ -131,6 +132,7 @@ class NmeaParser:
         """Extract NMEA data from data buffer. Return any unparsed data"""
         # Split data buffer at first newline
         sentence, separator, remainder = buf.partition("\r\n")
+        sentence = sentence.strip()
 
         if separator:
             if sentence[0:1] == '$':
@@ -285,6 +287,11 @@ class NmeaParser:
         self.flarm_traffic[f.id] = f
 
         self.signals.add("flarm-traffic")
+
+    def proc_flac(self, fields):
+        """Process FLARM command response"""
+        # Nothing to do other than add a signal
+        self.signals.add('flarm-command')
 
     def proc_gcs(self, fields):
         """Process Volkslogger pressure altitude"""

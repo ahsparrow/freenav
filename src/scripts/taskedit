@@ -1,7 +1,18 @@
 #!/usr/bin/python2.5
 
+import ConfigParser
+import os
+
+import freenav.freedb
 import freenav.taskedit
 
 if __name__  == '__main__':
-    task_app = freenav.taskedit.TaskApp()
+    # Program configuration
+    config = ConfigParser.ConfigParser()
+    config.read(os.path.join(os.path.expanduser('~'), '.freeflight',
+                             'freenav.ini'))
+
+    db = freenav.freedb.Freedb()
+
+    task_app = freenav.taskedit.TaskApp(db, config)
     task_app.run()

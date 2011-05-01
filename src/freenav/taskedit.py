@@ -1,4 +1,5 @@
 """Task editing program"""
+import time
 
 import gtk
 import gobject
@@ -11,8 +12,10 @@ except ImportError:
     is_hildon_app = False
 
 import freenav
-import freenav.freedb
 import freenav.tasklist
+import freenav.freenmea
+import freenav.nmeaparser
+
 
 OSSO_APPLICATION = "uk.org.freeflight.taskedit"
 
@@ -136,11 +139,10 @@ SELECTION_FORMAT_STR = 8
 
 class TaskApp(AppBase):
     """Main task application class"""
-    def __init__(self):
+    def __init__(self, db, config):
         """Class initialisation"""
         AppBase.__init__(self)
-
-        self.task_db = freenav.freedb.Freedb()
+        self.task_db = db
 
         self.window_in_fullscreen = False
 
@@ -155,7 +157,7 @@ class TaskApp(AppBase):
         self.window.set_title('Task')
         self.window.set_border_width(3)
         self.window.connect('destroy', gtk.main_quit)
-        self.window.connect('delete_event', self.on_quit)
+        self.window.connect('delete_event', self.on_delete)
         self.window.connect('key-press-event', self.on_keypress)
         self.window.connect('window-state-event', self.on_window_state_change)
 
@@ -230,6 +232,10 @@ class TaskApp(AppBase):
         save_button = gtk.Button('Save')
         save_button.connect('clicked', self.on_save)
 
+        # Quit
+        quit_button = gtk.Button('Quit')
+        quit_button.connect('clicked', self.on_quit)
+
         # Packing
         vbox = gtk.VBox()
         vbox.set_spacing(5)
@@ -238,6 +244,7 @@ class TaskApp(AppBase):
         vbox.pack_start(del_button, expand=False)
         vbox.pack_start(oz_button, expand=False)
         vbox.pack_start(gtk.HSeparator(), expand=False)
+        vbox.pack_end(quit_button, expand=False)
         vbox.pack_end(save_button, expand=False)
         vbox.pack_end(declare_button, expand=False)
         vbox.pack_end(combobox, expand=False)
@@ -265,6 +272,19 @@ class TaskApp(AppBase):
         self.task_view.connect('drag-data-received',
                                self.on_drag_data_received)
 
+        # Get GPS device
+        dev_name = config.get('Device-Names', db.get_settings()['gps_device'])
+        self.nmea_dev = config.get(dev_name, 'Device')
+        if config.has_option(dev_name, 'Baud'):
+            self.nmea_baud_rate = config.getint(dev_name, 'Baud')
+        else:
+            self.nmea_baud_rate = None
+
+        # Create NMEA device (and connect signals)
+        nmea_parser = freenav.nmeaparser.NmeaParser()
+        self.nmea = freenav.freenmea.FreeNmea(nmea_parser)
+        self.nmea.connect('flarm-declare', self.declare_callback)
+
     def tp_cell(self, _col, cell, model, model_iter):
         """Task list cell data function"""
         x = model.get_value(model_iter, 0)
@@ -274,15 +294,20 @@ class TaskApp(AppBase):
         """Callback on task list model change"""
         self.update_distance()
 
-    def on_quit(self, _widget, _event, _data=None):
+    def on_delete(self, _widget, _event, _data=None):
         """Callback on application quit"""
         if not self.task_saved:
-            dialog = gtk.MessageDialog(buttons=gtk.BUTTONS_YES_NO,
-                message_format='Task updated, are you sure you want to quit?',
-                type=gtk.MESSAGE_QUESTION)
-            ret = dialog.run()
-            dialog.destroy()
-            return (ret == gtk.RESPONSE_NO)
+            resp = self.confirm_quit_dialog()
+            return resp
+
+    def confirm_quit_dialog(self):
+        """Display quit confirmation dialog"""
+        dialog = gtk.MessageDialog(buttons=gtk.BUTTONS_YES_NO,
+            message_format='Task updated, are you sure you want to quit?',
+            type=gtk.MESSAGE_QUESTION)
+        ret = dialog.run()
+        dialog.destroy()
+        return (ret == gtk.RESPONSE_NO)
 
     def on_window_state_change(self, _widget, event, *_args):
         """Callback on window state change"""
@@ -301,13 +326,46 @@ class TaskApp(AppBase):
 
     def on_declare(self, _button):
         """Callback on declare button pressed"""
-        stat = self.task_store.declare()
-        if not stat:
-            dialog = gtk.MessageDialog(
-                None, gtk.DIALOG_MODAL, gtk.MESSAGE_ERROR, gtk.BUTTONS_CLOSE,
-                "Can't write flarmcfg.txt file")
-            dialog.run()
-            dialog.destroy()
+        self.dialog = gtk.MessageDialog(None,
+                gtk.DIALOG_MODAL, message_format="Sending declaration, wait...")
+        self.dialog.show()
+
+        self.timeout_id = gobject.timeout_add(10000, self.declare_timeout)
+
+        wps = self.task_store.get_waypoints()
+        self.nmea.open(self.nmea_dev, self.nmea_baud_rate)
+        self.nmea.declare(wps)
+
+    def declare_callback(self, _source, result):
+        """Callback with declaration result"""
+        time.sleep(1)
+        self.nmea.close()
+        self.dialog.destroy()
+
+        gobject.source_remove(self.timeout_id)
+
+    def declare_timeout(self):
+        """Callback if declaration takes too long"""
+        self.nmea.close()
+        self.dialog.destroy()
+
+        # Error message
+        dialog = gtk.MessageDialog(None, gtk.DIALOG_MODAL, gtk.MESSAGE_ERROR,
+            gtk.BUTTONS_OK, "Can't send declaration - timed out")
+        dialog.run()
+        dialog.destroy()
+
+        return False
+
+    def on_quit(self, _button):
+        """Callback on quit button pressed"""
+        if not self.task_saved:
+            resp = self.confirm_quit_dialog()
+        else:
+            resp = False
+
+        if not resp:
+            self.window.destroy()
 
     def on_save(self, _button):
         """Callback on save button pressed"""
