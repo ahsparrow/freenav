@@ -171,6 +171,7 @@ class FreeView(APP_BASE):
         # Display element states
         self.divert_flag = False
         self.mute_flag = False
+        self.track_log = False
         self.flarm_radar_flag = False
         self.matrix_flag = False
 
@@ -314,7 +315,8 @@ class FreeView(APP_BASE):
             self.draw_airspace(cr, win_width, win_height)
 
             # Draw track log
-            self.draw_track_log(cr, win_width, win_height)
+            if self.track_log:
+                self.draw_track_log(cr, win_width, win_height)
 
             # Task and turnpoint sectors
             self.draw_task(cr, win_width, win_height)
@@ -359,11 +361,11 @@ class FreeView(APP_BASE):
             cr.stroke()
 
         # Draw labels
-        font_size = self.font_size * 50
+        font_size = self.font_size * 40
         markup_template = '<span weight="bold" size="%d" underline="%s">%s</span>'
         for n, txt in enumerate(self.matrix_labels):
             layout = pango.Layout(self.drawing_area.create_pango_context())
-            if n == self.matrix_selected:
+            if self.matrix_selected[n]:
                 underline = "single"
             else:
                 underline = "none"
@@ -893,12 +895,12 @@ class FreeView(APP_BASE):
         self.mute_flag = flag
         self.redraw()
 
-    def set_flarm_display(self, flag):
+    def set_flarm_radar(self, flag):
         """Set flarm radar display mode"""
         self.flarm_radar_flag = flag
         self.redraw()
 
-    def set_matrix(self, labels, selected=None):
+    def set_matrix(self, labels, selected):
         """Display input matrix"""
         self.matrix_flag = True
         self.matrix_labels = labels
@@ -927,24 +929,28 @@ class FreeView(APP_BASE):
         else:
             # Normal display mode
             mode = "view"
-            left = x < 75
-            right = x > (win_width - 75)
-            top = y < 100
-            bottom = y > (win_height - 100)
+            delta = win_width / 3
+            left = x < delta
+            right = x > (win_width - delta)
+            top = y < 75
+            bottom = y > (win_height - 75)
             vertical_middle = abs(y - (win_height / 2)) < 50
-            horiz_middle = abs(x - (win_width / 2)) < 50
 
-            if left and top:
-                val = 'divert'
-            elif left and bottom:
-                val = 'next'
-            elif right and bottom:
-                val = 'prev'
-            elif right and top:
-                val = 'user1'
-            elif horiz_middle and top:
-                val = 'user2'
-            elif left and vertical_middle:
+            if top:
+                if left:
+                    val = 'divert'
+                elif right:
+                    val = 'flarm'
+                else:
+                    val = 'zoom'
+            elif bottom:
+                if left:
+                    val = 'next'
+                elif right:
+                    val = 'prev'
+                else:
+                    val = 'menu'
+            elif vertical_middle and (x < 50):
                 val = 'glide'
             else:
                 val = 'background'

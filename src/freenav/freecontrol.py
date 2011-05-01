@@ -167,6 +167,12 @@ class FreeControl:
                     self.flight.update_maccready(region_val * KTS_TO_MPS)
                 elif self.matrix_mode == 'zoom':
                     self.view.set_zoom(region_val)
+                elif self.matrix_mode == 'menu':
+                    if region_val == 0:
+                        self.view.track_log = not self.view.track_log
+                    elif region_val == 1:
+                        self.flarm_mute = not self.flarm_mute
+                        self.view.set_mute_indicator(self.flarm_mute)
 
             self.view.cancel_matrix()
 
@@ -187,20 +193,30 @@ class FreeControl:
                 self.flight.prev_turnpoint()
                 self.view.redraw()
 
-            elif region_val == 'user1':
+            elif region_val == 'flarm':
                 self.toggle_flarm()
                 self.view.redraw()
 
-            elif region_val == 'user2':
+            elif region_val == 'zoom':
                 self.matrix_mode = 'zoom'
                 ind = freeview.SCALE.index(self.view.view_scale)
-                self.view.set_matrix(freeview.ZOOM_LABELS, ind)
+                selected = [n==ind for n in range(len(freeview.ZOOM_LABELS))]
+                self.view.set_matrix(freeview.ZOOM_LABELS, selected)
 
             elif region_val == 'glide':
                 self.matrix_mode = 'maccready'
-                maccready = self.flight.task.get_glide()['maccready']
-                ind = int(round(maccready / KTS_TO_MPS))
-                self.view.set_matrix([str(x) for x in range(9)], ind)
+                maccready = (self.flight.task.get_glide()['maccready'] /
+                             KTS_TO_MPS)
+
+                labels = [str(x) for x in range(9)]
+                selected = [maccready==int(m) for m in labels]
+                self.view.set_matrix(labels, selected)
+
+            elif region_val == 'menu':
+                self.matrix_mode = 'menu'
+                labels = ["Log", "Mute"]
+                selected = [self.view.track_log, self.flarm_mute]
+                self.view.set_matrix(labels, selected)
 
             else:
                 self.display_airspace(x, y)
@@ -432,8 +448,8 @@ class FreeControl:
 
     def toggle_flarm(self):
         """Toggle FLARM radar display"""
-        self.flarm_display = not self.flarm_display
-        self.view.set_flarm_display(self.flarm_display)
+        flarm_radar = not self.view.flarm_radar_flag
+        self.view.set_flarm_radar(flarm_radar)
 
     def display_airspace(self, x, y):
         """Display airspace info"""

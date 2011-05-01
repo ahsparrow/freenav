@@ -148,8 +148,7 @@ class NmeaGen:
         for i in range(len(data) - 1):
             checksum = checksum ^ ord(data[i + 1])
 
-        checksum = hex(checksum)[2:].upper()
-        return data + '*' + checksum + '\r\n'
+        return (data + '*' + "%02X" + '\r\n') % checksum
 
 class NmeaApp:
     def __init__(self, bt_flag, serial_dev, baud_rate, qnh, flarm_flag):

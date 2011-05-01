@@ -132,7 +132,7 @@ class NmeaParser:
         """Extract NMEA data from data buffer. Return any unparsed data"""
         # Split data buffer at first newline
         sentence, separator, remainder = buf.partition("\r\n")
-        sentence = sentence.strip()
+        sentence = sentence.lstrip()
 
         if separator:
             if sentence[0:1] == '$':
