@@ -4,9 +4,13 @@ import bluetooth
 import gobject
 import serial
 
+import nmeaparser
 import util
 
 RF_COMM_CHANNEL = 1
+
+def make_sentence(nmea):
+    return "$" + nmea + "*" + nmeaparser.calc_checksum_str(nmea) + "\r\n"
 
 class FreeNmea(gobject.GObject):
     """Class to process data from serial or bluetooth connected GPS"""
@@ -97,16 +101,17 @@ class FreeNmea(gobject.GObject):
             self.emit(signal, self.parser)
 
     def flac_callback(self, _source, nmea):
-        if self.declaration:
-            self.write_func(self.declaration.pop(0))
+        if self.nmea_declaration:
+            self.write_func(self.nmea_declaration.pop(0))
         else:
             # Reset FLARM and signal end of declaration
-            self.write_func("$PFLAR,0\r\n")
+            self.write_func(make_sentence("$PFLAR,0"))
             self.emit('flarm-declare', True)
 
     def declare(self, declaration):
         """Start sending task declaration to FLARM"""
-        self.declaration = ["$PFLAC,S,ADDWP,0000000N,00000000W,Takeoff\r\n"]
+        nmea_decl = ["PFLAC,S,NEWTASK,Task"]
+        nmea_decl.append("PFLAC,S,ADDWP,0000000N,00000000W,Takeoff")
 
         for tp in declaration:
             lat = ("%(deg)02d%(min)02d%(dec)03d%(ns)s" %
@@ -114,11 +119,12 @@ class FreeNmea(gobject.GObject):
             lon = ("%(deg)03d%(min)02d%(dec)03d%(ew)s" %
                    util.dmm(tp['longitude'], 3))
 
-            self.declaration.append(
-                "$PFLAC,S,ADDWP,%s,%s,%s\r\n" % (lat, lon, tp['id']))
+            nmea_decl.append(
+                "PFLAC,S,ADDWP,%s,%s,%s" % (lat, lon, tp['id']))
 
-        self.declaration.append("$PFLAC,S,ADDWP,0000000N,00000000W,Land\r\n")
+        nmea_decl.append("PFLAC,S,ADDWP,0000000N,00000000W,Land")
+        self.nmea_declaration = map(make_sentence, nmea_decl)
 
         # Write first part of declaration to FLARM
-        self.write_func("$PFLAC,S,NEWTASK,Task\r\n")
-
+        self.write_func("\r\n")
+        self.write_func(self.nmea_declaration.pop(0))

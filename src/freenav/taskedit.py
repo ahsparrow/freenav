@@ -1,4 +1,5 @@
 """Task editing program"""
+import time
 
 import gtk
 import gobject
@@ -329,7 +330,7 @@ class TaskApp(AppBase):
                 gtk.DIALOG_MODAL, message_format="Sending declaration, wait...")
         self.dialog.show()
 
-        self.timeout_id = gobject.timeout_add(5000, self.declare_timeout)
+        self.timeout_id = gobject.timeout_add(10000, self.declare_timeout)
 
         wps = self.task_store.get_waypoints()
         self.nmea.open(self.nmea_dev, self.nmea_baud_rate)
@@ -337,8 +338,11 @@ class TaskApp(AppBase):
 
     def declare_callback(self, _source, result):
         """Callback with declaration result"""
+        time.sleep(1)
         self.nmea.close()
         self.dialog.destroy()
+
+        gobject.source_remove(self.timeout_id)
 
     def declare_timeout(self):
         """Callback if declaration takes too long"""
