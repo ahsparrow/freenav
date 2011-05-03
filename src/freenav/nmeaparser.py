@@ -100,7 +100,6 @@ class NmeaParser:
                            'PGRMZ': self.proc_grmz,
                            'PFLAU': self.proc_flau,
                            'PFLAA': self.proc_flaa,
-                           'PFLAC': self.proc_flac,
                            'PGCS': self.proc_gcs}
 
         # Initialise variables
@@ -287,11 +286,6 @@ class NmeaParser:
         self.flarm_traffic[f.id] = f
 
         self.signals.add("flarm-traffic")
-
-    def proc_flac(self, fields):
-        """Process FLARM command response"""
-        # Nothing to do other than add a signal
-        self.signals.add('flarm-command')
 
     def proc_gcs(self, fields):
         """Process Volkslogger pressure altitude"""

@@ -1,6 +1,7 @@
 """This module provides the backing store for the task list in freetask"""
 
 import math
+import os.path
 
 import gobject
 import gtk
@@ -64,10 +65,11 @@ class TaskListStore(gtk.ListStore):
             self.append([tp])
         self.emit("task_changed")
 
-    def declare(self):
+    def declare(self, dir):
         """Save FLARM declaration to flarmcfg.txt"""
         try:
-            f = open('/media/mmc1/flarmcfg.txt', 'w')
+            filename = os.path.join(dir, 'flarmcfg.txt')
+            f = open(filename, 'w')
             f.write("$PFLAC,S,NEWTASK,My Task\n")
             f.write("$PFLAC,S,ADDWP,0000000N,00000000W,Takeoff\n")
 

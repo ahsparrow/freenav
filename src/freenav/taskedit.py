@@ -143,6 +143,7 @@ class TaskApp(AppBase):
         """Class initialisation"""
         AppBase.__init__(self)
         self.task_db = db
+        self.config = config
 
         self.window_in_fullscreen = False
 
@@ -272,19 +273,6 @@ class TaskApp(AppBase):
         self.task_view.connect('drag-data-received',
                                self.on_drag_data_received)
 
-        # Get GPS device
-        dev_name = config.get('Device-Names', db.get_settings()['gps_device'])
-        self.nmea_dev = config.get(dev_name, 'Device')
-        if config.has_option(dev_name, 'Baud'):
-            self.nmea_baud_rate = config.getint(dev_name, 'Baud')
-        else:
-            self.nmea_baud_rate = None
-
-        # Create NMEA device (and connect signals)
-        nmea_parser = freenav.nmeaparser.NmeaParser()
-        self.nmea = freenav.freenmea.FreeNmea(nmea_parser)
-        self.nmea.connect('flarm-declare', self.declare_callback)
-
     def tp_cell(self, _col, cell, model, model_iter):
         """Task list cell data function"""
         x = model.get_value(model_iter, 0)
@@ -326,36 +314,14 @@ class TaskApp(AppBase):
 
     def on_declare(self, _button):
         """Callback on declare button pressed"""
-        self.dialog = gtk.MessageDialog(None,
-                gtk.DIALOG_MODAL, message_format="Sending declaration, wait...")
-        self.dialog.show()
-
-        self.timeout_id = gobject.timeout_add(10000, self.declare_timeout)
-
-        wps = self.task_store.get_waypoints()
-        self.nmea.open(self.nmea_dev, self.nmea_baud_rate)
-        self.nmea.declare(wps)
-
-    def declare_callback(self, _source, result):
-        """Callback with declaration result"""
-        time.sleep(1)
-        self.nmea.close()
-        self.dialog.destroy()
-
-        gobject.source_remove(self.timeout_id)
-
-    def declare_timeout(self):
-        """Callback if declaration takes too long"""
-        self.nmea.close()
-        self.dialog.destroy()
-
-        # Error message
-        dialog = gtk.MessageDialog(None, gtk.DIALOG_MODAL, gtk.MESSAGE_ERROR,
-            gtk.BUTTONS_OK, "Can't send declaration - timed out")
-        dialog.run()
-        dialog.destroy()
-
-        return False
+        declaration_dir = self.config.get('Declaration', 'Directory')
+        stat = self.task_store.declare(declaration_dir)
+        if not stat:
+            dialog = gtk.MessageDialog(
+                None, gtk.DIALOG_MODAL, gtk.MESSAGE_ERROR, gtk.BUTTONS_CLOSE,
+                "Can't write flarmcfg.txt file")
+            dialog.run()
+            dialog.destroy()
 
     def on_quit(self, _button):
         """Callback on quit button pressed"""

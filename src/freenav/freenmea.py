@@ -28,12 +28,6 @@ class FreeNmea(gobject.GObject):
                            gobject.TYPE_NONE, [gobject.TYPE_PYOBJECT])
         gobject.signal_new("flarm-traffic", FreeNmea, gobject.SIGNAL_ACTION,
                            gobject.TYPE_NONE, [gobject.TYPE_PYOBJECT])
-        gobject.signal_new("flarm-command", FreeNmea, gobject.SIGNAL_ACTION,
-                           gobject.TYPE_NONE, [gobject.TYPE_PYOBJECT])
-        gobject.signal_new("flarm-declare", FreeNmea, gobject.SIGNAL_ACTION,
-                           gobject.TYPE_NONE, [gobject.TYPE_BOOLEAN])
-
-        self.connect('flarm-command', self.flac_callback)
 
         self.nmea_dev = None
 
@@ -99,14 +93,6 @@ class FreeNmea(gobject.GObject):
         signals = self.parser.parse(data)
         for signal in signals:
             self.emit(signal, self.parser)
-
-    def flac_callback(self, _source, nmea):
-        if self.nmea_declaration:
-            self.write_func(self.nmea_declaration.pop(0))
-        else:
-            # Reset FLARM and signal end of declaration
-            self.write_func(make_sentence("$PFLAR,0"))
-            self.emit('flarm-declare', True)
 
     def declare(self, declaration):
         """Start sending task declaration to FLARM"""
