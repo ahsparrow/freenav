@@ -117,6 +117,12 @@ class NmeaParser:
         self.rmc_time = 0
         self.gga_time = 0
 
+        self.expect_str = None
+
+    def expect(self, expect_str, expect_cb):
+        self.expect_str = expect_str
+        self.expect_cb = expect_cb
+
     def parse(self, data):
         """Parse NMEA data. Return list of signals"""
         # Prepend new data to old
@@ -132,7 +138,11 @@ class NmeaParser:
         """Extract NMEA data from data buffer. Return any unparsed data"""
         # Split data buffer at first newline
         sentence, separator, remainder = buf.partition("\r\n")
-        sentence = sentence.strip()
+
+        # Expect callback on arbitrary pattern match
+        if self.expect_str and (self.expect_str in sentence):
+            self.expect_str = None
+            self.expect_cb()
 
         if separator:
             if sentence[0:1] == '$':
@@ -143,7 +153,10 @@ class NmeaParser:
                     self.logger.debug(sentence)
                     # Split body into comma separated fields and process
                     fields = body.split(',')
-                    self.proc_funcs.get(fields[0], self.proc_unknown)(fields)
+                    try:
+                        self.proc_funcs.get(fields[0], self.proc_unknown)(fields)
+                    except IndexError:
+                        self.logger.warning("Malformed sentence: " + sentence)
                 else:
                     self.logger.warning("Checksum error: " + sentence)
             else:

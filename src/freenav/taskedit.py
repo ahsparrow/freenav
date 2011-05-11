@@ -327,8 +327,15 @@ class TaskApp(AppBase):
     def on_declare(self, _button):
         """Callback on declare button pressed"""
         self.dialog = gtk.MessageDialog(None,
-                gtk.DIALOG_MODAL, message_format="Sending declaration, wait...")
+                message_format="Sending declaration, wait...")
         self.dialog.show()
+
+        # It's a complete mystery why this sleep is needed
+        time.sleep(0.1)
+
+        # Paint message dialog (won't work without previous sleep)
+        while gtk.events_pending():
+            gtk.main_iteration()
 
         self.timeout_id = gobject.timeout_add(10000, self.declare_timeout)
 
@@ -338,7 +345,6 @@ class TaskApp(AppBase):
 
     def declare_callback(self, _source, result):
         """Callback with declaration result"""
-        time.sleep(1)
         self.nmea.close()
         self.dialog.destroy()
 

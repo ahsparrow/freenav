@@ -9,8 +9,10 @@ import util
 
 RF_COMM_CHANNEL = 1
 
-def make_sentence(nmea):
-    return "$" + nmea + "*" + nmeaparser.calc_checksum_str(nmea) + "\r\n"
+def make_decl_expect(nmea):
+    decl =  "$" + nmea + "*" + nmeaparser.calc_checksum_str(nmea) + "\r\n"
+    expect = nmea.replace(",S,", ",A,")
+    return (decl, expect)
 
 class FreeNmea(gobject.GObject):
     """Class to process data from serial or bluetooth connected GPS"""
@@ -32,8 +34,6 @@ class FreeNmea(gobject.GObject):
                            gobject.TYPE_NONE, [gobject.TYPE_PYOBJECT])
         gobject.signal_new("flarm-declare", FreeNmea, gobject.SIGNAL_ACTION,
                            gobject.TYPE_NONE, [gobject.TYPE_BOOLEAN])
-
-        self.connect('flarm-command', self.flac_callback)
 
         self.nmea_dev = None
 
@@ -100,12 +100,14 @@ class FreeNmea(gobject.GObject):
         for signal in signals:
             self.emit(signal, self.parser)
 
-    def flac_callback(self, _source, nmea):
+    def flac_callback(self):
         if self.nmea_declaration:
-            self.write_func(self.nmea_declaration.pop(0))
+            decl, expect = self.nmea_declaration.pop(0)
+            self.parser.expect(expect, self.flac_callback)
+            self.write_func(decl)
         else:
             # Reset FLARM and signal end of declaration
-            self.write_func(make_sentence("$PFLAR,0"))
+            self.write_func("$PFLAR,0\r\n")
             self.emit('flarm-declare', True)
 
     def declare(self, declaration):
@@ -123,8 +125,10 @@ class FreeNmea(gobject.GObject):
                 "PFLAC,S,ADDWP,%s,%s,%s" % (lat, lon, tp['id']))
 
         nmea_decl.append("PFLAC,S,ADDWP,0000000N,00000000W,Land")
-        self.nmea_declaration = map(make_sentence, nmea_decl)
+        self.nmea_declaration = map(make_decl_expect, nmea_decl)
 
         # Write first part of declaration to FLARM
         self.write_func("\r\n")
-        self.write_func(self.nmea_declaration.pop(0))
+        decl, expect = self.nmea_declaration.pop(0)
+        self.parser.expect(expect, self.flac_callback)
+        self.write_func(decl)
