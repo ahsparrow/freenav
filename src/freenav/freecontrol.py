@@ -34,6 +34,8 @@ INFO_LEVEL = 0
 INFO_TASK = 1
 INFO_TIME = 2
 
+MENU_LABELS = ["Log", "Mute"] + [""] * (freeview.MATRIX_SIZE - 3) + ["Quit"]
+
 class FreeControl:
     """Controller class for freenav program"""
     def __init__(self, flight_model, view, db, config):
@@ -168,11 +170,16 @@ class FreeControl:
                 elif self.matrix_mode == 'zoom':
                     self.view.set_zoom(region_val)
                 elif self.matrix_mode == 'menu':
-                    if region_val == 0:
+                    if MENU_LABELS[region_val] == "Log":
                         self.view.track_log = not self.view.track_log
-                    elif region_val == 1:
+                    elif MENU_LABELS[region_val] == "Mute":
                         self.flarm_mute = not self.flarm_mute
                         self.view.set_mute_indicator(self.flarm_mute)
+                    elif MENU_LABELS[region_val] == "Quit":
+                        response = self.view.confirm_dialog("Quit?")
+                        if response != gtk.RESPONSE_NO:
+                            self.view.window.destroy()
+
 
             self.view.cancel_matrix()
 
@@ -214,9 +221,10 @@ class FreeControl:
 
             elif region_val == 'menu':
                 self.matrix_mode = 'menu'
-                labels = ["Log", "Mute"]
-                selected = [self.view.track_log, self.flarm_mute]
-                self.view.set_matrix(labels, selected)
+                selected = [False] * freeview.MATRIX_SIZE
+                selected[MENU_LABELS.index("Log")] = self.view.track_log
+                selected[MENU_LABELS.index("Mute")] = self.flarm_mute
+                self.view.set_matrix(MENU_LABELS, selected)
 
             else:
                 self.display_airspace(x, y)
@@ -317,7 +325,7 @@ class FreeControl:
             # Send SMS position messages
             if self.sms:
                 self.sound.play("sms-beep")
-                response = self.view.landing_dialog()
+                response = self.view.confirm_dialog("Send SMS?")
                 if response != gtk.RESPONSE_NO:
                     self.send_sms()
 
@@ -335,7 +343,7 @@ class FreeControl:
             self.flight.trigger_start()
 
         elif task_state in ("Start", "Sector", "Task"):
-            stat = self.view.task_start_dialog()
+            stat = self.view.confirm_dialog("Start?")
             if stat == gtk.RESPONSE_YES:
                 self.flight.trigger_start()
 

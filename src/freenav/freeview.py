@@ -56,6 +56,7 @@ MAX_FLARM_RADAR = 2000.0
 # Input matrix
 NX_MATRIX = 3
 NY_MATRIX = 4
+MATRIX_SIZE = NX_MATRIX * NY_MATRIX
 
 PIXMAP_DIRS = ['.', '/usr/share/pixmaps', '../../pixmaps']
 
@@ -854,22 +855,7 @@ class FreeView(APP_BASE):
             dialog.run(label)
             dialog.destroy()
 
-    def task_start_dialog(self):
-        """ Puts up a dialog to ask whether or not task to be started"""
-        dialog = BigButtonDialog("Start", (gtk.STOCK_YES, gtk.RESPONSE_YES,
-                                           gtk.STOCK_NO, gtk.RESPONSE_NO))
-        attr_list = pango.AttrList()
-        attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 40, 0, 999))
-
-        label = gtk.Label("Start?")
-        label.set_attributes(attr_list)
-
-        result = dialog.run(label)
-        dialog.destroy()
-
-        return result
-
-    def landing_dialog(self):
+    def confirm_dialog(self, question):
         """Puts up a dialog box to ask whether to send an SMS"""
         dialog = BigButtonDialog("SMS", (gtk.STOCK_YES, gtk.RESPONSE_YES,
                                          gtk.STOCK_NO, gtk.RESPONSE_NO),
@@ -877,7 +863,7 @@ class FreeView(APP_BASE):
         attr_list = pango.AttrList()
         attr_list.insert(pango.AttrSizeAbsolute(self.font_size * 40, 0, 999))
 
-        label = gtk.Label("Send SMS?")
+        label = gtk.Label(question)
         label.set_attributes(attr_list)
 
         result = dialog.run(label)
