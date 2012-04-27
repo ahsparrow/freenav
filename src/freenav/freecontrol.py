@@ -325,7 +325,7 @@ class FreeControl:
             # Send SMS position messages
             if self.sms:
                 self.sound.play("sms-beep")
-                response = self.view.confirm_dialog("Send SMS?")
+                response = self.view.confirm_dialog("Send SMS?", "SMS")
                 if response != gtk.RESPONSE_NO:
                     self.send_sms()
 
@@ -343,7 +343,7 @@ class FreeControl:
             self.flight.trigger_start()
 
         elif task_state in ("Start", "Sector", "Task"):
-            stat = self.view.confirm_dialog("Start?")
+            stat = self.view.confirm_dialog("Start?", "Task")
             if stat == gtk.RESPONSE_YES:
                 self.flight.trigger_start()
 

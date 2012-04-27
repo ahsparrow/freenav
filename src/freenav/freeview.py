@@ -855,9 +855,9 @@ class FreeView(APP_BASE):
             dialog.run(label)
             dialog.destroy()
 
-    def confirm_dialog(self, question):
+    def confirm_dialog(self, question, title="Freenav"):
         """Puts up a dialog box to ask whether to send an SMS"""
-        dialog = BigButtonDialog("SMS", (gtk.STOCK_YES, gtk.RESPONSE_YES,
+        dialog = BigButtonDialog(title, (gtk.STOCK_YES, gtk.RESPONSE_YES,
                                          gtk.STOCK_NO, gtk.RESPONSE_NO),
                                          timeout=LANDING_TIMEOUT)
         attr_list = pango.AttrList()
