@@ -19,6 +19,14 @@ BUILDING THE DATABASE
      ipaq> rm .freeflight/free.gz
      ipaq> zcat free.gz | sqlite3 .freeflight/free.db
 
-Generate Debian package:
-    Login to Scratchbox...
-    [ .../freenav-0.0.1] > dpkg-buildpackage -rfakeroot
+INSTALLING THE PROGRAM
+----------------------
+
+1. python setup.py sdist
+2. scp dist/freenav-*.tar.gz user@gary:
+3. On gary...
+   tar xzf freenav-*.tar.gz
+   cd freenav-*
+   sudo python setup.py install
+
+
