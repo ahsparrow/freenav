@@ -1,7 +1,7 @@
 from distutils.core import setup
 
 setup(name='freenav',
-      version='0.1.15',
+      version='0.1.16',
       description='FreeNav task and navigation programs',
       url='http://www.freeflight.org.uk/',
       author='Alan Sparrow',
