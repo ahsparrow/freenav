@@ -22,6 +22,8 @@ BUILDING THE DATABASE
 INSTALLING THE PROGRAM
 ----------------------
 
+0. Update version number in setup.py & src/freenav/__init__.py
+
 1. python setup.py sdist
 2. scp dist/freenav-*.tar.gz user@gary:
 3. On gary...
