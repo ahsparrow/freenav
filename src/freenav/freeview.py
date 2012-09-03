@@ -938,17 +938,19 @@ class FreeView(APP_BASE):
                 elif right:
                     val = 'flarm'
                 else:
-                    val = 'zoom'
+                    val = 'menu'
             elif bottom:
                 if left:
                     val = 'next'
                 elif right:
                     val = 'prev'
                 else:
-                    val = 'menu'
+                    val = 'zoom_out'
             elif vertical_middle:
                 if x < 50:
                     val = 'glide'
+                elif x > (win_width - 50):
+                    val = 'zoom'
                 else:
                     val = 'select'
             elif y < (win_height / 2):
