@@ -29,6 +29,7 @@ KPH_TO_MPS = 1000 / 3600.0
 FT_TO_M = 0.3048
 
 DIVERT_TIMEOUT = 5000
+INFO_TIMEOUT = 3000
 
 INFO_LEVEL = 0
 INFO_TASK = 1
@@ -75,6 +76,7 @@ class FreeControl:
 
         # Controller state variables
         self.divert_indicator_flag = False
+        self.info_flag = False
         self.level_display_type = collections.deque(["flight_level",
                                                      "height",
                                                      "altitude",
@@ -187,6 +189,9 @@ class FreeControl:
             if self.divert_indicator_flag:
                 self.divert(x, y)
 
+            elif self.info_flag:
+                self.show_info(x, y)
+
             elif region_val == 'divert':
                 if self.flight.get_state() in ('Task', 'Divert'):
                     self.start_divert()
@@ -226,8 +231,17 @@ class FreeControl:
                 selected[MENU_LABELS.index("Mute")] = self.flarm_mute
                 self.view.set_matrix(MENU_LABELS, selected)
 
+            elif region_val == 'zoom_in':
+                self.view.zoom_in()
+                self.view.redraw()
+
+            elif region_val == 'zoom_out':
+                self.view.zoom_out()
+                self.view.redraw()
+
             else:
-                self.display_airspace(x, y)
+                self.start_info()
+                self.view.redraw()
 
         return True
 
@@ -447,6 +461,26 @@ class FreeControl:
         """Reset divert indicator"""
         self.divert_indicator_flag = False
         self.view.set_divert_indicator(False)
+        return False
+
+    def show_info(self, x, y):
+        """Show info at given position"""
+        self.reset_info()
+        gobject.source_remove(self.info_timeout_id)
+
+        self.display_airspace(x, y)
+
+    def start_info(self):
+        """Set info indicator and start timeout"""
+        self.info_flag = True
+        self.view.set_info_indicator(True)
+        self.info_timeout_id = gobject.timeout_add(INFO_TIMEOUT,
+                                                   self.reset_info)
+
+    def reset_info(self):
+        """Reset info indicator"""
+        self.info_flag = False
+        self.view.set_info_indicator(False)
         return False
 
     def toggle_mute(self):

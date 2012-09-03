@@ -172,6 +172,7 @@ class FreeView(APP_BASE):
         # Display element states
         self.divert_flag = False
         self.mute_flag = False
+        self.info_flag = False
         self.track_log = False
         self.flarm_radar_flag = False
         self.matrix_flag = False
@@ -315,15 +316,19 @@ class FreeView(APP_BASE):
             # Airspace
             self.draw_airspace(cr, win_width, win_height)
 
+            # Waypoints
+            self.draw_waypoints(cr)
+
+            # Stop drawing if info mode is set
+            if self.info_flag:
+                return True
+
             # Draw track log
             if self.track_log:
                 self.draw_track_log(cr, win_width, win_height)
 
             # Task and turnpoint sectors
             self.draw_task(cr, win_width, win_height)
-
-            # Waypoints
-            self.draw_waypoints(cr)
 
             # Heading symbol
             self.draw_heading(cr, win_height, win_width)
@@ -469,7 +474,7 @@ class FreeView(APP_BASE):
             cr.line_to(*p)
 
         cr.restore()
-        cr.set_line_width(1)
+        cr.set_line_width(2)
         cr.stroke()
 
     def draw_waypoints(self, cr):
@@ -881,6 +886,11 @@ class FreeView(APP_BASE):
         self.mute_flag = flag
         self.redraw()
 
+    def set_info_indicator(self, flag):
+        """Set indicator showing info mode is active"""
+        self.info_flag = flag
+        self.redraw()
+
     def set_flarm_radar(self, flag):
         """Set flarm radar display mode"""
         self.flarm_radar_flag = flag
@@ -936,9 +946,14 @@ class FreeView(APP_BASE):
                     val = 'prev'
                 else:
                     val = 'menu'
-            elif vertical_middle and (x < 50):
-                val = 'glide'
+            elif vertical_middle:
+                if x < 50:
+                    val = 'glide'
+                else:
+                    val = 'select'
+            elif y < (win_height / 2):
+                val = 'zoom_in'
             else:
-                val = 'background'
+                val = 'zoom_out'
 
         return (mode, val)
