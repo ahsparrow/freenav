@@ -44,7 +44,7 @@ FG_WIDTH = 30
 FG_INC = 15
 
 # Time to display airspace info
-AIRSPACE_TIMEOUT = 10000
+AIRSPACE_TIMEOUT = 20000
 LANDING_TIMEOUT = 10000
 
 # Threshold (in feet) to display final glide indicator
@@ -951,8 +951,10 @@ class FreeView(APP_BASE):
                     val = 'glide'
                 elif x > (win_width - 50):
                     val = 'zoom'
-                else:
+                elif abs(x - (win_width / 2)) < 25:
                     val = 'select'
+                else:
+                    val = None
             elif y < (win_height / 2):
                 val = 'zoom_in'
             else:

@@ -37,6 +37,13 @@ INFO_TIME = 2
 
 MENU_LABELS = ["Log", "Mute"] + [""] * (freeview.MATRIX_SIZE - 3) + ["Quit"]
 
+def format_latlon(lat, lon):
+    lat_str = "%(deg)02d %(min)02d.%(dec)03d%(ns)s" % \
+            freenav.util.dmm(lat, 3)
+    lon_str = "%(deg)03d %(min)02d.%(dec)03d%(ew)s" % \
+            freenav.util.dmm(lon, 3)
+    return lat_str, lon_str
+
 class FreeControl:
     """Controller class for freenav program"""
     def __init__(self, flight_model, view, db, config):
@@ -190,7 +197,7 @@ class FreeControl:
                 self.divert(x, y)
 
             elif self.info_flag:
-                self.show_info(x, y)
+                self.show_info(x, y, region_val)
 
             elif region_val == 'divert':
                 if self.flight.get_state() in ('Task', 'Divert'):
@@ -463,12 +470,19 @@ class FreeControl:
         self.view.set_divert_indicator(False)
         return False
 
-    def show_info(self, x, y):
+    def show_info(self, x, y, region_val):
         """Show info at given position"""
         self.reset_info()
         gobject.source_remove(self.info_timeout_id)
 
-        self.display_airspace(x, y)
+        if region_val == 'select':
+            lat, lon = self.flight.get_latlon()
+            lat_str, lon_str = format_latlon(lat, lon)
+            extra_info = ("POSITION", lat_str, lon_str)
+        else:
+            extra_info = None
+
+        self.display_airspace(x, y, extra_info)
 
     def start_info(self):
         """Set info indicator and start timeout"""
@@ -493,9 +507,12 @@ class FreeControl:
         flarm_radar = not self.view.flarm_radar_flag
         self.view.set_flarm_radar(flarm_radar)
 
-    def display_airspace(self, x, y):
+    def display_airspace(self, x, y, extra_info):
         """Display airspace info"""
         info = self.view.mapcache.get_airspace_info(x, y)
+        if extra_info:
+            info.append(extra_info)
+
         self.view.show_airspace_info(info)
 
     def send_sms(self):
@@ -505,10 +522,7 @@ class FreeControl:
 
         # Create SMS message body
         tim_str = time.strftime("%H:%M", time.localtime(tim))
-        lat_str = "%(deg)02d %(min)02d.%(dec)03d%(ns)s" % \
-                freenav.util.dmm(lat, 3)
-        lon_str = "%(deg)03d %(min)02d.%(dec)03d%(ew)s" % \
-                freenav.util.dmm(lon, 3)
+        lat_str, lon_str = format_latlon(lat, lon)
         msg = "LANDED %s %s %s" % (tim_str, lat_str, lon_str)
 
         self.sms.send_all(msg)
