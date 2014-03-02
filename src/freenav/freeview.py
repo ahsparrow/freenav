@@ -176,6 +176,7 @@ class FreeView(APP_BASE):
         self.track_log = False
         self.flarm_radar_flag = False
         self.matrix_flag = False
+        self.wp_display_flag = True
 
         # Pixmaps
         self.glider_pixbuf = find_pixbuf("free_glider.png")
@@ -485,7 +486,7 @@ class FreeView(APP_BASE):
             wps = self.flight.db.get_landable_list()
         else:
             fill = False
-            if self.view_scale > 71:
+            if self.view_scale > 71 or not self.wp_display_flag:
                 # Task waypoints
                 tps = [tp['id'] for tp in self.flight.task.tp_list]
                 wps = filter(lambda x: x['id'] in tps, self.mapcache.wps)
@@ -884,6 +885,11 @@ class FreeView(APP_BASE):
     def set_mute_indicator(self, flag):
         """Set indicator showing mute is active"""
         self.mute_flag = flag
+        self.redraw()
+
+    def set_wp_display(self, flag):
+        """Set waypoints visible"""
+        self.wp_display_flag = flag
         self.redraw()
 
     def set_info_indicator(self, flag):

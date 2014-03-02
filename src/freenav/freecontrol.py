@@ -35,7 +35,8 @@ INFO_LEVEL = 0
 INFO_TASK = 1
 INFO_TIME = 2
 
-MENU_LABELS = ["Log", "Mute"] + [""] * (freeview.MATRIX_SIZE - 3) + ["Quit"]
+MENU_LABELS = ["Log", "Mute", "WP"] + [""] * (freeview.MATRIX_SIZE - 4) +\
+              ["Quit"]
 
 def format_latlon(lat, lon):
     lat_str = "%(deg)02d %(min)02d.%(dec)03d%(ns)s" % \
@@ -80,6 +81,10 @@ class FreeControl:
         # FLARM radar display control
         self.flarm_display = False
         self.flarm_detections = {}
+
+        # WP name display control
+        self.wp_display = True
+        self.view.set_wp_display(self.wp_display)
 
         # Controller state variables
         self.divert_indicator_flag = False
@@ -184,6 +189,9 @@ class FreeControl:
                     elif MENU_LABELS[region_val] == "Mute":
                         self.flarm_mute = not self.flarm_mute
                         self.view.set_mute_indicator(self.flarm_mute)
+                    elif MENU_LABELS[region_val] == "WP":
+                        self.wp_display = not self.wp_display
+                        self.view.set_wp_display(self.wp_display)
                     elif MENU_LABELS[region_val] == "Quit":
                         response = self.view.confirm_dialog("Quit?")
                         if response != gtk.RESPONSE_NO:
@@ -236,6 +244,7 @@ class FreeControl:
                 selected = [False] * freeview.MATRIX_SIZE
                 selected[MENU_LABELS.index("Log")] = self.view.track_log
                 selected[MENU_LABELS.index("Mute")] = self.flarm_mute
+                selected[MENU_LABELS.index("WP")] = self.wp_display
                 self.view.set_matrix(MENU_LABELS, selected)
 
             elif region_val == 'zoom_in':
