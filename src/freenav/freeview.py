@@ -480,10 +480,13 @@ class FreeView(APP_BASE):
 
     def draw_waypoints(self, cr):
         """Draw waypoints"""
-        if self.divert_flag or self.flight.get_state() == 'Divert':
+        if self.divert_flag:
             # Landable waypoints
             fill = True
             wps = self.flight.db.get_landable_list()
+        elif self.flight.get_state() == 'Divert':
+            fill =True
+            wps  = [self.flight.task.divert_wp]
         else:
             fill = False
             if self.view_scale > 71 or not self.wp_display_flag:
@@ -552,6 +555,9 @@ class FreeView(APP_BASE):
 
     def draw_task(self, cr, win_width, win_height):
         """Draw task and turnpoint sectors"""
+        if self.flight.get_state() == 'Divert':
+            return
+
         task_points = [(tp['mindistx'], tp['mindisty'])
                        for tp in self.flight.task.tp_list]
 

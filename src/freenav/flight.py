@@ -123,14 +123,6 @@ class Flight:
         """Update model with new Maccready parameters"""
         self.task.set_maccready(maccready)
 
-    def incr_maccready(self, incr):
-        """Increment the Maccready setting"""
-        self.task.increment_maccready(incr)
-
-    def decr_maccready(self, decr):
-        """Decrement the Maccready setting"""
-        self.task.decrement_maccready(decr)
-
     def update_pressure_level(self, level):
         """Update model with new pressure level data"""
         self.pressure_alt.update_pressure_level(level)

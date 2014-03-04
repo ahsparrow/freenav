@@ -58,6 +58,9 @@ class Task:
         self.task_ete = 0
         self.task_calc_time = 0
 
+        # Glide calculation mode
+        self.glide_mode = "Task"
+
     #------------------------------------------------------------------------
     # State change-y stuff
 
@@ -132,16 +135,8 @@ class Task:
 
         self.calculate_tp_glides()
 
-    def increment_maccready(self, incr):
-        """Increment Maccready setting"""
-        self.set_maccready(self.maccready + incr)
-
-    def decrement_maccready(self, decr):
-        """Decrement Maccready setting"""
-        maccready = self.maccready - decr
-        if maccready < 0.1:
-            maccready = 0
-        self.set_maccready(maccready)
+    def set_glide_mode(self, mode):
+        self.glide_mode = mode
 
     #------------------------------------------------------------------------
     # Access methods
@@ -208,7 +203,11 @@ class Task:
             tp_index = self.tp_index + 1
 
         # Calculate glide around rest of the task
-        self.calculate_glide_to_finish(x, y, altitude, self.tp_list[tp_index:])
+        if self.glide_mode == 'TP':
+            self.calculate_glide_to_tp(x, y, altitude, self.tp_list[tp_index])
+        else:
+            self.calculate_glide_to_finish(x, y, altitude,
+                                           self.tp_list[tp_index:])
 
         # Calculate speed on current leg and time to complete task
         if self.start_time and (tim - self.task_calc_time) >= 30:
@@ -233,7 +232,7 @@ class Task:
         self.tp_distance = dist
         self.tp_bearing = bearing
 
-        self.calculate_glide_to_finish(x, y, altitude, [self.divert_wp])
+        self.calculate_glide_to_tp(x, y, altitude, self.divert_wp)
 
     #-------------------------------------------------------------------------
     # Internal stuff
@@ -283,6 +282,21 @@ class Task:
                 (self.glide_arrival_height - self.safety_height) / height_loss)
         else:
             self.glide_ete = 0
+            self.glide_arrival_height = 0
+            self.glide_margin = 0
+
+    def calculate_glide_to_tp(self, x, y, altitude, tp):
+        """Calculate direct glide to turnpoint"""
+        if (self.vmac > self.wind_speed):
+            tpx, tpy = tp_minxy(tp)
+            height_loss, tim = self.calculate_glide(x, y, tpx, tpy)
+
+            self.glide_ete = tim
+            self.glide_arrival_height = altitude - height_loss - tp['altitude']
+            self.glide_margin = (
+                (self.glide_arrival_height - self.safety_height) / height_loss)
+        else:
+            self.glide_ete = tim
             self.glide_arrival_height = 0
             self.glide_margin = 0
 

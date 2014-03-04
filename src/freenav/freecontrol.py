@@ -35,8 +35,8 @@ INFO_LEVEL = 0
 INFO_TASK = 1
 INFO_TIME = 2
 
-MENU_LABELS = ["Log", "Mute", "WP"] + [""] * (freeview.MATRIX_SIZE - 4) +\
-              ["Quit"]
+MENU_LABELS = ["WP", "Mute", "Log"] +\
+              [""] * (freeview.MATRIX_SIZE - 4) + ["Quit"]
 
 def format_latlon(lat, lon):
     lat_str = "%(deg)02d %(min)02d.%(dec)03d%(ns)s" % \
@@ -180,18 +180,28 @@ class FreeControl:
         if mode == 'matrix':
             if region_val != None:
                 if self.matrix_mode == 'maccready':
-                    self.flight.update_maccready(region_val * KTS_TO_MPS)
+                    if self.view.matrix_labels[region_val] == "TP":
+                        self.flight.task.set_glide_mode('TP')
+                    elif self.view.matrix_labels[region_val] == "Task":
+                        self.flight.task.set_glide_mode('Task')
+                    else:
+                        self.flight.update_maccready(region_val * KTS_TO_MPS)
+
                 elif self.matrix_mode == 'zoom':
                     self.view.set_zoom(region_val)
+
                 elif self.matrix_mode == 'menu':
                     if MENU_LABELS[region_val] == "Log":
                         self.view.track_log = not self.view.track_log
+
                     elif MENU_LABELS[region_val] == "Mute":
                         self.flarm_mute = not self.flarm_mute
                         self.view.set_mute_indicator(self.flarm_mute)
+
                     elif MENU_LABELS[region_val] == "WP":
                         self.wp_display = not self.wp_display
                         self.view.set_wp_display(self.wp_display)
+
                     elif MENU_LABELS[region_val] == "Quit":
                         response = self.view.confirm_dialog("Quit?")
                         if response != gtk.RESPONSE_NO:
@@ -235,8 +245,10 @@ class FreeControl:
                 maccready = (self.flight.task.get_glide()['maccready'] /
                              KTS_TO_MPS)
 
-                labels = [str(x) for x in range(9)]
-                selected = [maccready==int(m) for m in labels]
+                labels = [str(x) for x in range(9)] + ["TP", "Task"]
+                selected = [maccready==int(m) for m in labels[:9]] +\
+                           [self.flight.task.glide_mode == 'TP',
+                            self.flight.task.glide_mode == 'Task']
                 self.view.set_matrix(labels, selected)
 
             elif region_val == 'menu':
