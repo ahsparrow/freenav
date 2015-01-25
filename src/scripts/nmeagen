@@ -204,14 +204,22 @@ class NmeaApp:
     def open_stream(self, bt_flag, serial_dev, baud_rate): 
         if bt_flag:
             self.serv_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-            self.serv_sock.bind(("", RF_COMM_CHANNEL))
+            self.serv_sock.bind(("", bluetooth.PORT_ANY))
             self.serv_sock.listen(1)
+
+            uuid = "09833c09-95e2-4be0-ba00-5df21f493449"
+            bluetooth.advertise_service(
+               self.serv_sock, "FreenavServer",
+               service_id = uuid,
+               service_classes = [uuid, bluetooth.SERIAL_PORT_CLASS],
+               profiles = [bluetooth.SERIAL_PORT_PROFILE])
+
             gobject.io_add_watch(self.serv_sock, gobject.IO_IN,
                                  self.socket_listener)
             print "Listening for Bluetooth connection..."
         elif serial_dev:
-            ser = serial.Serial(serial_dev, baud_rate)
-            self.stream = gio.unix.OutputStream(ser.fd, True)
+            self.ser = serial.Serial(serial_dev, baud_rate)
+            self.stream = gio.unix.OutputStream(self.ser.fd, True)
             self.stream_is_open = True
         else:
             master_fd, slave_fd = pty.openpty()
