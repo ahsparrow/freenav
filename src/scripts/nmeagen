@@ -8,6 +8,7 @@ import time
 import pty
 import serial
 import signal
+import socket
 import termios
 
 import bluetooth
@@ -151,11 +152,13 @@ class NmeaGen:
         return (data + '*' + "%02X" + '\r\n') % checksum
 
 class NmeaApp:
-    def __init__(self, bt_flag, serial_dev, baud_rate, qnh, flarm_flag):
+    def __init__(self, bt_flag, tcp_port, serial_dev, baud_rate, qnh,
+                 flarm_flag):
         self.bt_flag = bt_flag
+        self.tcp_port = tcp_port
         self.stream_is_open = False
 
-        self.open_stream(bt_flag, serial_dev, baud_rate)
+        self.open_stream(bt_flag, tcp_port, serial_dev, baud_rate)
         self.nmea_gen = NmeaGen(qnh, flarm_flag)
 
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -201,7 +204,7 @@ class NmeaApp:
         self.window.add(vbox)
         self.window.show_all()
 
-    def open_stream(self, bt_flag, serial_dev, baud_rate): 
+    def open_stream(self, bt_flag, tcp_port, serial_dev, baud_rate): 
         if bt_flag:
             self.serv_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
             self.serv_sock.bind(("", bluetooth.PORT_ANY))
@@ -217,6 +220,11 @@ class NmeaApp:
             gobject.io_add_watch(self.serv_sock, gobject.IO_IN,
                                  self.socket_listener)
             print "Listening for Bluetooth connection..."
+        elif tcp_port > 0:
+            self.tcp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.tcp_sock.connect(("localhost", tcp_port))
+            self.stream = gio.unix.OutputStream(self.tcp_sock.fileno(), True)
+            self.stream_is_open = True
         elif serial_dev:
             self.ser = serial.Serial(serial_dev, baud_rate)
             self.stream = gio.unix.OutputStream(self.ser.fd, True)
@@ -285,9 +293,10 @@ def main():
     parser.add_option("-s", "--serial_dev", default=None, help="Serial device")
     parser.add_option("-r", "--baud_rate", default=4800,
                       help="Serial device baud rate")
+    parser.add_option("-t", "--tcp", default=0, help="TCP port number")
     (options, args) = parser.parse_args()
 
-    nmea_app = NmeaApp(options.bt_flag, options.serial_dev,
+    nmea_app = NmeaApp(options.bt_flag, int(options.tcp), options.serial_dev,
                        int(options.baud_rate), int(options.qnh),
                        options.flarm_flag)
     nmea_app.main()
